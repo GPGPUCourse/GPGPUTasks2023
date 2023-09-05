@@ -96,7 +96,7 @@ int main() {
             // - Размер памяти устройства в мегабайтах
             // - Еще пару или более свойств устройства, которые вам покажутся наиболее интересными
 
-            std::cout << "Device #" << (deviceIndex + 1) << "/" << devicesCount << std::endl;
+            std::cout << "    Device #" << (deviceIndex + 1) << "/" << devicesCount << std::endl;
 
             cl_device_id device = devices[deviceIndex];
             size_t deviceNameSize = 0;
@@ -141,12 +141,14 @@ int main() {
 
             std::vector<unsigned char> deviceVersion(deviceVersionSize, 0);
             OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_VERSION, deviceVersionSize, deviceVersion.data(), NULL));
-            std::cout << "        Device version: " << deviceVersion.data() << std::endl;
+            std::cout << "        Device OpenCL version: " << deviceVersion.data() << std::endl;
 
             cl_ulong deviceMaxMemAllocSize;
             OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_MAX_MEM_ALLOC_SIZE, sizeof(cl_ulong), &deviceMaxMemAllocSize, NULL));
             std::cout << "        Device max memory allocation size: " << (deviceMaxMemAllocSize >> 20) << " MB" << std::endl;
         }
+
+        std::cout << std::endl;
     }
 
     return 0;
