@@ -27,6 +27,32 @@ void reportError(cl_int err, const std::string &filename, int line) {
 
 #define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
 
+template<typename T>
+void printDeviceInfo(cl_device_id device, cl_device_info param_name, std::string message,
+                     T (*process_func)(T) = nullptr) {
+    T param = 0;
+    OCL_SAFE_CALL(clGetDeviceInfo(device, param_name, sizeof(T), &param, nullptr));
+    if (process_func != nullptr) {
+        param = process_func(param);
+    }
+    std::cout << message << param << std::endl;
+}
+
+template<>
+void printDeviceInfo<std::vector<unsigned char>>(
+        cl_device_id device, cl_device_info param_name, std::string message,
+        std::vector<unsigned char> (*process_func)(std::vector<unsigned char>)) {
+    size_t deviceParamSize = 0;
+    OCL_SAFE_CALL(clGetDeviceInfo(device, param_name, 0, nullptr, &deviceParamSize));
+
+    std::vector<unsigned char> deviceParam(deviceParamSize, 0);
+    OCL_SAFE_CALL(clGetDeviceInfo(device, param_name, deviceParamSize, deviceParam.data(), nullptr));
+    if (process_func != nullptr) {
+        deviceParam = process_func(deviceParam);
+    }
+    std::cout << message << deviceParam.data() << std::endl;
+}
+
 
 int main() {
     // Пытаемся слинковаться с символами OpenCL API в runtime (через библиотеку libs/clew)
@@ -99,51 +125,14 @@ int main() {
 
             std::cout << "    Device #" << (deviceIndex + 1) << "/" << devicesCount << std::endl;
 
-            // CL_DEVICE_NAME
-            size_t deviceNameSize = 0;
-            OCL_SAFE_CALL(clGetDeviceInfo(devices[deviceIndex], CL_DEVICE_NAME, 0, nullptr, &deviceNameSize));
-
-            std::vector<unsigned char> deviceName(deviceNameSize, 0);
-            OCL_SAFE_CALL(
-                    clGetDeviceInfo(devices[deviceIndex], CL_DEVICE_NAME, deviceNameSize, deviceName.data(), nullptr));
-            std::cout << "        Device name: " << deviceName.data() << std::endl;
-
-            // CL_DEVICE_TYPE
-            cl_device_type deviceType = 0;
-            OCL_SAFE_CALL(clGetDeviceInfo(devices[deviceIndex], CL_DEVICE_TYPE, sizeof(cl_device_type), &deviceType,
-                                          nullptr));
-
-            std::cout << "        Device type: " << deviceType << std::endl;
-
-            // CL_DEVICE_GLOBAL_MEM_SIZE
-            cl_ulong memSize = 0;
-            OCL_SAFE_CALL(clGetDeviceInfo(devices[deviceIndex], CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &memSize,
-                                          nullptr));
-
-            std::cout << "        Memory size in MB: " << (memSize >> 20)<< std::endl;
-
-            // CL_DEVICE_IMAGE_SUPPORT
-            cl_bool imageSupport = false;
-            OCL_SAFE_CALL(clGetDeviceInfo(devices[deviceIndex], CL_DEVICE_IMAGE_SUPPORT, sizeof(cl_bool),
-                                          &imageSupport,
-                                          nullptr));
-            
-            std::cout << "        Image support: " << imageSupport << std::endl;
-
-            // CL_DEVICE_GLOBAL_MEM_CACHE_SIZE
-            cl_ulong memCacheSize = 0;
-            OCL_SAFE_CALL(clGetDeviceInfo(devices[deviceIndex], CL_DEVICE_GLOBAL_MEM_CACHE_SIZE, sizeof(cl_ulong),
-                                          &memCacheSize,
-                                          nullptr));
-
-            std::cout << "        Memory cache size in KB: " << (memCacheSize >> 10) << std::endl;
-
-            // CL_DEVICE_MAX_SAMPLERS
-            cl_ulong maxSamplers = 0;
-            OCL_SAFE_CALL(clGetDeviceInfo(devices[deviceIndex], CL_DEVICE_MAX_SAMPLERS, sizeof(cl_ulong), &maxSamplers,
-                                          nullptr));
-
-            std::cout << "        Max samplers: " << maxSamplers << std::endl;
+            printDeviceInfo<std::vector<unsigned char>>(devices[deviceIndex], CL_DEVICE_NAME, "        Device name: ");
+            printDeviceInfo<cl_device_type>(devices[deviceIndex], CL_DEVICE_TYPE, "        Device name: ");
+            printDeviceInfo<cl_ulong>(devices[deviceIndex], CL_DEVICE_GLOBAL_MEM_SIZE,
+                                      "        Memory size in MB: ", [](cl_ulong x) { return x >> 20; });
+            printDeviceInfo<cl_bool>(devices[deviceIndex], CL_DEVICE_IMAGE_SUPPORT, "        Image support: ");
+            printDeviceInfo<cl_ulong>(devices[deviceIndex], CL_DEVICE_GLOBAL_MEM_CACHE_SIZE,
+                                      "        Memory cache size in KB: ", [](cl_ulong x) { return x >> 10; });
+            printDeviceInfo<cl_ulong>(devices[deviceIndex], CL_DEVICE_MAX_SAMPLERS, "        Max samplers: ");
         }
     }
 
