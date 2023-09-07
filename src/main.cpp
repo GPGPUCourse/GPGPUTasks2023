@@ -32,7 +32,6 @@ std::string stringFrom(cl_device_type type) {
     case CL_DEVICE_TYPE_GPU: return "gpu";
     case CL_DEVICE_TYPE_CPU: return "cpu";
     case CL_DEVICE_TYPE_ACCELERATOR: return "accelerator";
-    case CL_DEVICE_TYPE_CUSTOM: return "unsupported";
     case CL_DEVICE_TYPE_DEFAULT: return "default";
     default: return "unknown";
     }
@@ -120,7 +119,7 @@ int main() {
 
             cl_ulong size;
             OCL_SAFE_CALL(clGetDeviceInfo(devices[i], CL_DEVICE_GLOBAL_MEM_SIZE, sizeof size, &size, NULL));
-            printf("    size: %llu MB\n", size / 1024 / 1024);
+            printf("    size: %lu MB\n", size / 1024 / 1024);
 
             cl_bool isAvailable;
             OCL_SAFE_CALL(clGetDeviceInfo(devices[i], CL_DEVICE_AVAILABLE, sizeof isAvailable, &isAvailable, NULL));
