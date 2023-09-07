@@ -107,7 +107,7 @@ int main() {
         
         cl_uint devicesCount = 0;
         OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &devicesCount));
-        std::cout << "Number of OpenCL devices: " << devicesCount << std::endl;
+        std::cout << "    Number of OpenCL devices: " << devicesCount << std::endl;
         std::vector<cl_device_id> devices(devicesCount);
         OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, devicesCount, devices.data(), nullptr));
 
@@ -119,7 +119,7 @@ int main() {
             // - Размер памяти устройства в мегабайтах
             // - Еще пару или более свойств устройства, которые вам покажутся наиболее интересными
 
-            std::cout << "Device #" << (deviceIndex + 1) << "/" << devicesCount << std::endl;
+            std::cout << "    Device #" << (deviceIndex + 1) << "/" << devicesCount << std::endl;
             cl_device_id device = devices[deviceIndex];
 
             size_t deviceNameSize = 0;
