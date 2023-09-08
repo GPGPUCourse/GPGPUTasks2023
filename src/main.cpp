@@ -40,19 +40,21 @@ int main() {
     // Прочитайте документацию clGetPlatformIDs и убедитесь, что этот способ узнать, сколько есть платформ, соответствует документации:
 
     // Цитата из документации:
-    // Parameters
-    // num_entries
-    //     The number of cl_platform_id entries that can be added to platforms.
-    //     If platforms is not NULL, the num_entries must be greater than zero.
-    // platforms
-    //     Returns a list of OpenCL platforms found.
-    //     The cl_platform_id values returned in platforms can be used to identify a specific OpenCL platform.
-    //     If platforms argument is NULL, this argument is ignored.
-    //     The number of OpenCL platforms returned is the mininum of the value specified
-    //     by num_entries or the number of OpenCL platforms available.
-    // num_platforms
-    //     Returns the number of OpenCL platforms available.
-    //     If num_platforms is NULL, this argument is ignored.
+    /*
+    Parameters
+    num_entries
+        The number of cl_platform_id entries that can be added to platforms.
+        If platforms is not NULL, the num_entries must be greater than zero.
+    platforms
+        Returns a list of OpenCL platforms found.
+        The cl_platform_id values returned in platforms can be used to identify a specific OpenCL platform.
+        If platforms argument is NULL, this argument is ignored.
+        The number of OpenCL platforms returned is the mininum of the value specified
+        by num_entries or the number of OpenCL platforms available.
+    num_platforms
+        Returns the number of OpenCL platforms available.
+        If num_platforms is NULL, this argument is ignored.
+     */
     //
     // Таким образом, вызов метода с аргументами 0, nullptr и &platformsCount
     // поместит количество доступных платформ в platformsCount.
@@ -156,3 +158,26 @@ int main() {
 
     return 0;
 }
+
+// Получил вывод:
+/*
+Number of OpenCL platforms: 2
+Platform #1/2
+    Platform name: NVIDIA CUDA
+    Platform vendor: NVIDIA Corporation
+    Device #1/1
+        Device name: NVIDIA GeForce GTX 1060 6GB
+        Device type: 4
+        Device memory: 6069 MB
+        Device available? YES
+        Device little endian? YES
+Platform #2/2
+    Platform name: Portable Computing Language
+    Platform vendor: The pocl project
+    Device #1/1
+        Device name: cpu-AMD Ryzen 5 1500X Quad-Core Processor
+        Device type: 2
+        Device memory: 21938 MB
+        Device available? YES
+        Device little endian? YES
+ */
