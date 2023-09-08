@@ -100,7 +100,7 @@ int main() {
 
         // TODO 1.3
         // Запросите и напечатайте так же в консоль вендора данной платформы
-#define GET_INFO_ARRAY(func, type, vecName, id, param)                                                                       \
+#define GET_INFO_ARRAY(func, type, vecName, id, param)                                                                 \
     size_t vecName##Size = 0;                                                                                          \
     OCL_SAFE_CALL(func(id, param, 0, nullptr, &vecName##Size));                                                        \
     std::vector<type> vecName(vecName##Size);                                                                          \
