@@ -159,9 +159,9 @@ int main() {
                                           &deviceGlobalMemCacheSize,
                                           nullptr));
             std::cout << "        Memory size:" << std::endl;
-            std::cout << "            Local: " << deviceLocalMemSize / 1024 << " Kb" << std::endl;
-            std::cout << "            Global: " << deviceGlobalMemSize / 1024 / 1024.f << " Mb" << std::endl; // NOLINT(cppcoreguidelines-narrowing-conversions,bugprone-integer-division)
-            std::cout << "            Cache: " << deviceGlobalMemCacheSize / 1024 / 1024.f << " Mb" << std::endl; // NOLINT(cppcoreguidelines-narrowing-conversions,bugprone-integer-division)
+            std::cout << "            Local: " << deviceLocalMemSize / 1024 << " KiB" << std::endl;
+            std::cout << "            Global: " << deviceGlobalMemSize / 1024 / 1024.f << " MiB" << std::endl;
+            std::cout << "            Cache: " << deviceGlobalMemCacheSize / 1024 << " KiB" << std::endl;
 
 //            cl_device_id deviceParentDevice;
 //            OCL_SAFE_CALL(clGetDeviceInfo(deviceId,
