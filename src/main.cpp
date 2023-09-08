@@ -39,6 +39,13 @@ std::string getType(const cl_device_type &deviceType) {
 
 #define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
 
+std::vector<unsigned char> getInfo(const cl_device_id &device, const cl_device_info &info) {
+    size_t size = 0;
+    OCL_SAFE_CALL(clGetDeviceInfo(device, info, 0, nullptr, &size));
+    std::vector<unsigned char> deviceInfo(size, 0);
+    OCL_SAFE_CALL(clGetDeviceInfo(device, info, size, deviceInfo.data(), nullptr));
+    return deviceInfo;
+}
 
 int main() {
     // Пытаемся слинковаться с символами OpenCL API в runtime (через библиотеку libs/clew)
@@ -111,11 +118,7 @@ int main() {
 
             cl_device_id device = devices[deviceIndex];
 
-            size_t deviceNameSize = 0;
-            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &deviceNameSize));
-            std::vector<unsigned char> deviceName(deviceNameSize, 0);
-            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, deviceNameSize, deviceName.data(), nullptr));
-            std::cout << "        Name: " << deviceName.data() << std::endl;
+            std::cout << "        Name: " << getInfo(device, CL_DEVICE_NAME).data() << std::endl;
 
             cl_device_type deviceType;
             OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_TYPE, sizeof(cl_device_type), &deviceType, nullptr));
@@ -130,11 +133,7 @@ int main() {
                                           &deviceMemCacheLine, nullptr));
             std::cout << "        Memory cache line: " << deviceMemCacheLine << "B" << std::endl;
 
-            size_t deviceVersionSize = 0;
-            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_VERSION, 0, nullptr, &deviceVersionSize));
-            std::vector<unsigned char> deviceVersion(deviceVersionSize, 0);
-            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_VERSION, deviceVersionSize, deviceVersion.data(), nullptr));
-            std::cout << "        Version: " << deviceVersion.data() << std::endl;
+            std::cout << "        Version: " << getInfo(device, CL_DEVICE_VERSION).data() << std::endl;
         }
     }
 
