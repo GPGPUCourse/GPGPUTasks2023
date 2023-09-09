@@ -8,7 +8,6 @@
 
 #include "error_print.h"
 
-
 template<typename T>
 std::string to_string(T value) {
     std::ostringstream ss;
@@ -30,15 +29,33 @@ void reportError(cl_int err, const std::string &filename, int line) {
 
 #define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
 
-
-std::string getVendorName(cl_platform_id platform) {
+template<class ParamT, class ObjT, class OcvFuncT, class ParamProviderT, class ParamToRawConverterT>
+ParamT getInfo(ObjT object, cl_device_info param, OcvFuncT ocvFunc, ParamProviderT paramProvider,
+               ParamToRawConverterT convertToRawType) {
     size_t size = 0;
-    OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, 0, nullptr, &size));
-    std::string vendor(size, 0);
-    OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, size, &vendor[0], nullptr));
-    return vendor;
+    OCL_SAFE_CALL(ocvFunc(object, param, 0, nullptr, &size));
+    ParamT paramValue = paramProvider(size);
+    OCL_SAFE_CALL(ocvFunc(object, param, size, convertToRawType(paramValue), nullptr));
+    return paramValue;
 }
 
+template<class ParamT, class ObjT, class OcvFuncT>
+ParamT getInfo(ObjT object, cl_device_info param, OcvFuncT ocvFunc) {
+    ParamT paramValue;
+    OCL_SAFE_CALL(ocvFunc(object, param, sizeof(ParamT), &paramValue, nullptr));
+    return paramValue;
+}
+
+template<class ObjT, class OcvFuncT>
+std::string getStringInfo(ObjT object, cl_device_info param, OcvFuncT ocvFunc) {
+    return getInfo<std::string>(
+            object, param, ocvFunc, [](size_t size) { return std::string(size, 0); },
+            [](std::string &str) { return (void *) &str[0]; });
+}
+
+std::string getVendorName(cl_platform_id platform) {
+    return getStringInfo(platform, CL_PLATFORM_VENDOR, clGetPlatformInfo);
+}
 
 std::vector<cl_device_id> getDevices(cl_platform_id platform) {
     cl_uint devicesCount = 0;
@@ -48,32 +65,27 @@ std::vector<cl_device_id> getDevices(cl_platform_id platform) {
     return devices;
 }
 
-
-std::string getDeviceInfoStringParam(cl_device_id device, uint32_t param) {
-    size_t size = 0;
-    OCL_SAFE_CALL(clGetDeviceInfo(device, param, 0, nullptr, &size));
-    std::string paramValue(size, 0);
-    OCL_SAFE_CALL(clGetDeviceInfo(device, param, size, &paramValue[0], nullptr));
-    return paramValue;
+std::string getDeviceStringInfo(cl_device_id device, cl_device_info param) {
+    return getStringInfo(device, param, clGetDeviceInfo);
 }
 
 template<class T>
-T getDeviceInfoParam(cl_device_id device, uint32_t param) {
-    T paramValue{};
-    OCL_SAFE_CALL(clGetDeviceInfo(device, param, sizeof(T), &paramValue, nullptr));
-    return paramValue;
+T getDeviceInfo(cl_device_id device, cl_device_info param) {
+    return getInfo<T>(device, param, clGetDeviceInfo);
 }
 
-
 std::string getDeviceType(cl_device_id device) {
-    auto type = getDeviceInfoParam<cl_device_type>(device, CL_DEVICE_TYPE);
+    auto type = getDeviceInfo<cl_device_type>(device, CL_DEVICE_TYPE);
+    std::string res;
     if (type & CL_DEVICE_TYPE_CPU)
-        return "CPU";
+        res += "CPU ";
     if (type & CL_DEVICE_TYPE_GPU)
-        return "GPU";
+        res += "GPU ";
     if (type & CL_DEVICE_TYPE_ACCELERATOR)
-        return "ACCELERATOR";
-    return "UNKNOWN";
+        res += "ACCELERATOR ";
+    if (res.empty())
+        return "UNKNOWN";
+    return res;
 }
 
 int main() {
@@ -136,15 +148,21 @@ int main() {
             // - Еще пару или более свойств устройства, которые вам покажутся наиболее интересными
             cl_device_id device = devices[deviceIndex];
             std::cout << "    Device #" << (deviceIndex + 1) << "/" << devices.size() << std::endl;
-            std::cout << "        Device name: " << getDeviceInfoStringParam(device, CL_DEVICE_NAME) << std::endl;
+            std::cout << "        Device name: " << getDeviceStringInfo(device, CL_DEVICE_NAME) << std::endl;
             std::cout << "        Device type: " << getDeviceType(device) << std::endl;
-            auto globalMemSize =  getDeviceInfoParam<cl_ulong>(device, CL_DEVICE_GLOBAL_MEM_SIZE);
-            std::cout << "        Global memory size: " << globalMemSize << " (" << globalMemSize / (1<<20) << " MB)" << std::endl;
-            std::cout << "        Global memory cache size: " << getDeviceInfoParam<cl_ulong>(device, CL_DEVICE_GLOBAL_MEM_CACHE_SIZE) << std::endl;
-            std::cout << "        Global memory cache line size: " << getDeviceInfoParam<cl_uint>(device, CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE) << std::endl;
-            std::cout << "        Clock frequency: " << getDeviceInfoParam<cl_uint>(device, CL_DEVICE_MAX_CLOCK_FREQUENCY) << std::endl;
-            std::cout << "        Compute units: " << getDeviceInfoParam<cl_uint>(device, CL_DEVICE_MAX_COMPUTE_UNITS) << std::endl;
-            std::cout << "        Work group max size: " << getDeviceInfoParam<size_t>(device, CL_DEVICE_MAX_WORK_GROUP_SIZE) << std::endl;
+            auto globalMemSize = getDeviceInfo<cl_ulong>(device, CL_DEVICE_GLOBAL_MEM_SIZE);
+            std::cout << "        Global memory size: " << globalMemSize << " (" << (globalMemSize >> 20) << " MB)"
+                      << std::endl;
+            std::cout << "        Global memory cache size: "
+                      << getDeviceInfo<cl_ulong>(device, CL_DEVICE_GLOBAL_MEM_CACHE_SIZE) << std::endl;
+            std::cout << "        Global memory cache line size: "
+                      << getDeviceInfo<cl_uint>(device, CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE) << std::endl;
+            std::cout << "        Clock frequency: " << getDeviceInfo<cl_uint>(device, CL_DEVICE_MAX_CLOCK_FREQUENCY)
+                      << std::endl;
+            std::cout << "        Compute units: " << getDeviceInfo<cl_uint>(device, CL_DEVICE_MAX_COMPUTE_UNITS)
+                      << std::endl;
+            std::cout << "        Work group max size: " << getDeviceInfo<size_t>(device, CL_DEVICE_MAX_WORK_GROUP_SIZE)
+                      << std::endl;
         }
     }
 
