@@ -64,23 +64,82 @@ int main() {
         // Затем откройте документацию по clGetPlatformInfo и в секции Errors найдите ошибку, с которой столкнулись
         // в документации подробно объясняется, какой ситуации соответствует данная ошибка, и это позволит, проверив код, понять, чем же вызвана данная ошибка (некорректным аргументом param_name)
         // Обратите внимание, что в этом же libs/clew/CL/cl.h файле указаны всевоможные defines, такие как CL_DEVICE_TYPE_GPU и т.п.
+        //        OCL_SAFE_CALL(clGetPlatformInfo(platform, 239, 0, nullptr, &platformNameSize));
+
 
         // TODO 1.2
         // Аналогично тому, как был запрошен список идентификаторов всех платформ - так и с названием платформы, теперь, когда известна длина названия - его можно запросить:
         std::vector<unsigned char> platformName(platformNameSize, 0);
         // clGetPlatformInfo(...);
+        OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_NAME, platformNameSize, platformName.data(), nullptr));
         std::cout << "    Platform name: " << platformName.data() << std::endl;
 
         // TODO 1.3
         // Запросите и напечатайте так же в консоль вендора данной платформы
 
+        size_t platformVendorSize;
+        OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, 0, nullptr, &platformVendorSize));
+        std::vector<unsigned char> platformVendor(platformVendorSize, 0);
+        // clGetPlatformInfo(...);
+        OCL_SAFE_CALL(
+                clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, platformVendorSize, platformVendor.data(), nullptr));
+        std::cout << "    Platform vendor: " << platformVendor.data() << std::endl;
+
         // TODO 2.1
         // Запросите число доступных устройств данной платформы (аналогично тому, как это было сделано для запроса числа доступных платформ - см. секцию "OpenCL Runtime" -> "Query Devices")
         cl_uint devicesCount = 0;
+        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &devicesCount));
+        std::cout << "    Amount of devices: " << devicesCount << std::endl;
+
+        std::vector<cl_device_id> devices(devicesCount);
+        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, devicesCount, devices.data(), nullptr));
 
         for (int deviceIndex = 0; deviceIndex < devicesCount; ++deviceIndex) {
             // TODO 2.2
+
+            std::cout << "    Device #" << deviceIndex + 1 << "/" << devicesCount << std::endl;
+            cl_device_id device = devices[deviceIndex];
             // Запросите и напечатайте в консоль:
+            size_t deviceNameSize;
+            size_t deviceVersionSize;
+            size_t deviceDriverVersionSize;
+            cl_device_type deviceType;
+            cl_ulong deviceMemAmount;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &deviceNameSize));
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_VERSION, 0, nullptr, &deviceVersionSize));
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DRIVER_VERSION, 0, nullptr, &deviceDriverVersionSize));
+            std::vector<char> deviceName(deviceNameSize);
+            std::vector<char> deviceVersion(deviceVersionSize);
+            std::vector<char> deviceDriverVersion(deviceDriverVersionSize);
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, deviceNameSize, deviceName.data(), nullptr));
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_VERSION, deviceVersionSize, deviceVersion.data(), nullptr));
+            OCL_SAFE_CALL(clGetDeviceInfo
+            (
+                  device
+                , CL_DRIVER_VERSION
+                , deviceDriverVersionSize
+                , deviceDriverVersion.data()
+                , nullptr
+            ));
+
+            OCL_SAFE_CALL(clGetDeviceInfo(device,  CL_DEVICE_TYPE, sizeof(cl_device_type), &deviceType, nullptr));
+            OCL_SAFE_CALL(clGetDeviceInfo(device,  CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &deviceMemAmount, nullptr));
+            std::cout << "        Device name: " << deviceName.data() << std::endl;
+            std::cout << "        Device version: " << deviceVersion.data() << std::endl;
+            std::cout << "        Device driver version: " << deviceDriverVersion.data() << std::endl;
+            std::cout << "        Device memory amount: " << deviceMemAmount / 1024 / 1024 << std::endl;
+            switch (deviceType)
+            {
+                case CL_DEVICE_TYPE_GPU:
+                    std::cout << "        Device type: GPU" << std::endl;
+                    break;
+                case CL_DEVICE_TYPE_CPU:
+                    std::cout << "        Device type: CPU" << std::endl;
+                    break;
+                default:
+                    std::cout << "        Device type: Something wierd" << std::endl;
+            }
+
             // - Название устройства
             // - Тип устройства (видеокарта/процессор/что-то странное)
             // - Размер памяти устройства в мегабайтах
