@@ -31,11 +31,16 @@ Platform #1/1
 <details><summary>Вывод Github CI</summary><p>
 
 <pre>
-$ ./enumDevices
 Number of OpenCL platforms: 1
 Platform #1/1
-    Platform name: 
-The command "./enumDevices" exited with 0.
+    Platform name: Intel(R) CPU Runtime for OpenCL(TM) Applications
+    Platform vendor: Intel(R) Corporation
+    Number of platform devices: 1
+    Device #1/1
+        Device name: Intel(R) Xeon(R) Platinum 8272CL CPU @ 2.60GHz
+        Device type: 2
+        Device memory size: 32768
+        Device platform: FULL_PROFILE
 </pre>
 
 </p></details>
