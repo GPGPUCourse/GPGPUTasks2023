@@ -141,7 +141,14 @@ int main() {
             cl_ulong deviceMemCacheBytes = 0;
             OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_CACHE_SIZE, sizeof(cl_ulong),
                                           &deviceMemCacheBytes, nullptr));
-            std::cout << "        Device memory size: " << deviceMemCacheBytes / 1024 << " Kb" << std::endl;
+            std::cout << "        Device cache size: " << deviceMemCacheBytes / 1024 << " Kb" << std::endl;
+
+            size_t driverVersionSize = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DRIVER_VERSION, 0, nullptr, &driverVersionSize));
+            std::vector<unsigned char> driverVersion(driverVersionSize, 0);
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DRIVER_VERSION, driverVersionSize * sizeof(unsigned char),
+                                          driverVersion.data(), nullptr));
+            std::cout << "        Driver version: " << driverVersion.data() << std::endl;
         }
     }
 
