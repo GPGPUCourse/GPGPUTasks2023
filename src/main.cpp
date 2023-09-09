@@ -28,6 +28,22 @@ void reportError(cl_int err, const std::string &filename, int line) {
 #define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
 
 
+template<typename T, typename EntityId, typename OclGetter>
+T clGetScalarParam(EntityId entityId, size_t paramIndex, OclGetter oclGetter) {
+    T value;
+    OCL_SAFE_CALL(oclGetter(entityId, paramIndex, sizeof(value), &value, nullptr));
+    return value;
+}
+
+template<typename T, typename EntityId, typename OclGetter>
+std::vector<T> clGetVectorParam(EntityId entityId, size_t paramIndex, OclGetter oclGetter) {
+    size_t valueSize = 0;
+    OCL_SAFE_CALL(oclGetter(entityId, paramIndex, 0, nullptr, &valueSize));
+    std::vector<T> value(valueSize, 0);
+    OCL_SAFE_CALL(oclGetter(entityId, paramIndex, valueSize, value.data(), nullptr));
+    return value;
+}
+
 int main() {
     // Пытаемся слинковаться с символами OpenCL API в runtime (через библиотеку libs/clew)
     if (!ocl_init())
@@ -51,8 +67,8 @@ int main() {
 
         // Откройте документацию по "OpenCL Runtime" -> "Query Platform Info" -> "clGetPlatformInfo"
         // Не забывайте проверять коды ошибок с помощью макроса OCL_SAFE_CALL
-        size_t platformNameSize = 0;
-        OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_NAME, 0, nullptr, &platformNameSize));
+        //size_t platformNameSize = 0;
+        //OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_NAME, 0, nullptr, &platformNameSize));
         // TODO 1.1
         // Попробуйте вместо CL_PLATFORM_NAME передать какое-нибудь случайное число - например 239
         // Т.к. это некорректный идентификатор параметра платформы - то метод вернет код ошибки
@@ -64,19 +80,24 @@ int main() {
         // Затем откройте документацию по clGetPlatformInfo и в секции Errors найдите ошибку, с которой столкнулись
         // в документации подробно объясняется, какой ситуации соответствует данная ошибка, и это позволит, проверив код, понять, чем же вызвана данная ошибка (некорректным аргументом param_name)
         // Обратите внимание, что в этом же libs/clew/CL/cl.h файле указаны всевоможные defines, такие как CL_DEVICE_TYPE_GPU и т.п.
+        //OCL_SAFE_CALL(clGetPlatformInfo(platform, 239, 0, nullptr, &platformNameSize));
 
         // TODO 1.2
         // Аналогично тому, как был запрошен список идентификаторов всех платформ - так и с названием платформы, теперь, когда известна длина названия - его можно запросить:
-        std::vector<unsigned char> platformName(platformNameSize, 0);
-        // clGetPlatformInfo(...);
-        std::cout << "    Platform name: " << platformName.data() << std::endl;
+        //std::vector<unsigned char> platformName(platformNameSize, 0);
+        //OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_NAME, platformNameSize, platformName.data(), nullptr));
+        std::cout << "    Platform name: " << clGetVectorParam<unsigned char>(platform, CL_PLATFORM_NAME, clGetPlatformInfo).data() << std::endl;
 
         // TODO 1.3
         // Запросите и напечатайте так же в консоль вендора данной платформы
+        std::cout << "    Platform vendor: " << clGetVectorParam<unsigned char>(platform, CL_PLATFORM_VENDOR, clGetPlatformInfo).data() << std::endl;
 
         // TODO 2.1
         // Запросите число доступных устройств данной платформы (аналогично тому, как это было сделано для запроса числа доступных платформ - см. секцию "OpenCL Runtime" -> "Query Devices")
         cl_uint devicesCount = 0;
+        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &devicesCount));
+        std::vector<cl_device_id> devices(devicesCount, 0);
+        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, devicesCount, devices.data(), nullptr));
 
         for (int deviceIndex = 0; deviceIndex < devicesCount; ++deviceIndex) {
             // TODO 2.2
@@ -85,6 +106,14 @@ int main() {
             // - Тип устройства (видеокарта/процессор/что-то странное)
             // - Размер памяти устройства в мегабайтах
             // - Еще пару или более свойств устройства, которые вам покажутся наиболее интересными
+            std::cout << "    Device #" << deviceIndex + 1 << "/" << devicesCount << std::endl;
+            cl_device_id deviceId = devices[deviceIndex];
+            std::cout << "        Device name: " << clGetVectorParam<unsigned char>(deviceId, CL_DEVICE_NAME, clGetDeviceInfo).data() << std::endl;
+            std::cout << "        Device type: " << clGetVectorParam<unsigned char>(deviceId, CL_DEVICE_TYPE, clGetDeviceInfo).data() << std::endl;
+            std::cout << "        Device global memory size: " << clGetScalarParam<size_t>(deviceId, CL_DEVICE_GLOBAL_MEM_SIZE, clGetDeviceInfo) << std::endl;
+            std::cout << "        Device compute units: " << clGetScalarParam<cl_uint>(deviceId, CL_DEVICE_MAX_COMPUTE_UNITS, clGetDeviceInfo) << std::endl;
+            std::cout << "        Device image2d max width: " << clGetScalarParam<size_t>(deviceId, CL_DEVICE_IMAGE2D_MAX_WIDTH, clGetDeviceInfo) << std::endl;
+            std::cout << "        Device image2d max height: " << clGetScalarParam<size_t>(deviceId, CL_DEVICE_IMAGE2D_MAX_HEIGHT, clGetDeviceInfo) << std::endl;
         }
     }
 
