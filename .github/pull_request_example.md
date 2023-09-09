@@ -10,8 +10,14 @@
 $ ./enumDevices
 Number of OpenCL platforms: 1
 Platform #1/1
-    Platform name: 
-The command "./enumDevices" exited with 0.
+    Platform name: Intel(R) CPU Runtime for OpenCL(TM) Applications
+    Platform vendor: Intel(R) Corporation
+    Number of platform devices: 1
+    Device #1/1
+        Device name: AMD Ryzen 9 3900X 12-Core Processor            
+        Device type: 2
+        Device memory size: 32768
+        Device platform: FULL_PROFILE
 </pre>
 
 </p></details>
