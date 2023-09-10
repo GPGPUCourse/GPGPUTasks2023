@@ -44,6 +44,18 @@ std::vector<T> clGetVectorParam(EntityId entityId, size_t paramIndex, OclGetter 
     return value;
 }
 
+const char* strDeviceType(cl_device_type deviceType) {
+    switch (deviceType)
+    {
+    case CL_DEVICE_TYPE_CPU:
+        return "CPU";
+    case CL_DEVICE_TYPE_GPU:
+        return "GPU";
+    default:
+        return "other";
+    }
+}
+
 int main() {
     // Пытаемся слинковаться с символами OpenCL API в runtime (через библиотеку libs/clew)
     if (!ocl_init())
@@ -109,7 +121,7 @@ int main() {
             std::cout << "    Device #" << deviceIndex + 1 << "/" << devicesCount << std::endl;
             cl_device_id deviceId = devices[deviceIndex];
             std::cout << "        Device name: " << clGetVectorParam<unsigned char>(deviceId, CL_DEVICE_NAME, clGetDeviceInfo).data() << std::endl;
-            std::cout << "        Device type: " << clGetScalarParam<cl_device_type>(deviceId, CL_DEVICE_TYPE, clGetDeviceInfo) << std::endl;
+            std::cout << "        Device type: " << strDeviceType(clGetScalarParam<cl_device_type>(deviceId, CL_DEVICE_TYPE, clGetDeviceInfo)) << std::endl;
             std::cout << "        Device global memory size: " << clGetScalarParam<size_t>(deviceId, CL_DEVICE_GLOBAL_MEM_SIZE, clGetDeviceInfo) << std::endl;
             std::cout << "        Device compute units: " << clGetScalarParam<cl_uint>(deviceId, CL_DEVICE_MAX_COMPUTE_UNITS, clGetDeviceInfo) << std::endl;
             std::cout << "        Device image2d max width: " << clGetScalarParam<size_t>(deviceId, CL_DEVICE_IMAGE2D_MAX_WIDTH, clGetDeviceInfo) << std::endl;
