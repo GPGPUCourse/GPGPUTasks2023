@@ -135,7 +135,9 @@ int main() {
             std::cout << "        Memory: " << deviceMem / 1024 / 1024 << "MB" << std::endl;
 
             cl_uint deviceMemCacheLine;
-            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE, sizeof(cl_uint), &deviceMemCacheLine, nullptr));
+            OCL_SAFE_CALL(
+                    clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE, sizeof(cl_uint), &deviceMemCacheLine,
+                                    nullptr));
 
             std::cout << "        Memory cache line: " << deviceMemCacheLine << "B" << std::endl;
 
