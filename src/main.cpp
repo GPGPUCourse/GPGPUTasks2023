@@ -109,7 +109,7 @@ int main() {
             std::cout << "    Device #" << deviceIndex + 1 << "/" << devicesCount << std::endl;
             cl_device_id deviceId = devices[deviceIndex];
             std::cout << "        Device name: " << clGetVectorParam<unsigned char>(deviceId, CL_DEVICE_NAME, clGetDeviceInfo).data() << std::endl;
-            std::cout << "        Device type: " << clGetVectorParam<unsigned char>(deviceId, CL_DEVICE_TYPE, clGetDeviceInfo).data() << std::endl;
+            std::cout << "        Device type: " << clGetScalarParam<cl_device_type>(deviceId, CL_DEVICE_TYPE, clGetDeviceInfo) << std::endl;
             std::cout << "        Device global memory size: " << clGetScalarParam<size_t>(deviceId, CL_DEVICE_GLOBAL_MEM_SIZE, clGetDeviceInfo) << std::endl;
             std::cout << "        Device compute units: " << clGetScalarParam<cl_uint>(deviceId, CL_DEVICE_MAX_COMPUTE_UNITS, clGetDeviceInfo) << std::endl;
             std::cout << "        Device image2d max width: " << clGetScalarParam<size_t>(deviceId, CL_DEVICE_IMAGE2D_MAX_WIDTH, clGetDeviceInfo) << std::endl;
