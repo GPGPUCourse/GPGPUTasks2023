@@ -38,7 +38,16 @@ const char *getType(const cl_device_type &deviceType) {
 
 #define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
 
-std::vector<unsigned char> getInfo(const cl_device_id &device, const cl_device_info &info) {
+template<typename R>
+R getInfo(const cl_device_id &device, const cl_device_info &info) {
+    R value;
+    OCL_SAFE_CALL(clGetDeviceInfo(device, info, sizeof(R), &value, nullptr));
+
+    return value;
+}
+
+template<>
+std::vector<unsigned char> getInfo<std::vector<unsigned char>>(const cl_device_id &device, const cl_device_info &info) {
     size_t size = 0;
     OCL_SAFE_CALL(clGetDeviceInfo(device, info, 0, nullptr, &size));
 
@@ -122,26 +131,25 @@ int main() {
             std::cout << "    Devices #" << deviceIndex + 1 << "/" << devicesCount << std::endl;
             cl_device_id device = devices[deviceIndex];
 
-            std::cout << "        Name: " << getInfo(device, CL_DEVICE_NAME).data() << std::endl;
+            std::cout << "        Name: "
+                      << getInfo<std::vector<unsigned char>>(device, CL_DEVICE_NAME).data()
+                      << std::endl;
 
-            cl_device_type deviceType;
-            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_TYPE, sizeof(cl_device_type), &deviceType, nullptr));
+            std::cout << "        Type: "
+                      << getType(getInfo<cl_device_type>(device, CL_DEVICE_TYPE))
+                      << std::endl;
 
-            std::cout << "        Type: " << getType(deviceType) << std::endl;
+            std::cout << "        Memory: "
+                      << getInfo<cl_ulong>(device, CL_DEVICE_GLOBAL_MEM_SIZE) / 1024 / 1024
+                      << "MB" << std::endl;
 
-            cl_ulong deviceMem;
-            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &deviceMem, nullptr));
+            std::cout << "        Memory cache line: "
+                      << getInfo<cl_uint>(device, CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE)
+                      << "B" << std::endl;
 
-            std::cout << "        Memory: " << deviceMem / 1024 / 1024 << "MB" << std::endl;
-
-            cl_uint deviceMemCacheLine;
-            OCL_SAFE_CALL(
-                    clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_CACHELINE_SIZE, sizeof(cl_uint), &deviceMemCacheLine,
-                                    nullptr));
-
-            std::cout << "        Memory cache line: " << deviceMemCacheLine << "B" << std::endl;
-
-            std::cout << "        Version: " << getInfo(device, CL_DEVICE_VERSION).data() << std::endl;
+            std::cout << "        Version: "
+                      << getInfo<std::vector<unsigned char>>(device, CL_DEVICE_VERSION).data()
+                      << std::endl;
         }
     }
 
