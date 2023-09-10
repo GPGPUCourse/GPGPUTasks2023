@@ -27,6 +27,18 @@ void reportError(cl_int err, const std::string &filename, int line) {
 
 #define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
 
+std::string parseDeviceType(cl_device_type deviceType)
+{
+    if (deviceType & CL_DEVICE_TYPE_CPU) {
+        return "CPU";
+    } else if (deviceType & CL_DEVICE_TYPE_GPU) {
+        return "GPU";
+    } else if (deviceType & CL_DEVICE_TYPE_ACCELERATOR) {
+        return "ACCELERATOR";
+    } else {
+        return "UNKNOWN";
+    }
+}
 
 int main() {
     // Пытаемся слинковаться с символами OpenCL API в runtime (через библиотеку libs/clew)
@@ -68,23 +80,85 @@ int main() {
         // TODO 1.2
         // Аналогично тому, как был запрошен список идентификаторов всех платформ - так и с названием платформы, теперь, когда известна длина названия - его можно запросить:
         std::vector<unsigned char> platformName(platformNameSize, 0);
-        // clGetPlatformInfo(...);
+        OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_NAME, platformNameSize, platformName.data(), nullptr));
         std::cout << "    Platform name: " << platformName.data() << std::endl;
 
         // TODO 1.3
         // Запросите и напечатайте так же в консоль вендора данной платформы
 
+        size_t vendorNameSize = 0;
+        OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, 0, nullptr, &vendorNameSize));
+        std::vector<unsigned char> platformVendor(vendorNameSize);
+        OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, platformVendor.size(), platformVendor.data(), nullptr));
+        std::cout << "        Vendor name: " << platformVendor.data() << std::endl;
+
         // TODO 2.1
         // Запросите число доступных устройств данной платформы (аналогично тому, как это было сделано для запроса числа доступных платформ - см. секцию "OpenCL Runtime" -> "Query Devices")
         cl_uint devicesCount = 0;
+        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &devicesCount));
+        std::cout << "        Number of devices: " << devicesCount << std::endl;
+
+        std::vector<cl_device_id> devices(devicesCount);
+        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, devicesCount, devices.data(), nullptr));
 
         for (int deviceIndex = 0; deviceIndex < devicesCount; ++deviceIndex) {
+            std::cout << "        Device #" << deviceIndex + 1 << "/" << devicesCount << std::endl;
+            cl_device_id device = devices[deviceIndex];
             // TODO 2.2
             // Запросите и напечатайте в консоль:
             // - Название устройства
+            size_t deviceNameSize = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &deviceNameSize));
+            std::vector<unsigned char> deviceName(deviceNameSize);
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, deviceNameSize, deviceName.data(), nullptr));
+            std::cout << "            Device Name: " << deviceName.data() << std::endl;
+
             // - Тип устройства (видеокарта/процессор/что-то странное)
+            size_t deviceTypeSize = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_TYPE, 0, nullptr, &deviceTypeSize));
+            if (deviceTypeSize > sizeof(cl_device_type)) {
+                throw std::runtime_error("Size mismatch: required " + to_string(deviceTypeSize) + "; actual: " + to_string(sizeof(cl_device_type)));
+            }
+
+            cl_device_type deviceType = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_TYPE, deviceTypeSize, &deviceType, nullptr));
+            std::cout << "            Device Type: " << parseDeviceType(deviceType) << std::endl;
+
             // - Размер памяти устройства в мегабайтах
+            size_t deviceMemSize = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_SIZE, 0, nullptr, &deviceMemSize));
+            if (deviceMemSize > sizeof(cl_ulong)) {
+                throw std::runtime_error("Size mismatch: required " + to_string(deviceMemSize) + "; actual: " + to_string(sizeof(cl_ulong)));
+            }
+
+            cl_ulong deviceMem = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_SIZE, deviceMemSize, &deviceMem, nullptr));
+            std::cout << "            Device Global Memory (MB): " << deviceMem / 1e6 << std::endl;
+
             // - Еще пару или более свойств устройства, которые вам покажутся наиболее интересными
+            // -- Размер локальной памяти устройства
+            size_t deviceLocalMemSize = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_LOCAL_MEM_SIZE, 0, nullptr, &deviceLocalMemSize));
+            if (deviceLocalMemSize > sizeof(cl_ulong))
+            {
+                throw std::runtime_error("Size mismatch: required " + to_string(deviceLocalMemSize) + "; actual: " + to_string(sizeof(cl_ulong)));
+            }
+
+            cl_ulong deviceLocalMem = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_SIZE, deviceLocalMemSize, &deviceLocalMem, nullptr));
+            std::cout << "            Device Local Memory (MB): " << deviceLocalMem / 1e6 << std::endl;
+
+            // -- Количество compute units устройства
+            size_t deviceUnitsSize = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_MAX_COMPUTE_UNITS, 0, nullptr, &deviceUnitsSize));
+            if (deviceUnitsSize > sizeof(cl_uint))
+            {
+                throw std::runtime_error("Size mismatch: required " + to_string(deviceUnitsSize) + "; actual: " + to_string(sizeof(cl_uint)));
+            }
+
+            cl_uint deviceUnits = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_MAX_COMPUTE_UNITS, deviceUnitsSize, &deviceUnits, nullptr));
+            std::cout << "            Number of compute units: " << deviceUnits << std::endl;
         }
     }
 
