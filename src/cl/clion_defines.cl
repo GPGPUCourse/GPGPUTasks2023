@@ -3,6 +3,9 @@
 
 #ifdef __CLION_IDE__
 
+using size_t = unsigned long long;
+using uint = unsigned int;
+
 #define __kernel
 #define __global
 #define __local

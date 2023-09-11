@@ -31,6 +31,206 @@ void reportError(cl_int err, const std::string &filename, int line) {
 
 #define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
 
+// Немного упростим себе жизнь при вызовах геттеров
+
+template<typename Size, typename ElemPtr, typename Elem, typename... Args>
+class WArrayGetter
+{
+    using Getter = cl_int (*)(Args..., Size, ElemPtr, Size *);
+    Getter mGetter;
+
+public:
+    explicit WArrayGetter(Getter getter) noexcept : mGetter(getter) {
+    }
+
+    std::vector<Elem> operator()(Args... args) const {
+        Size count = 0;
+        OCL_SAFE_CALL(mGetter(args..., 0, nullptr, &count));
+        std::vector<Elem> result(count);
+        OCL_SAFE_CALL(mGetter(args..., count, &result[0], nullptr));
+        // Полагаемся на RVO
+        return result;
+    }
+};
+
+template<typename Elem, typename... Args>
+using WVecGetter = WArrayGetter<cl_uint, Elem *, Elem, Args...>;
+
+template<typename Char, typename... Args>
+using WStringGetter = WArrayGetter<size_t, void *, Char, Args...>;
+
+const WVecGetter<cl_platform_id> GetPlatformIDs(&clGetPlatformIDs);
+const WVecGetter<cl_device_id, cl_platform_id, cl_device_type> GetDeviceIDs(&clGetDeviceIDs);
+const WStringGetter<char, cl_platform_id, cl_platform_info> GetPlatformString(&clGetPlatformInfo);
+const WStringGetter<char, cl_device_id, cl_device_info> GetDeviceString(&clGetDeviceInfo);
+const WStringGetter<char, cl_program, cl_device_id, cl_program_build_info> GetProgramBuildInfo(clGetProgramBuildInfo);
+
+void SelectDevice(cl_platform_id *pOutPlatformId, cl_device_id *pOutDeviceId) {
+    cl_device_type bestType = CL_DEVICE_TYPE_ALL;
+    cl_ulong bestMem = 0;
+
+    std::vector<cl_platform_id> platformIdx = GetPlatformIDs();
+    for (cl_platform_id platformId : platformIdx) {
+        std::vector<cl_device_id> deviceIdx = GetDeviceIDs(platformId, CL_DEVICE_TYPE_ALL);
+        for (cl_device_id deviceId : deviceIdx) {
+            cl_device_type deviceType = 0;
+            cl_ulong deviceMem = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(deviceId, CL_DEVICE_TYPE, sizeof(deviceType), &deviceType, nullptr));
+            OCL_SAFE_CALL(clGetDeviceInfo(deviceId, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(deviceMem), &deviceMem, nullptr));
+
+            bool betterOption = bestMem == 0;
+            // TODO: use GPU
+            const cl_device_type IDEAL_TYPE = CL_DEVICE_TYPE_CPU;
+            betterOption |= deviceType == IDEAL_TYPE && bestType != IDEAL_TYPE;
+            betterOption |= deviceMem > bestMem;
+            betterOption &= !(deviceType != IDEAL_TYPE && bestType == IDEAL_TYPE);
+            if (!betterOption) {
+                continue;
+            }
+
+            *pOutPlatformId = platformId;
+            *pOutDeviceId = deviceId;
+            bestType = deviceType;
+            bestMem = deviceMem;
+        }
+    }
+}
+
+class WContext
+{
+    cl_context mContext = nullptr;
+
+    static void CL_CALLBACK HandleNotify(const char *errInfo, const void *privateInfo, size_t cb, void *userData) {
+        std::cerr << "[CL][err] " << errInfo << std::endl;
+    }
+
+public:
+    explicit WContext(cl_device_id deviceId) {
+        cl_int errCode = 0;
+        mContext = clCreateContext(nullptr, 1, &deviceId, &HandleNotify, nullptr, &errCode);
+        OCL_SAFE_CALL(errCode);
+    }
+
+    ~WContext() {
+        if (mContext) {
+            OCL_SAFE_CALL(clReleaseContext(mContext));
+        }
+    }
+
+    cl_context Get() const noexcept {
+        return mContext;
+    }
+};
+
+class WCommandQueue
+{
+    cl_command_queue mQueue = nullptr;
+
+public:
+    explicit WCommandQueue(cl_context context, cl_device_id deviceId, cl_command_queue_properties properties) {
+        cl_int errCode = 0;
+        mQueue = clCreateCommandQueue(context, deviceId, properties, &errCode);
+        OCL_SAFE_CALL(errCode);
+    }
+
+    ~WCommandQueue() {
+        if (mQueue) {
+            OCL_SAFE_CALL(clReleaseCommandQueue(mQueue));
+        }
+    }
+
+    cl_command_queue Get() const noexcept {
+        return mQueue;
+    }
+};
+
+class WBuffer
+{
+    cl_mem mBuffer = nullptr;
+
+public:
+    explicit WBuffer(cl_context context, cl_mem_flags flags, size_t size, void *pHost) {
+        cl_int errCode = 0;
+        mBuffer = clCreateBuffer(context, flags, size, pHost, &errCode);
+        OCL_SAFE_CALL(errCode);
+    }
+
+    ~WBuffer() {
+        if (mBuffer) {
+            clReleaseMemObject(mBuffer);
+        }
+    }
+
+    cl_mem Get() const noexcept {
+        return mBuffer;
+    }
+};
+
+class WProgram
+{
+    cl_program mProgram = nullptr;
+    cl_device_id mDeviceId = nullptr;
+
+public:
+    explicit WProgram(cl_context context, const std::string &source) {
+        const char *strings[] = {source.c_str()};
+        const size_t lengths[] = {source.size()};
+        cl_int errCode = 0;
+        mProgram = clCreateProgramWithSource(context, 1, strings, lengths, &errCode);
+        OCL_SAFE_CALL(errCode);
+    }
+
+    ~WProgram() {
+        if (mProgram) {
+            OCL_SAFE_CALL(clReleaseProgram(mProgram));
+        }
+    }
+
+    cl_program Get() const noexcept {
+        return mProgram;
+    }
+
+    void Build(cl_device_id deviceId, const char *options) {
+        mDeviceId = deviceId;
+        OCL_SAFE_CALL(clBuildProgram(mProgram, 1, &deviceId, options, nullptr, nullptr));
+    }
+
+    void PrintBuildLog() {
+        std::vector<char> buildLog = GetProgramBuildInfo(mProgram, mDeviceId, CL_PROGRAM_BUILD_LOG);
+        if (buildLog.size() <= 1) {
+            std::cout << "Build log is empty\n";
+        } else {
+            std::cout << "Build log:\n" << &buildLog[0] << std::endl;
+        }
+    }
+};
+
+class WKernel
+{
+    cl_kernel mKernel = nullptr;
+
+public:
+    explicit WKernel(cl_program program, const char *kernelName) {
+        cl_int errCode = 0;
+        mKernel = clCreateKernel(program, kernelName, &errCode);
+        OCL_SAFE_CALL(errCode);
+    }
+
+    ~WKernel() {
+        if (mKernel) {
+            clReleaseKernel(mKernel);
+        }
+    }
+
+    cl_kernel Get() const noexcept {
+        return mKernel;
+    }
+
+    template<typename T>
+    void SetArg(cl_uint argIndex, const T &arg) {
+        OCL_SAFE_CALL(clSetKernelArg(mKernel, argIndex, sizeof(T), &arg));
+    }
+};
 
 int main() {
     // Пытаемся слинковаться с символами OpenCL API в runtime (через библиотеку clew)
@@ -39,17 +239,26 @@ int main() {
 
     // TODO 1 По аналогии с предыдущим заданием узнайте, какие есть устройства, и выберите из них какое-нибудь
     // (если в списке устройств есть хоть одна видеокарта - выберите ее, если нету - выбирайте процессор)
+    cl_platform_id platformId = nullptr;
+    cl_device_id deviceId = nullptr;
+    SelectDevice(&platformId, &deviceId);
+
+    std::vector<char> platformName = GetPlatformString(platformId, CL_PLATFORM_NAME);
+    std::vector<char> deviceName = GetDeviceString(deviceId, CL_DEVICE_NAME);
+    std::cout << "Selected platform " << &platformName[0] << " and device " << &deviceName[0] << std::endl;
 
     // TODO 2 Создайте контекст с выбранным устройством
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Contexts -> clCreateContext
     // Не забывайте проверять все возвращаемые коды на успешность (обратите внимание, что в данном случае метод возвращает
     // код по переданному аргументом errcode_ret указателю)
     // И хорошо бы сразу добавить в конце clReleaseContext (да, не очень RAII, но это лишь пример)
+    WContext context(deviceId);
 
     // TODO 3 Создайте очередь выполняемых команд в рамках выбранного контекста и устройства
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Runtime APIs -> Command Queues -> clCreateCommandQueue
     // Убедитесь, что в соответствии с документацией вы создали in-order очередь задач
     // И хорошо бы сразу добавить в конце clReleaseQueue (не забывайте освобождать ресурсы)
+    WCommandQueue commandQueue(context.Get(), deviceId, 0);
 
     unsigned int n = 1000 * 1000;
     // Создаем два массива псевдослучайных данных для сложения и массив для будущего хранения результата
@@ -69,6 +278,9 @@ int main() {
     // Данные в as и bs можно прогрузить этим же методом, скопировав данные из host_ptr=as.data() (и не забыв про битовый флаг, на это указывающий)
     // или же через метод Buffer Objects -> clEnqueueWriteBuffer
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
+    WBuffer bufA(context.Get(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, n * sizeof(float), &as[0]);
+    WBuffer bufB(context.Get(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, n * sizeof(float), &bs[0]);
+    WBuffer bufC(context.Get(), CL_MEM_WRITE_ONLY, n * sizeof(float), nullptr);
 
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
@@ -86,9 +298,11 @@ int main() {
     // TODO 7 Создайте OpenCL-подпрограмму с исходниками кернела
     // см. Runtime APIs -> Program Objects -> clCreateProgramWithSource
     // у string есть метод c_str(), но обратите внимание, что передать вам нужно указатель на указатель
+    WProgram program(context.Get(), kernel_sources);
 
     // TODO 8 Теперь скомпилируйте программу и напечатайте в консоль лог компиляции
     // см. clBuildProgram
+    program.Build(deviceId, "");
 
     // А также напечатайте лог компиляции (он будет очень полезен, если в кернеле есть синтаксические ошибки - т.е. когда clBuildProgram вернет CL_BUILD_PROGRAM_FAILURE)
     // Обратите внимание, что при компиляции на процессоре через Intel OpenCL драйвер - в логе указывается, какой ширины векторизацию получилось выполнить для кернела
@@ -99,17 +313,19 @@ int main() {
     //        std::cout << "Log:" << std::endl;
     //        std::cout << log.data() << std::endl;
     //    }
+    program.PrintBuildLog();
 
     // TODO 9 Создайте OpenCL-kernel в созданной подпрограмме (в одной подпрограмме может быть несколько кернелов, но в данном случае кернел один)
     // см. подходящую функцию в Runtime APIs -> Program Objects -> Kernel Objects
+    WKernel kernel(program.Get(), "aplusb");
 
     // TODO 10 Выставите все аргументы в кернеле через clSetKernelArg (as_gpu, bs_gpu, cs_gpu и число значений, убедитесь, что тип количества элементов такой же в кернеле)
     {
-        // unsigned int i = 0;
-        // clSetKernelArg(kernel, i++, ..., ...);
-        // clSetKernelArg(kernel, i++, ..., ...);
-        // clSetKernelArg(kernel, i++, ..., ...);
-        // clSetKernelArg(kernel, i++, ..., ...);
+         unsigned int i = 0;
+         kernel.SetArg(i++, bufA.Get());
+         kernel.SetArg(i++, bufB.Get());
+         kernel.SetArg(i++, bufC.Get());
+         kernel.SetArg(i++, cl_ulong(n));
     }
 
     // TODO 11 Выше увеличьте n с 1000*1000 до 100*1000*1000 (чтобы дальнейшие замеры были ближе к реальности)
