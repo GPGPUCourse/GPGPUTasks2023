@@ -71,7 +71,7 @@ int main() {
     };
 
     cl_device_id device = nullptr;
-    getDevice(CL_DEVICE_TYPE_CPU, device);
+    getDevice(CL_DEVICE_TYPE_GPU, device);
 
     // TODO 2 Создайте контекст с выбранным устройством
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Contexts -> clCreateContext
@@ -126,7 +126,6 @@ int main() {
     {
         std::ifstream file("src/cl/aplusb.cl");
         kernel_source = std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
-        std::cout << kernel_source.size() << std::endl;
         if (kernel_source.size() == 0) {
             throw std::runtime_error("Empty source file! May be you forgot to configure working directory properly?");
         }
@@ -209,7 +208,7 @@ int main() {
         // - В гигафлопсе 10^9 флопсов
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
         const int e9 = 1e9;
-        std::cout << "GFlops: " << n / t.lapAvg() / e9 << std::endl;
+        std::cout << "GFlops: " << 1.0 * n / t.lapAvg() / e9 << std::endl;
 
         // TODO 14 Рассчитайте используемую пропускную способность обращений к видеопамяти (в гигабайтах в секунду)
         // - Всего элементов в массивах по n штук
@@ -218,7 +217,7 @@ int main() {
         // - В гигабайте 1024*1024*1024 байт
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
         const int x30 = 1 << 30;
-        std::cout << "VRAM bandwidth: " << 3 * n * sizeof(float) / t.lapAvg() / x30 << " GB/s" << std::endl;
+        std::cout << "VRAM bandwidth: " << 3.0 * n * sizeof(float) / t.lapAvg() / x30 << " GB/s" << std::endl;
     }
 
     // TODO 15 Скачайте результаты вычислений из видеопамяти (VRAM) в оперативную память (RAM) - из cs_gpu в cs (и рассчитайте скорость трансфера данных в гигабайтах в секунду)
@@ -233,7 +232,7 @@ int main() {
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         const int x30 = 1 << 30;
-        std::cout << "VRAM -> RAM bandwidth: " << n * sizeof(float) / t.lapAvg() / x30 << " GB/s" << std::endl;
+        std::cout << "VRAM -> RAM bandwidth: " << 1.0 * n * sizeof(float) / t.lapAvg() / x30 << " GB/s" << std::endl;
     }
 
     //TODO 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
