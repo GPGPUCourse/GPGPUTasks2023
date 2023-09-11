@@ -6,39 +6,22 @@
 #include <cassert>
 #include <fstream>
 #include <iostream>
-#include <sstream>
-#include <stdexcept>
 #include <vector>
 
-
-template<typename T>
-std::string to_string(T value) {
-    std::ostringstream ss;
-    ss << value;
-    return ss.str();
-}
-
-void reportError(cl_int err, const std::string &filename, int line) {
-    if (CL_SUCCESS == err)
-        return;
-
-    // Таблица с кодами ошибок:
-    // libs/clew/CL/cl.h:103
-    // P.S. Быстрый переход к файлу в CLion: Ctrl+Shift+N -> cl.h (или даже с номером строки: cl.h:103) -> Enter
-    std::string message = "OpenCL error code " + to_string(err) + " encountered at " + filename + ":" + to_string(line);
-    throw std::runtime_error(message);
-}
-
-#define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
-
+#include "error_handler.h"
+#include "helpers.h"
 
 int main() {
     // Пытаемся слинковаться с символами OpenCL API в runtime (через библиотеку clew)
-    if (!ocl_init())
+    if (!ocl_init()) {
         throw std::runtime_error("Can't init OpenCL driver!");
+    }
 
     // TODO 1 По аналогии с предыдущим заданием узнайте, какие есть устройства, и выберите из них какое-нибудь
     // (если в списке устройств есть хоть одна видеокарта - выберите ее, если нету - выбирайте процессор)
+
+    cl_device_id selectedDevice = helpers::selectDevice();
+    helpers::prettyPrintSelectedDevice(selectedDevice);
 
     // TODO 2 Создайте контекст с выбранным устройством
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Contexts -> clCreateContext
