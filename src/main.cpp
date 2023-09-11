@@ -72,6 +72,8 @@ int main() {
 
     cl_device_id device = nullptr;
     getDevice(CL_DEVICE_TYPE_GPU, device);
+    if (device == nullptr)
+        getDevice(CL_DEVICE_TYPE_CPU, device);
 
     // TODO 2 Создайте контекст с выбранным устройством
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Contexts -> clCreateContext
