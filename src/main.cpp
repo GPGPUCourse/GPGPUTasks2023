@@ -77,26 +77,26 @@ int main() {
     helpers::Holder<cl_mem, int (*)(_cl_mem *)>
             memAsHolder(clCreateBuffer(contextHolder.get(), CL_MEM_READ_ONLY, sizeBuff, nullptr, &errcode_ret),
                         clReleaseMemObject);
+    eh::OCL_SAFE_CALL(errcode_ret);
 
     helpers::Holder<cl_mem, int (*)(_cl_mem *)>
             memBsHolder(clCreateBuffer(contextHolder.get(), CL_MEM_READ_ONLY, sizeBuff, nullptr, &errcode_ret),
                         clReleaseMemObject);
+    eh::OCL_SAFE_CALL(errcode_ret);
 
     helpers::Holder<cl_mem, int (*)(_cl_mem *)>
             memCsHolder(clCreateBuffer(contextHolder.get(), CL_MEM_WRITE_ONLY, sizeBuff, nullptr, &errcode_ret),
                         clReleaseMemObject);
+    eh::OCL_SAFE_CALL(errcode_ret);
 
-    eh::OCL_SAFE_CALL(
-            clEnqueueWriteBuffer(queueHolder.get(), memAsHolder.get(), CL_TRUE, 0, sizeBuff, as.data(), 0, nullptr,
-                                 nullptr));
+    eh::OCL_SAFE_CALL(clEnqueueWriteBuffer(queueHolder.get(), memAsHolder.get(), CL_TRUE, 0, sizeBuff, as.data(),
+                                           0, nullptr, nullptr));
 
-    eh::OCL_SAFE_CALL(
-            clEnqueueWriteBuffer(queueHolder.get(), memBsHolder.get(), CL_TRUE, 0, sizeBuff, bs.data(), 0, nullptr,
-                                 nullptr));
+    eh::OCL_SAFE_CALL(clEnqueueWriteBuffer(queueHolder.get(), memBsHolder.get(), CL_TRUE, 0, sizeBuff, bs.data(),
+                                           0, nullptr, nullptr));
 
-    eh::OCL_SAFE_CALL(
-            clEnqueueWriteBuffer(queueHolder.get(), memCsHolder.get(), CL_TRUE, 0, sizeBuff, cs.data(), 0, nullptr,
-                                 nullptr));
+    eh::OCL_SAFE_CALL(clEnqueueWriteBuffer(queueHolder.get(), memCsHolder.get(), CL_TRUE, 0, sizeBuff, cs.data(),
+                                           0, nullptr, nullptr));
 
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
