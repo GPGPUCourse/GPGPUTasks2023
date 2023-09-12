@@ -35,9 +35,7 @@ int main() {
             contextHolder(clCreateContext(nullptr, 1, &selectedDevice, nullptr, nullptr, &errcode_ret),
                           clReleaseContext);
 
-    if (errcode_ret != CL_SUCCESS) {
-        eh::OCL_SAFE_CALL(errcode_ret);
-    }
+    eh::OCL_SAFE_CALL(errcode_ret);
 
     // TODO 3 Создайте очередь выполняемых команд в рамках выбранного контекста и устройства
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Runtime APIs -> Command Queues -> clCreateCommandQueue
