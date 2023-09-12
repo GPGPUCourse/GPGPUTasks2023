@@ -172,7 +172,8 @@ int main() {
     std::string kernel_sources;
     {
         
-        std::ifstream file("/home/boris/Documents/courses_2023_2024/GPGPUTasks2023/src/cl/aplusb.cl"); // !!!
+//         std::ifstream file("/home/boris/Documents/courses_2023_2024/GPGPUTasks2023/src/cl/aplusb.cl"); // !!!
+        std::ifstream file("src/cl/aplusb.cl");
         kernel_sources = std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
         if (kernel_sources.size() == 0) {
             throw std::runtime_error("Empty source file! May be you forgot to configure working directory properly?");
@@ -185,7 +186,8 @@ int main() {
     // у string есть метод c_str(), но обратите внимание, что передать вам нужно указатель на указатель
         
     
-    std::ifstream file("/home/boris/Documents/courses_2023_2024/GPGPUTasks2023/src/cl/aplusb.cl"); // !!!
+//     std::ifstream file("/home/boris/Documents/courses_2023_2024/GPGPUTasks2023/src/cl/aplusb.cl"); // !!!
+    std::ifstream file("src/cl/aplusb.cl");
     cl_uint count = 1;
     std::string s;
     while (getline(file, s)) {
