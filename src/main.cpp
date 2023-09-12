@@ -312,9 +312,8 @@ int main() {
     {
         timer t;
         for (unsigned int i = 0; i < 20; ++i) {
-            cl_event event;
-            OCL_SAFE_CALL(clEnqueueReadBuffer(command_queue, buffer_cs, CL_FALSE, sizeof(buffer_cs), 4, &cs, 0, nullptr, &event));
-            t.nextLap();
+            OCL_SAFE_CALL(clEnqueueReadBuffer(command_queue, buffer_cs, CL_TRUE, sizeof(buffer_cs), sizeof(float), &cs, 0, nullptr, nullptr));
+            OCL_SAFE_CALL(t.nextLap());
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         double bandwidth = n * 4 * 3 * n * 4 / 1024 / 1024 / 1024 * t.lapAvg();
