@@ -280,7 +280,7 @@ int main() {
     // И хорошо бы сразу добавить в конце clReleaseQueue (не забывайте освобождать ресурсы)
     WCommandQueue commandQueue(context.Get(), deviceId, 0);
 
-    size_t n = 100 * 1000 * 1000;
+    size_t n = 100 * 1000 * 1024;
     // Создаем два массива псевдослучайных данных для сложения и массив для будущего хранения результата
     std::vector<float> as(n, 0);
     std::vector<float> bs(n, 0);
@@ -298,9 +298,10 @@ int main() {
     // Данные в as и bs можно прогрузить этим же методом, скопировав данные из host_ptr=as.data() (и не забыв про битовый флаг, на это указывающий)
     // или же через метод Buffer Objects -> clEnqueueWriteBuffer
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
-    WBuffer bufA(context.Get(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, n * sizeof(float), &as[0]);
-    WBuffer bufB(context.Get(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, n * sizeof(float), &bs[0]);
-    WBuffer bufC(context.Get(), CL_MEM_WRITE_ONLY, n * sizeof(float), nullptr);
+    size_t bufSize = n * sizeof(float);
+    WBuffer bufA(context.Get(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, bufSize, &as[0]);
+    WBuffer bufB(context.Get(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, bufSize, &bs[0]);
+    WBuffer bufC(context.Get(), CL_MEM_WRITE_ONLY, bufSize, nullptr);
 
     // DONE 6 Выполните DONE 5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
@@ -391,14 +392,12 @@ int main() {
         // - Обращений к видеопамяти 2*n*sizeof(float) байт на чтение и 1*n*sizeof(float) байт на запись, т.е. итого 3*n*sizeof(float) байт
         // - В гигабайте 1024*1024*1024 байт
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
-        size_t transferredBytes = 3 * n * sizeof(float);
-        double bandwidthGBps = transferredBytes / (1024 * 1024 * 1024 * avgTime);// NOLINT
+        double bandwidthGBps = (3 * bufSize) / (1024 * 1024 * 1024 * avgTime);// NOLINT
         std::cout << "VRAM bandwidth: " << bandwidthGBps << " GB/s" << std::endl;
     }
 
     // DONE 15 Скачайте результаты вычислений из видеопамяти (VRAM) в оперативную память (RAM) - из cs_gpu в cs (и рассчитайте скорость трансфера данных в гигабайтах в секунду)
     {
-        size_t bufSize = n * sizeof(float);
         timer t;
         for (int i = 0; i < 20; ++i) {
             OCL_SAFE_CALL(clEnqueueReadBuffer(commandQueue.Get(), bufC.Get(), CL_TRUE, 0, bufSize, &cs[0], 0, nullptr,
