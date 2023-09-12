@@ -35,7 +35,7 @@ void reportError(cl_int err, const std::string &filename, int line) {
 // W от слова Wrapper, т.е. обёртка
 
 // unique_ptr для ресурсов OpenCL
-template<typename T, CL_API_ENTRY cl_int(*Destructor) CL_API_CALL(T), T NullVal = nullptr>
+template<typename T, CL_API_ENTRY cl_int CL_API_CALL (*Destructor)(T), T NullVal = nullptr>
 class WBox
 {
     T mElem;
@@ -87,7 +87,7 @@ public:
 template<typename Size, typename ElemPtr, typename Elem, typename... Args>
 class WArrayGetter
 {
-    using Getter = cl_int (*)(Args..., Size, ElemPtr, Size *);
+    using Getter = CL_API_ENTRY cl_int CL_API_CALL (*)(Args..., Size, ElemPtr, Size *);
     Getter mGetter;
 
 public:
@@ -114,7 +114,7 @@ const WVecGetter<cl_platform_id> GetPlatformIDs(&clGetPlatformIDs);
 const WVecGetter<cl_device_id, cl_platform_id, cl_device_type> GetDeviceIDs(&clGetDeviceIDs);
 const WStringGetter<char, cl_platform_id, cl_platform_info> GetPlatformString(&clGetPlatformInfo);
 const WStringGetter<char, cl_device_id, cl_device_info> GetDeviceString(&clGetDeviceInfo);
-const WStringGetter<char, cl_program, cl_device_id, cl_program_build_info> GetProgramBuildInfo(clGetProgramBuildInfo);
+const WStringGetter<char, cl_program, cl_device_id, cl_program_build_info> GetProgramBuildInfo(&clGetProgramBuildInfo);
 
 void SelectDevice(cl_platform_id *pOutPlatformId, cl_device_id *pOutDeviceId) {
     cl_device_type bestType = CL_DEVICE_TYPE_ALL;
