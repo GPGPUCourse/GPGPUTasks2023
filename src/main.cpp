@@ -31,7 +31,58 @@ void reportError(cl_int err, const std::string &filename, int line) {
 
 #define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
 
-// Немного упростим себе жизнь при вызовах геттеров
+// Немного упростим себе жизнь при вызовах OpenCL API
+// W от слова Wrapper, т.е. обёртка
+
+// unique_ptr для ресурсов OpenCL
+template<typename T, CL_API_ENTRY cl_int(*Destructor) CL_API_CALL(T), T NullVal = nullptr>
+class WBox
+{
+    T mElem;
+
+public:
+    WBox() noexcept : WBox(NullVal) {
+    }
+    WBox(T elem) noexcept : mElem(elem) {
+    }
+    ~WBox() {
+        Clear();
+    }
+
+    WBox(const WBox &) = delete;
+    WBox &operator=(const WBox &) = delete;
+
+    WBox(WBox &&rhs) noexcept : mElem(rhs.Release()) {
+    }
+
+    WBox &operator=(WBox &&rhs) noexcept {
+        if (this == &rhs) {
+            return *this;
+        }
+        Clear();
+        mElem = rhs.Release();
+        return *this;
+    }
+
+    T Get() const noexcept {
+        return mElem;
+    }
+
+    T Release() noexcept {
+        T retVal = mElem;
+        mElem = NullVal;
+        return retVal;
+    }
+
+    void Clear() {
+        if (mElem) {
+            if (Destructor) {
+                OCL_SAFE_CALL(Destructor(mElem));
+            }
+            mElem = NullVal;
+        }
+    }
+};
 
 template<typename Size, typename ElemPtr, typename Elem, typename... Args>
 class WArrayGetter
@@ -79,8 +130,7 @@ void SelectDevice(cl_platform_id *pOutPlatformId, cl_device_id *pOutDeviceId) {
             OCL_SAFE_CALL(clGetDeviceInfo(deviceId, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(deviceMem), &deviceMem, nullptr));
 
             bool betterOption = bestMem == 0;
-            // TODO: use GPU
-            const cl_device_type IDEAL_TYPE = CL_DEVICE_TYPE_CPU;
+            const cl_device_type IDEAL_TYPE = CL_DEVICE_TYPE_GPU;
             betterOption |= deviceType == IDEAL_TYPE && bestType != IDEAL_TYPE;
             betterOption |= deviceMem > bestMem;
             betterOption &= !(deviceType != IDEAL_TYPE && bestType == IDEAL_TYPE);
@@ -98,7 +148,7 @@ void SelectDevice(cl_platform_id *pOutPlatformId, cl_device_id *pOutDeviceId) {
 
 class WContext
 {
-    cl_context mContext = nullptr;
+    WBox<cl_context, clReleaseContext> mContext;
 
     static void CL_CALLBACK HandleNotify(const char *errInfo, const void *privateInfo, size_t cb, void *userData) {
         std::cerr << "[CL][err] " << errInfo << std::endl;
@@ -111,20 +161,14 @@ public:
         OCL_SAFE_CALL(errCode);
     }
 
-    ~WContext() {
-        if (mContext) {
-            OCL_SAFE_CALL(clReleaseContext(mContext));
-        }
-    }
-
     cl_context Get() const noexcept {
-        return mContext;
+        return mContext.Get();
     }
 };
 
 class WCommandQueue
 {
-    cl_command_queue mQueue = nullptr;
+    WBox<cl_command_queue, clReleaseCommandQueue> mQueue;
 
 public:
     explicit WCommandQueue(cl_context context, cl_device_id deviceId, cl_command_queue_properties properties) {
@@ -133,20 +177,14 @@ public:
         OCL_SAFE_CALL(errCode);
     }
 
-    ~WCommandQueue() {
-        if (mQueue) {
-            OCL_SAFE_CALL(clReleaseCommandQueue(mQueue));
-        }
-    }
-
     cl_command_queue Get() const noexcept {
-        return mQueue;
+        return mQueue.Get();
     }
 };
 
 class WBuffer
 {
-    cl_mem mBuffer = nullptr;
+    WBox<cl_mem, clReleaseMemObject> mBuffer;
 
 public:
     explicit WBuffer(cl_context context, cl_mem_flags flags, size_t size, void *pHost) {
@@ -155,20 +193,14 @@ public:
         OCL_SAFE_CALL(errCode);
     }
 
-    ~WBuffer() {
-        if (mBuffer) {
-            clReleaseMemObject(mBuffer);
-        }
-    }
-
     cl_mem Get() const noexcept {
-        return mBuffer;
+        return mBuffer.Get();
     }
 };
 
 class WProgram
 {
-    cl_program mProgram = nullptr;
+    WBox<cl_program, clReleaseProgram> mProgram;
     cl_device_id mDeviceId = nullptr;
 
 public:
@@ -180,23 +212,17 @@ public:
         OCL_SAFE_CALL(errCode);
     }
 
-    ~WProgram() {
-        if (mProgram) {
-            OCL_SAFE_CALL(clReleaseProgram(mProgram));
-        }
-    }
-
     cl_program Get() const noexcept {
-        return mProgram;
+        return mProgram.Get();
     }
 
     void Build(cl_device_id deviceId, const char *options) {
         mDeviceId = deviceId;
-        OCL_SAFE_CALL(clBuildProgram(mProgram, 1, &deviceId, options, nullptr, nullptr));
+        OCL_SAFE_CALL(clBuildProgram(Get(), 1, &deviceId, options, nullptr, nullptr));
     }
 
     void PrintBuildLog() {
-        std::vector<char> buildLog = GetProgramBuildInfo(mProgram, mDeviceId, CL_PROGRAM_BUILD_LOG);
+        std::vector<char> buildLog = GetProgramBuildInfo(Get(), mDeviceId, CL_PROGRAM_BUILD_LOG);
         if (buildLog.size() <= 1) {
             std::cout << "Build log is empty\n";
         } else {
@@ -207,7 +233,7 @@ public:
 
 class WKernel
 {
-    cl_kernel mKernel = nullptr;
+    WBox<cl_kernel, clReleaseKernel> mKernel;
 
 public:
     explicit WKernel(cl_program program, const char *kernelName) {
@@ -216,19 +242,13 @@ public:
         OCL_SAFE_CALL(errCode);
     }
 
-    ~WKernel() {
-        if (mKernel) {
-            clReleaseKernel(mKernel);
-        }
-    }
-
     cl_kernel Get() const noexcept {
-        return mKernel;
+        return mKernel.Get();
     }
 
     template<typename T>
     void SetArg(cl_uint argIndex, const T &arg) {
-        OCL_SAFE_CALL(clSetKernelArg(mKernel, argIndex, sizeof(T), &arg));
+        OCL_SAFE_CALL(clSetKernelArg(Get(), argIndex, sizeof(T), &arg));
     }
 };
 
@@ -237,7 +257,7 @@ int main() {
     if (!ocl_init())
         throw std::runtime_error("Can't init OpenCL driver!");
 
-    // TODO 1 По аналогии с предыдущим заданием узнайте, какие есть устройства, и выберите из них какое-нибудь
+    // DONE 1 По аналогии с предыдущим заданием узнайте, какие есть устройства, и выберите из них какое-нибудь
     // (если в списке устройств есть хоть одна видеокарта - выберите ее, если нету - выбирайте процессор)
     cl_platform_id platformId = nullptr;
     cl_device_id deviceId = nullptr;
@@ -247,32 +267,32 @@ int main() {
     std::vector<char> deviceName = GetDeviceString(deviceId, CL_DEVICE_NAME);
     std::cout << "Selected platform " << &platformName[0] << " and device " << &deviceName[0] << std::endl;
 
-    // TODO 2 Создайте контекст с выбранным устройством
+    // DONE 2 Создайте контекст с выбранным устройством
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Contexts -> clCreateContext
     // Не забывайте проверять все возвращаемые коды на успешность (обратите внимание, что в данном случае метод возвращает
     // код по переданному аргументом errcode_ret указателю)
     // И хорошо бы сразу добавить в конце clReleaseContext (да, не очень RAII, но это лишь пример)
     WContext context(deviceId);
 
-    // TODO 3 Создайте очередь выполняемых команд в рамках выбранного контекста и устройства
+    // DONE 3 Создайте очередь выполняемых команд в рамках выбранного контекста и устройства
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Runtime APIs -> Command Queues -> clCreateCommandQueue
     // Убедитесь, что в соответствии с документацией вы создали in-order очередь задач
     // И хорошо бы сразу добавить в конце clReleaseQueue (не забывайте освобождать ресурсы)
     WCommandQueue commandQueue(context.Get(), deviceId, 0);
 
-    unsigned int n = 1000 * 1000;
+    size_t n = 100 * 1000 * 1000;
     // Создаем два массива псевдослучайных данных для сложения и массив для будущего хранения результата
     std::vector<float> as(n, 0);
     std::vector<float> bs(n, 0);
     std::vector<float> cs(n, 0);
     FastRandom r(n);
-    for (unsigned int i = 0; i < n; ++i) {
+    for (size_t i = 0; i < n; ++i) {
         as[i] = r.nextf();
         bs[i] = r.nextf();
     }
     std::cout << "Data generated for n=" << n << "!" << std::endl;
 
-    // TODO 4 Создайте три буфера в памяти устройства (в случае видеокарты - в видеопамяти - VRAM) - для двух суммируемых массивов as и bs (они read-only) и для массива с результатом cs (он write-only)
+    // DONE 4 Создайте три буфера в памяти устройства (в случае видеокарты - в видеопамяти - VRAM) - для двух суммируемых массивов as и bs (они read-only) и для массива с результатом cs (он write-only)
     // См. Buffer Objects -> clCreateBuffer
     // Размер в байтах соответственно можно вычислить через sizeof(float)=4 и тот факт, что чисел в каждом массиве n штук
     // Данные в as и bs можно прогрузить этим же методом, скопировав данные из host_ptr=as.data() (и не забыв про битовый флаг, на это указывающий)
@@ -282,7 +302,7 @@ int main() {
     WBuffer bufB(context.Get(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, n * sizeof(float), &bs[0]);
     WBuffer bufC(context.Get(), CL_MEM_WRITE_ONLY, n * sizeof(float), nullptr);
 
-    // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
+    // DONE 6 Выполните DONE 5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
     // напечатав исходники в консоль (if проверяет, что удалось считать хоть что-то)
     std::string kernel_sources;
@@ -295,12 +315,12 @@ int main() {
         // std::cout << kernel_sources << std::endl;
     }
 
-    // TODO 7 Создайте OpenCL-подпрограмму с исходниками кернела
+    // DONE 7 Создайте OpenCL-подпрограмму с исходниками кернела
     // см. Runtime APIs -> Program Objects -> clCreateProgramWithSource
     // у string есть метод c_str(), но обратите внимание, что передать вам нужно указатель на указатель
     WProgram program(context.Get(), kernel_sources);
 
-    // TODO 8 Теперь скомпилируйте программу и напечатайте в консоль лог компиляции
+    // DONE 8 Теперь скомпилируйте программу и напечатайте в консоль лог компиляции
     // см. clBuildProgram
     program.Build(deviceId, "");
 
@@ -315,22 +335,22 @@ int main() {
     //    }
     program.PrintBuildLog();
 
-    // TODO 9 Создайте OpenCL-kernel в созданной подпрограмме (в одной подпрограмме может быть несколько кернелов, но в данном случае кернел один)
+    // DONE 9 Создайте OpenCL-kernel в созданной подпрограмме (в одной подпрограмме может быть несколько кернелов, но в данном случае кернел один)
     // см. подходящую функцию в Runtime APIs -> Program Objects -> Kernel Objects
     WKernel kernel(program.Get(), "aplusb");
 
-    // TODO 10 Выставите все аргументы в кернеле через clSetKernelArg (as_gpu, bs_gpu, cs_gpu и число значений, убедитесь, что тип количества элементов такой же в кернеле)
+    // DONE 10 Выставите все аргументы в кернеле через clSetKernelArg (as_gpu, bs_gpu, cs_gpu и число значений, убедитесь, что тип количества элементов такой же в кернеле)
     {
-         unsigned int i = 0;
-         kernel.SetArg(i++, bufA.Get());
-         kernel.SetArg(i++, bufB.Get());
-         kernel.SetArg(i++, bufC.Get());
-         kernel.SetArg(i++, cl_ulong(n));
+        cl_uint i = 0;
+        kernel.SetArg(i++, bufA.Get());
+        kernel.SetArg(i++, bufB.Get());
+        kernel.SetArg(i++, bufC.Get());
+        kernel.SetArg(i++, cl_ulong(n));
     }
 
-    // TODO 11 Выше увеличьте n с 1000*1000 до 100*1000*1000 (чтобы дальнейшие замеры были ближе к реальности)
+    // DONE 11 Выше увеличьте n с 1000*1000 до 100*1000*1000 (чтобы дальнейшие замеры были ближе к реальности)
 
-    // TODO 12 Запустите выполнения кернела:
+    // DONE 12 Запустите выполнения кернела:
     // - С одномерной рабочей группой размера 128
     // - В одномерном рабочем пространстве размера roundedUpN, где roundedUpN - наименьшее число, кратное 128 и при этом не меньшее n
     // - см. clEnqueueNDRangeKernel
@@ -341,50 +361,66 @@ int main() {
         size_t workGroupSize = 128;
         size_t global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
         timer t;// Это вспомогательный секундомер, он замеряет время своего создания и позволяет усреднять время нескольких замеров
-        for (unsigned int i = 0; i < 20; ++i) {
-            // clEnqueueNDRangeKernel...
-            // clWaitForEvents...
+        for (int i = 0; i < 20; ++i) {
+            // Здесь не так удобно делать обёртку
+            cl_event execEvent = nullptr;
+            OCL_SAFE_CALL(clEnqueueNDRangeKernel(commandQueue.Get(), kernel.Get(), 1, nullptr, &global_work_size,
+                                                 &workGroupSize, 0, nullptr, &execEvent));
+            OCL_SAFE_CALL(clWaitForEvents(1, &execEvent));
+            OCL_SAFE_CALL(clReleaseEvent(execEvent));
             t.nextLap();// При вызове nextLap секундомер запоминает текущий замер (текущий круг) и начинает замерять время следующего круга
         }
         // Среднее время круга (вычисления кернела) на самом деле считается не по всем замерам, а лишь с 20%-перцентайля по 80%-перцентайль (как и стандартное отклонение)
         // подробнее об этом - см. timer.lapsFiltered
         // P.S. чтобы в CLion быстро перейти к символу (функции/классу/много чему еще), достаточно нажать Ctrl+Shift+Alt+N -> lapsFiltered -> Enter
-        std::cout << "Kernel average time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        double avgTime = t.lapAvg();
+        std::cout << "Kernel average time: " << avgTime << "+-" << t.lapStd() << " s" << std::endl;
 
-        // TODO 13 Рассчитайте достигнутые гигафлопcы:
+        // DONE 13 Рассчитайте достигнутые гигафлопcы:
         // - Всего элементов в массивах по n штук
         // - Всего выполняется операций: операция a+b выполняется n раз
         // - Флопс - это число операций с плавающей точкой в секунду
         // - В гигафлопсе 10^9 флопсов
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
-        std::cout << "GFlops: " << 0 << std::endl;
+        double avgGFlops = 1e-9 * n / avgTime;// NOLINT
+        std::cout << "GFlops: " << avgGFlops << std::endl;
 
-        // TODO 14 Рассчитайте используемую пропускную способность обращений к видеопамяти (в гигабайтах в секунду)
+        // DONE 14 Рассчитайте используемую пропускную способность обращений к видеопамяти (в гигабайтах в секунду)
         // - Всего элементов в массивах по n штук
         // - Размер каждого элемента sizeof(float)=4 байта
         // - Обращений к видеопамяти 2*n*sizeof(float) байт на чтение и 1*n*sizeof(float) байт на запись, т.е. итого 3*n*sizeof(float) байт
         // - В гигабайте 1024*1024*1024 байт
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
-        std::cout << "VRAM bandwidth: " << 0 << " GB/s" << std::endl;
+        size_t transferredBytes = 3 * n * sizeof(float);
+        double bandwidthGBps = transferredBytes / (1024 * 1024 * 1024 * avgTime);// NOLINT
+        std::cout << "VRAM bandwidth: " << bandwidthGBps << " GB/s" << std::endl;
     }
 
-    // TODO 15 Скачайте результаты вычислений из видеопамяти (VRAM) в оперативную память (RAM) - из cs_gpu в cs (и рассчитайте скорость трансфера данных в гигабайтах в секунду)
+    // DONE 15 Скачайте результаты вычислений из видеопамяти (VRAM) в оперативную память (RAM) - из cs_gpu в cs (и рассчитайте скорость трансфера данных в гигабайтах в секунду)
     {
+        size_t bufSize = n * sizeof(float);
         timer t;
-        for (unsigned int i = 0; i < 20; ++i) {
-            // clEnqueueReadBuffer...
+        for (int i = 0; i < 20; ++i) {
+            OCL_SAFE_CALL(clEnqueueReadBuffer(commandQueue.Get(), bufC.Get(), CL_TRUE, 0, bufSize, &cs[0], 0, nullptr,
+                                              nullptr));
             t.nextLap();
         }
-        std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "VRAM -> RAM bandwidth: " << 0 << " GB/s" << std::endl;
+        double avgTime = t.lapAvg();
+        std::cout << "Result data transfer time: " << avgTime << "+-" << t.lapStd() << " s" << std::endl;
+        double bandwidthGBps = bufSize / (1024 * 1024 * 1024 * avgTime);// NOLINT
+        std::cout << "VRAM -> RAM bandwidth: " << bandwidthGBps << " GB/s" << std::endl;
     }
 
-    // TODO 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
-    //    for (unsigned int i = 0; i < n; ++i) {
-    //        if (cs[i] != as[i] + bs[i]) {
-    //            throw std::runtime_error("CPU and GPU results differ!");
-    //        }
-    //    }
+    // DONE 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
+    for (size_t i = 0; i < n; ++i) {
+        float expected = as[i] + bs[i];
+        float actual = cs[i];
+        float absDiff = abs(expected - actual);
+        bool matches = absDiff < 1e-5;
+        if (!matches) {
+            throw std::runtime_error("CPU and GPU results differ!");
+        }
+    }
 
     return 0;
 }
