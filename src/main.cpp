@@ -218,7 +218,6 @@ int main() {
 //     TODO 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
     for (unsigned int i = 0; i < n; ++i) {
         if (cs[i] != as[i] + bs[i]) {
-            std::cout << "cs: " << cs[i] << " " << i << " e" << as[i] + bs[i] << std::endl;
             throw std::runtime_error("CPU and GPU results differ!");
         }
     }
