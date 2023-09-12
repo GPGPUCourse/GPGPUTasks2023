@@ -44,7 +44,7 @@ namespace helpers {
 
             std::vector<cl_device_id> devices(numberDevices);
 
-            eh::OCL_SAFE_CALL(clGetDeviceIDs(platformId, CL_DEVICE_TYPE_GPU, numberDevices, devices.data(), nullptr));
+            eh::OCL_SAFE_CALL(clGetDeviceIDs(platformId, CL_DEVICE_TYPE_ALL, numberDevices, devices.data(), nullptr));
             selectedDevice = devices[0];
         }
         return selectedDevice;
