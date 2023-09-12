@@ -23,7 +23,7 @@ Linux (Рекомендуется Ubuntu 18.04, 20.04 или 22.04)
 
 1. Откройте https://software.intel.com/content/www/us/en/develop/tools/opencl-cpu-runtime.html
 2. Скачайте (требует регистрацию, [прямая ссылка для Ubuntu](http://registrationcenter-download.intel.com/akdlm/irc_nas/vcp/15532/l_opencl_p_18.1.0.015.tgz) - если не качает - попробуйте из-под инкогнито или [отсюда](https://disk.yandex.ru/d/dlVbMoI3tsPZfw))
-3. ``apt-get install -yq cpio``
+3. ``apt-get install -yq cpio lsb-core``
 4. ``tar -xzf l_opencl_p_18.1.0.015.tgz``
 5. ``sudo ./l_opencl_p_18.1.0.015/install.sh``
 6. Проведите установку.
