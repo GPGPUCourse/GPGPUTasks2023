@@ -86,7 +86,22 @@ namespace helpers {
         std::cout << "Name: " << getInfo<std::vector<unsigned char>>(device, CL_DEVICE_NAME).data() << std::endl;
         std::cout << "Type: " << getType(getInfo<cl_device_type>(device, CL_DEVICE_TYPE)) << std::endl;
         std::cout << "Version: " << getInfo<std::vector<unsigned char>>(device, CL_DEVICE_VERSION).data() << std::endl;
+        std::cout << std::endl;
     }
+
+    template<typename T, typename F>
+    class Holder {
+    private:
+        T holder_;
+        F release_;
+
+    public:
+        Holder(const T &o, const F &f) noexcept: holder_{o}, release_{f} {}
+
+        const T &get() const noexcept { return holder_; }
+
+        ~Holder() { release_(holder_); }
+    };
 }
 
 #endif //APLUSB_HELPERS_H
