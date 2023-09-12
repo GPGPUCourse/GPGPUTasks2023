@@ -130,10 +130,6 @@ int main() {
         return 1;
     }
 
-    std::cout << std::endl;
-    std::cout << "OK" << std::endl;
-    std::cout << std::endl;
-
     // TODO 3 Создайте очередь выполняемых команд в рамках выбранного контекста и устройства
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Runtime APIs -> Command Queues -> clCreateCommandQueue
     // Убедитесь, что в соответствии с документацией вы создали in-order очередь задач
