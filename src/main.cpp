@@ -31,7 +31,7 @@ void reportError(cl_int err, const std::string &filename, int line) {
 
 #define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
 
-cl_int getGpuDeviceId(cl_device_id *deviceIdIn) {
+cl_int getDeviceId(cl_device_id *deviceIdIn, cl_device_type deviceType) {
     cl_uint num_platforms;
     OCL_SAFE_CALL(clGetPlatformIDs(0, nullptr, &num_platforms));
     std::vector<cl_platform_id> platforms(num_platforms, nullptr);
@@ -39,7 +39,7 @@ cl_int getGpuDeviceId(cl_device_id *deviceIdIn) {
     cl_int return_value;
     for (auto platform: platforms) {
         cl_uint num_gpu_devices;
-        return_value = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, deviceIdIn, &num_gpu_devices);
+        return_value = clGetDeviceIDs(platform, deviceType, 1, deviceIdIn, &num_gpu_devices);
         if (return_value == CL_DEVICE_NOT_FOUND)
             continue;
         if (num_gpu_devices > 0)
@@ -55,7 +55,11 @@ int main() {
 
     // TODO 1 По аналогии с предыдущим заданием узнайте, какие есть устройства, и выберите из них какое-нибудь
     cl_device_id device;
-    OCL_SAFE_CALL(getGpuDeviceId(&device));
+    if (getDeviceId(&device, CL_DEVICE_TYPE_GPU) != CL_SUCCESS)
+    {
+        OCL_SAFE_CALL(getDeviceId(&device, CL_DEVICE_TYPE_CPU));
+        std::cout << "No suitable GPU devices found, using CPU." << std::endl;
+    }
     // (если в списке устройств есть хоть одна видеокарта - выберите ее, если нету - выбирайте процессор)
 
     // TODO 2 Создайте контекст с выбранным устройством
