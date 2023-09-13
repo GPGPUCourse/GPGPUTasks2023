@@ -50,7 +50,7 @@ int main() {
         eh::OCL_SAFE_CALL(errcode_ret);
     }
 
-    unsigned int n = 100 * 1000 * 1000;
+    const unsigned int n = 100 * 1000 * 1000;
     // Создаем два массива псевдослучайных данных для сложения и массив для будущего хранения результата
     std::vector<float> as(n, 0);
     std::vector<float> bs(n, 0);
@@ -103,7 +103,7 @@ int main() {
     {
         std::ifstream file("src/cl/aplusb.cl");
         kernel_sources = std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
-        if (kernel_sources.size() == 0) {
+        if (kernel_sources.empty()) {
             throw std::runtime_error("Empty source file! May be you forgot to configure working directory properly?");
         }
         // std::cout << kernel_sources << std::endl;
@@ -155,7 +155,7 @@ int main() {
         eh::OCL_SAFE_CALL(clSetKernelArg(kernelHolder.get(), i++, sizeof(cl_mem), &memAsHolder.get()));
         eh::OCL_SAFE_CALL(clSetKernelArg(kernelHolder.get(), i++, sizeof(cl_mem), &memBsHolder.get()));
         eh::OCL_SAFE_CALL(clSetKernelArg(kernelHolder.get(), i++, sizeof(cl_mem), &memCsHolder.get()));
-        eh::OCL_SAFE_CALL(clSetKernelArg(kernelHolder.get(), i++, sizeof(unsigned int), &sizeBuff));
+        eh::OCL_SAFE_CALL(clSetKernelArg(kernelHolder.get(), i++, sizeof(unsigned int), &n));
     }
 
     // TODO 11 Выше увеличьте n с 1000*1000 до 100*1000*1000 (чтобы дальнейшие замеры были ближе к реальности)
