@@ -35,6 +35,8 @@ void reportError(cl_int err, const std::string &filename, int line) {
 
 
 int main() {
+    cl_int error_code = 0;
+
     // Пытаемся слинковаться с символами OpenCL API в runtime (через библиотеку clew)
     if (!ocl_init())
         throw std::runtime_error("Can't init OpenCL driver!");
@@ -118,7 +120,6 @@ int main() {
     // Не забывайте проверять все возвращаемые коды на успешность (обратите внимание, что в данном случае метод возвращает
     // код по переданному аргументом errcode_ret указателю)
     // И хорошо бы сразу добавить в конце clReleaseContext (да, не очень RAII, но это лишь пример)
-    cl_int error_code = 0;
     cl_context_properties props[3] = { CL_CONTEXT_PLATFORM, (cl_context_properties)(bestPlatformId), 0 };
     cl_device_id devices[1] = { bestDeviceId };
     cl_context context;
@@ -129,11 +130,17 @@ int main() {
         printf("Error: Failed to create a compute context!\n");
         return 1;
     }
+    std::cout << "Context created successfully" << std::endl;
 
     // TODO 3 Создайте очередь выполняемых команд в рамках выбранного контекста и устройства
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Runtime APIs -> Command Queues -> clCreateCommandQueue
     // Убедитесь, что в соответствии с документацией вы создали in-order очередь задач
     // И хорошо бы сразу добавить в конце clReleaseQueue (не забывайте освобождать ресурсы)
+
+    cl_command_queue queue;
+    queue = clCreateCommandQueue(context, bestDeviceId, 0, &error_code);
+    OCL_SAFE_CALL(error_code);
+    std::cout << "Queue created successfully" << std::endl;
 
     unsigned int n = 1000 * 1000;
     // Создаем два массива псевдослучайных данных для сложения и массив для будущего хранения результата
@@ -153,6 +160,21 @@ int main() {
     // Данные в as и bs можно прогрузить этим же методом, скопировав данные из host_ptr=as.data() (и не забыв про битовый флаг, на это указывающий)
     // или же через метод Buffer Objects -> clEnqueueWriteBuffer
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
+
+    cl_mem_flags readBufferFlags = 0, writeBufferFlags = 0;
+    readBufferFlags |= CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR;
+    writeBufferFlags |= CL_MEM_WRITE_ONLY | CL_MEM_ALLOC_HOST_PTR;
+
+    cl_mem bufferA, bufferB, bufferC;
+    bufferA = clCreateBuffer(context, readBufferFlags, sizeof(float) * n, as.data(), &error_code);
+    OCL_SAFE_CALL(error_code);
+    bufferB = clCreateBuffer(context, readBufferFlags, sizeof(float) * n, bs.data(), &error_code);
+    OCL_SAFE_CALL(error_code);
+
+    bufferA = clCreateBuffer(context, writeBufferFlags, sizeof(float) * n, nullptr, &error_code);
+    OCL_SAFE_CALL(error_code);
+
+    std::cout << "Buffers created successfully" << std::endl;
 
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
@@ -253,6 +275,13 @@ int main() {
     //            throw std::runtime_error("CPU and GPU results differ!");
     //        }
     //    }
+
+    OCL_SAFE_CALL(clReleaseMemObject(bufferA));
+    OCL_SAFE_CALL(clReleaseMemObject(bufferB));
+    OCL_SAFE_CALL(clReleaseMemObject(bufferC));
+    
+    OCL_SAFE_CALL(clReleaseContext(context));
+    OCL_SAFE_CALL(clReleaseCommandQueue(queue));
 
     return 0;
 }
