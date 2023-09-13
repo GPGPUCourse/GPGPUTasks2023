@@ -38,13 +38,25 @@ int main() {
         throw std::runtime_error("Can't init OpenCL driver!");
 
     // TODO 1 По аналогии с предыдущим заданием узнайте, какие есть устройства, и выберите из них какое-нибудь
-    // (если в списке устройств есть хоть одна видеокарта - выберите ее, если нету - выбирайте процессор)
+    // (если в списке устройств есть хоть одна видеокарта - выберите ее, если нету - выбирайте процессор)x
+
+    // Из предыдущей домашки я знаю, что у меня всего лишь одна платформа с одним девайсом
+    cl_platform_id platform;
+    OCL_SAFE_CALL(clGetPlatformIDs(1, &platform, nullptr));
+    cl_device_id device;
+    OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 1, &device, nullptr));
+
+
 
     // TODO 2 Создайте контекст с выбранным устройством
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Contexts -> clCreateContext
     // Не забывайте проверять все возвращаемые коды на успешность (обратите внимание, что в данном случае метод возвращает
     // код по переданному аргументом errcode_ret указателю)
     // И хорошо бы сразу добавить в конце clReleaseContext (да, не очень RAII, но это лишь пример)
+
+    cl_int errCode;
+    cl_context context = clCreateContext(nullptr, 1, &device, nullptr, nullptr, &errCode);
+    OCL_SAFE_CALL(errCode);
 
     // TODO 3 Создайте очередь выполняемых команд в рамках выбранного контекста и устройства
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Runtime APIs -> Command Queues -> clCreateCommandQueue
@@ -105,11 +117,11 @@ int main() {
 
     // TODO 10 Выставите все аргументы в кернеле через clSetKernelArg (as_gpu, bs_gpu, cs_gpu и число значений, убедитесь, что тип количества элементов такой же в кернеле)
     {
-        // unsigned int i = 0;
-        // clSetKernelArg(kernel, i++, ..., ...);
-        // clSetKernelArg(kernel, i++, ..., ...);
-        // clSetKernelArg(kernel, i++, ..., ...);
-        // clSetKernelArg(kernel, i++, ..., ...);
+            // unsigned int i = 0;
+            // clSetKernelArg(kernel, i++, ..., ...);
+            // clSetKernelArg(kernel, i++, ..., ...);
+            // clSetKernelArg(kernel, i++, ..., ...);
+            // clSetKernelArg(kernel, i++, ..., ...);
     }
 
     // TODO 11 Выше увеличьте n с 1000*1000 до 100*1000*1000 (чтобы дальнейшие замеры были ближе к реальности)
@@ -170,5 +182,6 @@ int main() {
     //        }
     //    }
 
+    OCL_SAFE_CALL(clReleaseContext(context));
     return 0;
 }
