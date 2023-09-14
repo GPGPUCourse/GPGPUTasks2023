@@ -68,23 +68,76 @@ int main() {
         // TODO 1.2
         // Аналогично тому, как был запрошен список идентификаторов всех платформ - так и с названием платформы, теперь, когда известна длина названия - его можно запросить:
         std::vector<unsigned char> platformName(platformNameSize, 0);
-        // clGetPlatformInfo(...);
+        clGetPlatformInfo(platform, CL_PLATFORM_NAME, platformNameSize, platformName.data(), NULL);
         std::cout << "    Platform name: " << platformName.data() << std::endl;
 
         // TODO 1.3
         // Запросите и напечатайте так же в консоль вендора данной платформы
+        size_t platformVendorSize = 0;
+        OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, 0, nullptr, &platformVendorSize));
+
+        std::vector<unsigned char> platformVendor(platformVendorSize, 0);
+        clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, platformVendorSize, platformVendor.data(), NULL);
+        std::cout << "    Platform vendor: " << platformVendor.data() << std::endl;
 
         // TODO 2.1
         // Запросите число доступных устройств данной платформы (аналогично тому, как это было сделано для запроса числа доступных платформ - см. секцию "OpenCL Runtime" -> "Query Devices")
         cl_uint devicesCount = 0;
+        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, NULL, &devicesCount));
+        std::cout << "    Number of OpenCL devices: " << devicesCount << std::endl;
+
+        std::vector<cl_device_id> devices(devicesCount);
+        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, devicesCount, devices.data(), NULL));
 
         for (int deviceIndex = 0; deviceIndex < devicesCount; ++deviceIndex) {
+            std::cout << "    Device #" << (deviceIndex + 1) << "/" << devicesCount << std::endl;
+            cl_device_id device = devices[deviceIndex];
             // TODO 2.2
             // Запросите и напечатайте в консоль:
             // - Название устройства
+            size_t deviceNameSize = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &deviceNameSize));
+
+            std::vector<unsigned char> deviceName(deviceNameSize, 0);
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, deviceNameSize, deviceName.data(), nullptr));
+            std::cout << "      Device name: " << deviceName.data() << std::endl;
             // - Тип устройства (видеокарта/процессор/что-то странное)
+
+            cl_device_type deviceType;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_TYPE, sizeof(cl_device_type), &deviceType, nullptr));
+            std::cout << "      Device type(s): " << deviceName.data() << std::endl;
+            if (deviceType & (1 << 0))
+                std::cout << "          - "
+                          << "CL_DEVICE_TYPE_DEFAULT" << std::endl;
+            if (deviceType & (1 << 1))
+                std::cout << "          - "
+                          << "CL_DEVICE_TYPE_CPU" << std::endl;
+            if (deviceType & (1 << 2))
+                std::cout << "          - "
+                          << "CL_DEVICE_TYPE_GPU" << std::endl;
+            if (deviceType & (1 << 3))
+                std::cout << "          - "
+                          << "CL_DEVICE_TYPE_ACCELERATOR" << std::endl;
             // - Размер памяти устройства в мегабайтах
-            // - Еще пару или более свойств устройства, которые вам покажутся наиболее интересными
+            cl_ulong deviceMemorySizeInBytes;
+            float deviceMemorySizeInMBs;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(cl_ulong), &deviceMemorySizeInBytes,
+                                          nullptr));
+            std::cout << "      Device memory (MBs): " << (float) ((double) deviceMemorySizeInBytes / (double) 1e+6)
+                      << std::endl;
+            // - Максимальный размер (высота и ширина) в пикселях двумерной картинки
+            size_t maxHeight2D, maxWidth2D;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_IMAGE2D_MAX_HEIGHT, sizeof(size_t), &maxHeight2D, nullptr));
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_IMAGE2D_MAX_WIDTH, sizeof(size_t), &maxWidth2D, nullptr));
+            std::cout << "      Max size of 2D image (height, width) in pixels: "
+                      << "(" << maxHeight2D << ", " << maxWidth2D << ")"
+                      << std::endl;
+
+            // - Максимальный размер work group:
+            size_t maxWorkGroupSize;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t), &maxWorkGroupSize, nullptr));
+            std::cout << "      Max work group size: " << maxWorkGroupSize
+            << std::endl;
         }
     }
 
