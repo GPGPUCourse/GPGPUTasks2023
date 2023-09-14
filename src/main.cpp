@@ -240,5 +240,12 @@ int main() {
         }
     }
 
+    OCL_SAFE_CALL(clReleaseProgram(program));
+    OCL_SAFE_CALL(clReleaseKernel(kernel));
+    OCL_SAFE_CALL(clReleaseMemObject(a_gpu));
+    OCL_SAFE_CALL(clReleaseMemObject(b_gpu));
+    OCL_SAFE_CALL(clReleaseMemObject(c_gpu));
+    OCL_SAFE_CALL(clReleaseCommandQueue(command_queue));
+    OCL_SAFE_CALL(clReleaseContext(context));
     return 0;
 }
