@@ -27,12 +27,20 @@ void reportError(cl_int err, const std::string &filename, int line) {
 
 #define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
 
-void getDeviceInfo(cl_device_id device, cl_device_info param, const char *paramName) {
+template<typename T = unsigned char>
+T getDeviceInfo(cl_device_id device, cl_device_info param, const char *paramName) {
     size_t paramSize = 0;
     OCL_SAFE_CALL(clGetDeviceInfo(device, param, 0, nullptr, &paramSize));
-    std::vector<unsigned char> paramValue(paramSize, 0);
-    OCL_SAFE_CALL(clGetDeviceInfo(device, param, paramSize, &paramValue[0], nullptr));
-    std::cout << "\t    Device " << paramName << ": " << paramValue.data() << std::endl;
+    if (typeid(T) == typeid(unsigned char)) {
+        std::vector<T> paramValue(paramSize, 0);
+        OCL_SAFE_CALL(clGetDeviceInfo(device, param, paramSize, &paramValue[0], nullptr));
+        std::cout << "\t    Device " << paramName << ": " << paramValue.data() << std::endl;
+        return paramValue[0];
+    } else {
+        T paramValue;
+        OCL_SAFE_CALL(clGetDeviceInfo(device, param, paramSize, &paramValue, nullptr));
+        return paramValue;
+    }
 }
 
 int main() {
@@ -107,8 +115,33 @@ int main() {
             cl_device_id device = devices[deviceIndex];
 
             getDeviceInfo(device, CL_DEVICE_NAME, "name");
-            getDeviceInfo(device, CL_DEVICE_TYPE, "type");
-            getDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_SIZE, "memory");
+            cl_device_type clDeviceType = getDeviceInfo<cl_device_type>(device, CL_DEVICE_TYPE, "type");
+
+            if (clDeviceType == CL_DEVICE_TYPE_DEFAULT) {
+                std::cout << "\t    Device type: "
+                          << "DEFAULT" << std::endl;
+            }
+            if (clDeviceType == CL_DEVICE_TYPE_CPU) {
+                std::cout << "\t    Device type: "
+                          << "CPU" << std::endl;
+            }
+            if (clDeviceType == CL_DEVICE_TYPE_GPU) {
+                std::cout << "\t    Device type: "
+                          << "GPU" << std::endl;
+            }
+            if (clDeviceType == CL_DEVICE_TYPE_ACCELERATOR) {
+                std::cout << "\t    Device type: "
+                          << "ACCELERATOR" << std::endl;
+            }
+            if (clDeviceType == CL_DEVICE_TYPE_ALL) {
+                std::cout << "\t    Device type: "
+                          << "ALL" << std::endl;
+            }
+
+            cl_ulong memSize = getDeviceInfo<cl_ulong>(device, CL_DEVICE_GLOBAL_MEM_SIZE, "memory");
+            std::cout << "\t    Device "
+                      << "memory"
+                      << ": " << memSize / 1048576 << " MB" << std::endl;
             getDeviceInfo(device, CL_DEVICE_VENDOR, "vendor");
             getDeviceInfo(device, CL_DEVICE_VERSION, "version");
             getDeviceInfo(device, CL_DRIVER_VERSION, "driver version");
