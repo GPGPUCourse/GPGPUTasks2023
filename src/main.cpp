@@ -44,11 +44,11 @@ int run(cl_device_id device, std::vector<float> &as, std::vector<float> &bs) {
     // cl_mem aBuffer = createBufferFrom(context, as, CL_MEM_READ_ONLY);
     // cl_mem bBuffer = createBufferFrom(context, bs, CL_MEM_READ_ONLY);
 
-    cl_mem aBuffer = createBufferWithSize<float>(context, n, CL_MEM_READ_ONLY);
-    writeToBuffer(queue, aBuffer, as);
-    cl_mem bBuffer = createBufferWithSize<float>(context, n, CL_MEM_READ_ONLY);
-    writeToBuffer(queue, bBuffer, bs);
-    cl_mem cBuffer = createBufferWithSize<float>(context, n, CL_MEM_WRITE_ONLY);
+    cl_mem aBuffer = createBufferFrom(context, as, CL_MEM_READ_ONLY);
+    cl_mem bBuffer = createBufferFrom(context, bs, CL_MEM_READ_ONLY);
+
+    std::vector<float> cs(n);
+    cl_mem cBuffer = createBufferFrom(context, cs, CL_MEM_WRITE_ONLY);
 
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
@@ -148,12 +148,12 @@ int run(cl_device_id device, std::vector<float> &as, std::vector<float> &bs) {
         std::cout << "VRAM bandwidth: " << 3 * n * sizeof(float) / t.lapAvg() / (1 << 30) << " GB/s" << std::endl;
     }
 
-    std::vector<float> cs(n);
+    
     // TODO 15 Скачайте результаты вычислений из видеопамяти (VRAM) в оперативную память (RAM) - из cs_gpu в cs (и рассчитайте скорость трансфера данных в гигабайтах в секунду)
     {
         timer t;
         for (unsigned int i = 0; i < 40; ++i) {
-            readBufferTo(queue, cBuffer, n, cs);
+            readBufferTo(queue, cBuffer, cs);
             t.nextLap();
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;

@@ -122,18 +122,41 @@ inline void releaseQueue(cl_command_queue queue) {
     OCL_SAFE_CALL(clReleaseCommandQueue(queue));
 }
 
-template<class T>
-void writeToBuffer(cl_command_queue queue, cl_mem buffer, std::vector<T> values) {
-    auto size = values.size() * sizeof(T);
-    OCL_SAFE_CALL(clEnqueueWriteBuffer(queue, buffer, true, 0, size, values.data(), 0, nullptr, nullptr));
+inline void waitForEvent(cl_event event) {
+    OCL_SAFE_CALL(clWaitForEvents(1, &event));
 }
 
+template<class T>
+T *mapBuffer(cl_command_queue queue, cl_mem buffer, size_t count, cl_map_flags mapFlags) {
+    auto size = count * sizeof(T);
+    cl_int retCode;
+    void *ptr = clEnqueueMapBuffer(queue, buffer, true, mapFlags, 0, size, 0, nullptr, nullptr, &retCode);
+    OCL_SAFE_CALL(retCode);
+    return static_cast<T *>(ptr);
+}
+
+void unmapBuffer(cl_command_queue queue, cl_mem buffer, void *mappedPtr) {
+    OCL_SAFE_CALL(clEnqueueUnmapMemObject(queue, buffer, mappedPtr, 0, nullptr, nullptr));
+    OCL_SAFE_CALL(clFinish(queue));
+}
+
+
+template<class T>
+void writeToBuffer(cl_command_queue queue, cl_mem buffer, const T *values, size_t count) {
+    auto size = count * sizeof(T);
+    OCL_SAFE_CALL(clEnqueueWriteBuffer(queue, buffer, true, 0, size, values, 0, nullptr, nullptr));
+}
+
+template<class T>
+void writeToBuffer(cl_command_queue queue, cl_mem buffer, const std::vector<T> &values) {
+    writeToBuffer(queue, buffer, values.data(), values.size());
+}
 
 template<class T>
 cl_mem createBufferFrom(cl_context context, std::vector<T> &from, cl_mem_flags flags = {}) {
     cl_int retCode;
     auto size = from.size() * sizeof(T);
-    auto buffer = clCreateBuffer(context, flags | CL_MEM_COPY_HOST_PTR, size, from.data(), &retCode);
+    auto buffer = clCreateBuffer(context, flags | CL_MEM_USE_HOST_PTR, size, from.data(), &retCode);
     OCL_SAFE_CALL(retCode);
     return buffer;
 }
@@ -197,9 +220,6 @@ inline cl_event enqueueOneDimKernelExecution(cl_command_queue queue, cl_kernel k
     return event;
 }
 
-inline void waitForEvent(cl_event event) {
-    OCL_SAFE_CALL(clWaitForEvents(1, &event));
-}
 
 template<class T>
 inline void setKernelArg(cl_kernel kernel, unsigned int argIndex, const T &arg) {
@@ -214,7 +234,13 @@ inline std::vector<T> readBuffer(cl_command_queue queue, cl_mem buffer, size_t s
     return values;
 }
 
+
 template<class T>
-inline void readBufferTo(cl_command_queue queue, cl_mem buffer, size_t size, std::vector<T>& to) {
-    OCL_SAFE_CALL(clEnqueueReadBuffer(queue, buffer, CL_TRUE, 0, size * sizeof(T), to.data(), 0, nullptr, nullptr));
+inline void readBufferTo(cl_command_queue queue, cl_mem buffer, T *data, size_t count) {
+    OCL_SAFE_CALL(clEnqueueReadBuffer(queue, buffer, CL_TRUE, 0, count * sizeof(T), data, 0, nullptr, nullptr));
+}
+
+template<class T>
+inline void readBufferTo(cl_command_queue queue, cl_mem buffer, std::vector<T> &to) {
+    readBufferTo(queue, buffer, to.data(), to.size());
 }
