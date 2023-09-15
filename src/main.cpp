@@ -148,12 +148,12 @@ int run(cl_device_id device, std::vector<float> &as, std::vector<float> &bs) {
         std::cout << "VRAM bandwidth: " << 3 * n * sizeof(float) / t.lapAvg() / (1 << 30) << " GB/s" << std::endl;
     }
 
-    std::vector<float> cs;
+    std::vector<float> cs(n);
     // TODO 15 Скачайте результаты вычислений из видеопамяти (VRAM) в оперативную память (RAM) - из cs_gpu в cs (и рассчитайте скорость трансфера данных в гигабайтах в секунду)
     {
         timer t;
         for (unsigned int i = 0; i < 40; ++i) {
-            cs = readBuffer<float>(queue, cBuffer, n);
+            readBufferTo(queue, cBuffer, n, cs);
             t.nextLap();
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;

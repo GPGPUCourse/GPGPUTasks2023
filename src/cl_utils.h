@@ -210,6 +210,11 @@ inline void setKernelArg(cl_kernel kernel, unsigned int argIndex, const T &arg) 
 template<class T>
 inline std::vector<T> readBuffer(cl_command_queue queue, cl_mem buffer, size_t size) {
     std::vector<T> values(size);
-    clEnqueueReadBuffer(queue, buffer, CL_TRUE, 0, size * sizeof(T), values.data(), 0, nullptr, nullptr);
+    readBufferTo(queue, buffer, size, values);
     return values;
+}
+
+template<class T>
+inline void readBufferTo(cl_command_queue queue, cl_mem buffer, size_t size, std::vector<T>& to) {
+    OCL_SAFE_CALL(clEnqueueReadBuffer(queue, buffer, CL_TRUE, 0, size * sizeof(T), to.data(), 0, nullptr, nullptr));
 }
