@@ -9,6 +9,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <vector>
+#include <optional>
 
 
 template<typename T>
@@ -31,6 +32,58 @@ void reportError(cl_int err, const std::string &filename, int line) {
 
 #define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
 
+template<typename T, typename EntityId, typename OclGetter>
+T clGetScalarParam(EntityId entityId, size_t paramIndex, OclGetter oclGetter) {
+    T value;
+    OCL_SAFE_CALL(oclGetter(entityId, paramIndex, sizeof(value), &value, nullptr));
+    return value;
+}
+
+template<typename T, typename EntityId, typename OclGetter, typename Iterator>
+std::vector<T> clGetVectorParam(EntityId entityId, size_t paramIndex, OclGetter oclGetter) {
+    size_t valueSize = 0;
+    OCL_SAFE_CALL(oclGetter(entityId, paramIndex, 0, nullptr, &valueSize));
+    std::vector<T> value(valueSize, 0);
+    OCL_SAFE_CALL(oclGetter(entityId, paramIndex, valueSize, value.data(), nullptr));
+    return value;
+}
+
+template<typename T, typename EntityId, typename OclGetter>
+std::vector<T> clGetVectorParam(EntityId entityId, size_t paramIndex, OclGetter oclGetter) {
+    size_t valueSize = 0;
+    OCL_SAFE_CALL(oclGetter(entityId, paramIndex, 0, nullptr, &valueSize));
+    std::vector<T> value(valueSize, 0);
+    OCL_SAFE_CALL(oclGetter(entityId, paramIndex, valueSize, value.data(), nullptr));
+    return value;
+}
+
+const char* strDeviceType(cl_device_type deviceType) {
+    switch (deviceType)
+    {
+    case CL_DEVICE_TYPE_CPU:
+        return "CPU";
+    case CL_DEVICE_TYPE_GPU:
+        return "GPU";
+    default:
+        return "other";
+    }
+}
+
+std::vector<cl_platform_id> getPlatformsAvailable() {
+    cl_uint platformsCount = 0;
+    OCL_SAFE_CALL(clGetPlatformIDs(0, nullptr, &platformsCount));
+
+    std::vector<cl_platform_id> platforms(platformsCount);
+    OCL_SAFE_CALL(clGetPlatformIDs(platformsCount, platforms.data(), nullptr));
+
+    return platforms;
+}
+
+template<typename Iterator>
+size_t getDeviceOfType(cl_platform_id platform, cl_device_type deviceType, Iterator iterator) {
+    auto devices = clGetVectorParam<cl_device_id>(platform, deviceType, clGetDeviceIDs);
+    
+}
 
 int main() {
     // Пытаемся слинковаться с символами OpenCL API в runtime (через библиотеку clew)
@@ -39,6 +92,8 @@ int main() {
 
     // TODO 1 По аналогии с предыдущим заданием узнайте, какие есть устройства, и выберите из них какое-нибудь
     // (если в списке устройств есть хоть одна видеокарта - выберите ее, если нету - выбирайте процессор)
+
+    std::vector<cl_platform_id> platforms = getPlatformsAvailable();
 
     // TODO 2 Создайте контекст с выбранным устройством
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Contexts -> clCreateContext
