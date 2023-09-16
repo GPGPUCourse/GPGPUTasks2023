@@ -23,7 +23,7 @@ Device::operator cl_device_id() const {
 }
 
 std::string Device::GetName() const {
-    auto deviceName = GetVector<char>(clGetDeviceInfo, DeviceId_, CL_DEVICE_NAME);
+    auto deviceName = GetVector<char, size_t>(clGetDeviceInfo, DeviceId_, CL_DEVICE_NAME);
     return {deviceName.begin(), deviceName.end()};
 }
 
@@ -56,7 +56,7 @@ cl_uint Device::GetMaxComputeUnits() const {
 }
 
 std::vector<size_t> Device::GetWorkItemSizes() const {
-    return GetVector<size_t>(clGetDeviceInfo, DeviceId_, CL_DEVICE_MAX_WORK_ITEM_SIZES);
+    return GetVector<size_t, size_t>(clGetDeviceInfo, DeviceId_, CL_DEVICE_MAX_WORK_ITEM_SIZES);
 }
 
 std::string Device::GetDeviceInfo() const {

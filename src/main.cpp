@@ -21,8 +21,8 @@ int main() {
     // (если в списке устройств есть хоть одна видеокарта - выберите ее, если нету - выбирайте процессор)
 
     Device device(0);
-    for (auto platform : GetVector<cl_platform_id>(clGetPlatformIDs)) {
-        for (auto device_id : GetVector<cl_device_id>(clGetDeviceIDs, platform, CL_DEVICE_TYPE_ALL)) {
+    for (auto platform : GetVector<cl_platform_id, cl_uint>(clGetPlatformIDs)) {
+        for (auto device_id : GetVector<cl_device_id, cl_uint>(clGetDeviceIDs, platform, CL_DEVICE_TYPE_ALL)) {
             device = Device(device_id);
             if (device.GetDeviceType() & CL_DEVICE_TYPE_GPU) {
                 break;

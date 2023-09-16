@@ -44,40 +44,12 @@ R GetValue(Function function, Id id, Param param) {
     return result;
 }
 
-
-template<class R, class Function>
-std::vector<R> GetVector(Function function) {
-    size_t size = 0;
-    OCL_SAFE_CALL(function(0, nullptr, &size));
+template<class R, class Size, class Function, typename... Args>
+std::vector<R> GetVector(Function function, Args... args) {
+    Size size = 0;
+    OCL_SAFE_CALL(function(args...,  0, nullptr, &size));
     std::vector<R> result(size);
-    OCL_SAFE_CALL(function(size, result.data(), nullptr));
-    return result;
-}
-
-template<class R, class Function, class Id>
-std::vector<R> GetVector(Function function, Id id) {
-    size_t size = 0;
-    OCL_SAFE_CALL(function(id, 0, nullptr, &size));
-    std::vector<R> result(size);
-    OCL_SAFE_CALL(function(id, size, result.data(), nullptr));
-    return result;
-}
-
-template<class R, class Function, class Id, class Param>
-std::vector<R> GetVector(Function function, Id id, Param param) {
-    size_t size = 0;
-    OCL_SAFE_CALL(function(id, param, 0, nullptr, &size));
-    std::vector<R> result(size);
-    OCL_SAFE_CALL(function(id, param, size, result.data(), nullptr));
-    return result;
-}
-
-template<class R, class Function, class Id, class Param1, class Param2>
-std::vector<R> GetVector(Function function, Id id, Param1 param1, Param2 param2) {
-    size_t size = 0;
-    OCL_SAFE_CALL(function(id, param1, param2,  0, nullptr, &size));
-    std::vector<R> result(size);
-    OCL_SAFE_CALL(function(id, param1, param2, size, result.data(), nullptr));
+    OCL_SAFE_CALL(function(args..., size, result.data(), nullptr));
     return result;
 }
 

@@ -32,6 +32,6 @@ void Program::Build(cl_uint num_devices, const cl_device_id *device_list, const 
 }
 
 std::string Program::GetBuildLog(cl_device_id device) const {
-    std::vector<char> log = GetVector<char>(clGetProgramBuildInfo, Program_, device, CL_PROGRAM_BUILD_LOG);
+    std::vector<char> log = GetVector<char, size_t>(clGetProgramBuildInfo, Program_, device, CL_PROGRAM_BUILD_LOG);
     return {log.begin(), log.end()};
 }
