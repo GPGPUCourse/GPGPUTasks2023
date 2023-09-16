@@ -180,8 +180,8 @@ int main() {
         size_t workGroupSize = 128;
         size_t global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
         timer t;// Это вспомогательный секундомер, он замеряет время своего создания и позволяет усреднять время нескольких замеров
+        cl_event event;
         for (unsigned int i = 0; i < 20; ++i) {
-            cl_event event;
             OCL_SAFE_CALL(
                     clEnqueueNDRangeKernel(commandQueue, aplusbKernel, 1, nullptr, &global_work_size, &workGroupSize, 0,
                                            nullptr, &event));
@@ -197,15 +197,19 @@ int main() {
 
         std::cout << "VRAM bandwidth: " << double(n * sizeof(float) * 3) / t.lapAvg() / (1024 * 1024 * 1024) << " GB/s"
                   << std::endl;
+        OCL_SAFE_CALL(clReleaseEvent(event));
     }
 
     {
+        cl_event event;
         timer t;
         for (unsigned int i = 0; i < 20; ++i) {
             OCL_SAFE_CALL(clEnqueueReadBuffer(commandQueue, cBuf, CL_TRUE, 0, sizeof(float) * n, cs.data(), 0, nullptr,
-                                              nullptr));
+                                              &event));
+            OCL_SAFE_CALL(clWaitForEvents(1, &event));
             t.nextLap();
         }
+        OCL_SAFE_CALL(clReleaseEvent(event));
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "VRAM -> RAM bandwidth: " << double(n * sizeof(float)) / t.lapAvg() / (1 << 30) << " GB/s" << std::endl;
     }
@@ -217,12 +221,12 @@ int main() {
         }
     }
 
-    clReleaseKernel(aplusbKernel);
-    clReleaseProgram(aplusbProgram);
-    clReleaseMemObject(aBuf);
-    clReleaseMemObject(bBuf);
-    clReleaseMemObject(cBuf);
-    clReleaseCommandQueue(commandQueue);
-    clReleaseContext(context);
+    OCL_SAFE_CALL(clReleaseKernel(aplusbKernel));
+    OCL_SAFE_CALL(clReleaseProgram(aplusbProgram));
+    OCL_SAFE_CALL(clReleaseMemObject(aBuf));
+    OCL_SAFE_CALL(clReleaseMemObject(bBuf));
+    OCL_SAFE_CALL(clReleaseMemObject(cBuf));
+    OCL_SAFE_CALL(clReleaseCommandQueue(commandQueue));
+    OCL_SAFE_CALL(clReleaseContext(context));
     return 0;
 }
