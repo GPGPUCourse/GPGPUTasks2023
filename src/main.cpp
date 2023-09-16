@@ -181,7 +181,7 @@ int main() {
     // напечатав исходники в консоль (if проверяет, что удалось считать хоть что-то)
     std::string kernel_sources;
     {
-        std::ifstream file("../src/cl/aplusb.cl");
+        std::ifstream file("src/cl/aplusb.cl");
         kernel_sources = std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
         if (kernel_sources.size() == 0) {
             throw std::runtime_error("Empty source file! May be you forgot to configure working directory properly?");
