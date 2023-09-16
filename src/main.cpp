@@ -130,7 +130,7 @@ void SelectDevice(cl_platform_id *pOutPlatformId, cl_device_id *pOutDeviceId) {
             OCL_SAFE_CALL(clGetDeviceInfo(deviceId, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(deviceMem), &deviceMem, nullptr));
 
             bool betterOption = bestMem == 0;
-            const cl_device_type IDEAL_TYPE = CL_DEVICE_TYPE_GPU;
+            const cl_device_type IDEAL_TYPE = CL_DEVICE_TYPE_CPU;
             betterOption |= deviceType == IDEAL_TYPE && bestType != IDEAL_TYPE;
             betterOption |= deviceMem > bestMem;
             betterOption &= !(deviceType != IDEAL_TYPE && bestType == IDEAL_TYPE);
@@ -300,10 +300,10 @@ int main() {
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
     size_t bufSize = n * sizeof(float);
     cl_mem_flags srcBufFlags = CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR;
-    cl_mem_flags dstBufFlags = CL_MEM_WRITE_ONLY;
+    cl_mem_flags dstBufFlags = CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR;
     WBuffer bufA(context.Get(), srcBufFlags, bufSize, &as[0]);
     WBuffer bufB(context.Get(), srcBufFlags, bufSize, &bs[0]);
-    WBuffer bufC(context.Get(), dstBufFlags, bufSize, nullptr);
+    WBuffer bufC(context.Get(), dstBufFlags, bufSize, &cs[0]);
 
     // DONE 6 Выполните DONE 5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
