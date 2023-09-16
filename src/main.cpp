@@ -81,9 +81,8 @@ int main() {
     // код по переданному аргументом errcode_ret указателю)
     // И хорошо бы сразу добавить в конце clReleaseContext (да, не очень RAII, но это лишь пример)
 
-    std::vector<cl_device_id> devices(1, device);
     cl_int errorcode_ret = 0;
-    cl_context context = clCreateContext(nullptr, 1, devices.data(), nullptr, nullptr, &errorcode_ret);
+    cl_context context = clCreateContext(nullptr, 1, &device, nullptr, nullptr, &errorcode_ret);
     if (errorcode_ret != 0) exit(errorcode_ret);
 
     // TODO 3 Создайте очередь выполняемых команд в рамках выбранного контекста и устройства
@@ -113,9 +112,9 @@ int main() {
     // или же через метод Buffer Objects -> clEnqueueWriteBuffer
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
 
-    cl_mem arrayA = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR, n * sizeof(float), as.data(), &errorcode_ret);
+    cl_mem arrayA = clCreateBuffer(context, CL_MEM_USE_HOST_PTR, n * sizeof(float), as.data(), &errorcode_ret);
     if (errorcode_ret != 0) exit(errorcode_ret);
-    cl_mem arrayB = clCreateBuffer(context, CL_MEM_COPY_HOST_PTR, n * sizeof(float), bs.data(), &errorcode_ret);
+    cl_mem arrayB = clCreateBuffer(context, CL_MEM_USE_HOST_PTR, n * sizeof(float), bs.data(), &errorcode_ret);
     if (errorcode_ret != 0) exit(errorcode_ret);
     cl_mem arrayC = clCreateBuffer(context, CL_MEM_USE_HOST_PTR, n * sizeof(float), cs.data(), &errorcode_ret);
     if (errorcode_ret != 0) exit(errorcode_ret);
@@ -133,20 +132,19 @@ int main() {
         }
     }
 
-    std::vector<size_t> kernel_sources_sizes(1, kernel_source.size());
-    const char** kernel_sources = (const char**)malloc(1 * sizeof(const char*));
-    kernel_sources[0] = kernel_source.data();
-
     // TODO 7 Создайте OpenCL-подпрограмму с исходниками кернела
     // см. Runtime APIs -> Program Objects -> clCreateProgramWithSource
     // у string есть метод c_str(), но обратите внимание, что передать вам нужно указатель на указатель
-    cl_program program = clCreateProgramWithSource(context, 1, kernel_sources, kernel_sources_sizes.data(), &errorcode_ret);
+    const size_t kernel_source_size = kernel_source.size();
+    const char* kernel_source_data = kernel_source.data();
+
+    cl_program program = clCreateProgramWithSource(context, 1, &kernel_source_data, &kernel_source_size, &errorcode_ret);
     if (errorcode_ret != 0) exit(errorcode_ret);
 
     // TODO 8 Теперь скомпилируйте программу и напечатайте в консоль лог компиляции
     // см. clBuildProgram
     std::string options;
-    OCL_SAFE_CALL(clBuildProgram(program, 1, devices.data(), options.data(), nullptr, nullptr));
+    OCL_SAFE_CALL(clBuildProgram(program, 1, &device, options.data(), nullptr, nullptr));
 
     // А также напечатайте лог компиляции (он будет очень полезен, если в кернеле есть синтаксические ошибки - т.е. когда clBuildProgram вернет CL_BUILD_PROGRAM_FAILURE)
     // Обратите внимание, что при компиляции на процессоре через Intel OpenCL драйвер - в логе указывается, какой ширины векторизацию получилось выполнить для кернела
@@ -162,19 +160,17 @@ int main() {
 
     // TODO 9 Создайте OpenCL-kernel в созданной подпрограмме (в одной подпрограмме может быть несколько кернелов, но в данном случае кернел один)
     // см. подходящую функцию в Runtime APIs -> Program Objects -> Kernel Objects
-    cl_uint cntKernels = 0;
-    OCL_SAFE_CALL(clCreateKernelsInProgram(program, 0, nullptr, &cntKernels));
-    std::vector<cl_kernel> kernels(cntKernels);
-    OCL_SAFE_CALL(clCreateKernelsInProgram(program, cntKernels, kernels.data(), nullptr));
+    cl_kernel kernel = nullptr;
+    OCL_SAFE_CALL(clCreateKernelsInProgram(program, 1, &kernel, nullptr));
 
     // TODO 10 Выставите все аргументы в кернеле через clSetKernelArg (as_gpu, bs_gpu, cs_gpu и число значений, убедитесь, что тип количества элементов такой же в кернеле)
     {
         unsigned int i = 0;
-        OCL_SAFE_CALL(clSetKernelArg(kernels[0], i++, sizeof(cl_mem), &arrayA));
-        OCL_SAFE_CALL(clSetKernelArg(kernels[0], i++, sizeof(cl_mem), &arrayB));
-        OCL_SAFE_CALL(clSetKernelArg(kernels[0], i++, sizeof(cl_mem), &arrayC));
+        OCL_SAFE_CALL(clSetKernelArg(kernel, i++, sizeof(cl_mem), &arrayA));
+        OCL_SAFE_CALL(clSetKernelArg(kernel, i++, sizeof(cl_mem), &arrayB));
+        OCL_SAFE_CALL(clSetKernelArg(kernel, i++, sizeof(cl_mem), &arrayC));
 
-        OCL_SAFE_CALL(clSetKernelArg(kernels[0], i++, sizeof(unsigned int), &n));
+        OCL_SAFE_CALL(clSetKernelArg(kernel, i++, sizeof(unsigned int), &n));
     }
 
     // TODO 11 Выше увеличьте n с 1000*1000 до 100*1000*1000 (чтобы дальнейшие замеры были ближе к реальности)
@@ -193,7 +189,7 @@ int main() {
         for (unsigned int i = 0; i < 20; ++i) {
             // clEnqueueNDRangeKernel...
             cl_event event;
-            OCL_SAFE_CALL(clEnqueueNDRangeKernel(commandQueue, kernels[0], 1, nullptr, &global_work_size, &workGroupSize, 0, nullptr, &event));
+            OCL_SAFE_CALL(clEnqueueNDRangeKernel(commandQueue, kernel, 1, nullptr, &global_work_size, &workGroupSize, 0, nullptr, &event));
             // clWaitForEvents...
             OCL_SAFE_CALL(clWaitForEvents(1, &event));
             t.nextLap();// При вызове nextLap секундомер запоминает текущий замер (текущий круг) и начинает замерять время следующего круга
@@ -244,8 +240,6 @@ int main() {
         }
     }
 
-    OCL_SAFE_CALL(clReleaseKernel(kernels[0]));
-    free(kernel_sources);
     OCL_SAFE_CALL(clReleaseProgram(program));
     OCL_SAFE_CALL(clReleaseMemObject(arrayC));
     OCL_SAFE_CALL(clReleaseMemObject(arrayB));
