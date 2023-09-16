@@ -116,7 +116,6 @@ cl_program createProgramWithSource(cl_context context, const std::string &filePa
 
 void compileProgram(cl_program program, cl_device_id device) {
     cl_int err = clBuildProgram(program, 1, &device, nullptr, nullptr, nullptr);
-    OCL_SAFE_CALL(err);
 
     size_t log_size = 0;
     OCL_SAFE_CALL(clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size));
@@ -128,6 +127,7 @@ void compileProgram(cl_program program, cl_device_id device) {
         std::cout << "Log:" << std::endl;
         std::cout << log.data() << std::endl;
     }
+    OCL_SAFE_CALL(err);
 }
 
 
@@ -176,13 +176,6 @@ int main() {
         OCL_SAFE_CALL(clSetKernelArg(aplusbKernel, i++, sizeof(unsigned int), &n));
     }
 
-    // TODO 12 Запустите выполнения кернела:
-    // - С одномерной рабочей группой размера 128
-    // - В одномерном рабочем пространстве размера roundedUpN, где roundedUpN - наименьшее число, кратное 128 и при этом не меньшее n
-    // - см. clEnqueueNDRangeKernel
-    // - Обратите внимание, что, чтобы дождаться окончания вычислений (чтобы знать, когда можно смотреть результаты в cs_gpu) нужно:
-    //   - Сохранить событие "кернел запущен" (см. аргумент "cl_event *event")
-    //   - Дождаться завершения полунного события - см. в документации подходящий метод среди Event Objects
     {
         size_t workGroupSize = 128;
         size_t global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
