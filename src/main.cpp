@@ -280,7 +280,7 @@ int main() {
     // И хорошо бы сразу добавить в конце clReleaseQueue (не забывайте освобождать ресурсы)
     WCommandQueue commandQueue(context.Get(), deviceId, 0);
 
-    size_t n = 100 * 1000 * 1024;
+    size_t n = 100 * 1000 * 1000;
     // Создаем два массива псевдослучайных данных для сложения и массив для будущего хранения результата
     std::vector<float> as(n, 0);
     std::vector<float> bs(n, 0);
@@ -299,9 +299,11 @@ int main() {
     // или же через метод Buffer Objects -> clEnqueueWriteBuffer
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
     size_t bufSize = n * sizeof(float);
-    WBuffer bufA(context.Get(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, bufSize, &as[0]);
-    WBuffer bufB(context.Get(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, bufSize, &bs[0]);
-    WBuffer bufC(context.Get(), CL_MEM_WRITE_ONLY, bufSize, nullptr);
+    cl_mem_flags srcBufFlags = CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR;
+    cl_mem_flags dstBufFlags = CL_MEM_WRITE_ONLY;
+    WBuffer bufA(context.Get(), srcBufFlags, bufSize, &as[0]);
+    WBuffer bufB(context.Get(), srcBufFlags, bufSize, &bs[0]);
+    WBuffer bufC(context.Get(), dstBufFlags, bufSize, nullptr);
 
     // DONE 6 Выполните DONE 5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
