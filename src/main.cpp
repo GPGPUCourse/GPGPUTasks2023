@@ -115,8 +115,7 @@ int main() {
     cl_mem bs_gpu =
             clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(float) * n, bs.data(), &errorCode);
     OCL_SAFE_CALL(errorCode);
-    cl_mem cs_gpu =
-            clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * n, cs.data(), &errorCode);
+    cl_mem cs_gpu = clCreateBuffer(context, CL_MEM_WRITE_ONLY, sizeof(float) * n, NULL, &errorCode);
     OCL_SAFE_CALL(errorCode);
 
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
