@@ -72,16 +72,27 @@ int main() {
         // TODO 1.2
         // Аналогично тому, как был запрошен список идентификаторов всех платформ - так и с названием платформы, теперь, когда известна длина названия - его можно запросить:
         std::vector<unsigned char> platformName(platformNameSize, 0);
-        // clGetPlatformInfo(...);
+        clGetPlatformInfo(platform, CL_PLATFORM_NAME, platformNameSize, platformName.data(), nullptr);
         std::cout << "    Platform name: " << platformName.data() << std::endl;
 
         // TODO 1.3
         // Запросите и напечатайте так же в консоль вендора данной платформы
+        size_t platformVendorSize = 0;
+        OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, 0, nullptr, &platformVendorSize));
+        
+        std::vector<unsigned char> platformVendor(platformVendorSize, 0);
+        clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, platformVendorSize, platformVendor.data(), nullptr);
+        std::cout << "    Platform vendor: " << platformVendor.data() << std::endl;
 
         // TODO 2.1
         // Запросите число доступных устройств данной платформы (аналогично тому, как это было сделано для запроса числа доступных платформ - см. секцию "OpenCL Runtime" -> "Query Devices")
         cl_uint devicesCount = 0;
+        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &devicesCount));
+        std::cout << "    Number of devices: " << devicesCount << std::endl;
 
+        std::vector<cl_device_id> devices(devicesCount);
+        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, devicesCount, devices.data(), nullptr));
+      
         for (int deviceIndex = 0; deviceIndex < devicesCount; ++deviceIndex) {
             // TODO 2.2
             // Запросите и напечатайте в консоль:
@@ -89,6 +100,62 @@ int main() {
             // - Тип устройства (видеокарта/процессор/что-то странное)
             // - Размер памяти устройства в мегабайтах
             // - Еще пару или более свойств устройства, которые вам покажутся наиболее интересными
+
+
+
+            std::cout << "        Device #" << (deviceIndex + 1) << "/" << devicesCount << std::endl;
+            cl_device_id device = devices[deviceIndex];
+
+            size_t deviceNameSize = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &deviceNameSize));
+
+            std::vector<unsigned char> deviceName(deviceNameSize, 0);
+            clGetDeviceInfo(device, CL_DEVICE_NAME, deviceNameSize, deviceName.data(), nullptr);
+            std::cout << "        Device name: " << deviceName.data() << std::endl;
+
+
+            size_t deviceTypeSize = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_TYPE, 0, nullptr, &deviceTypeSize));
+
+            cl_device_type deviceType = 0;
+            clGetDeviceInfo(device, CL_DEVICE_TYPE, deviceTypeSize, &deviceType, nullptr);
+            std::cout << "        Device type: ";
+
+            if (deviceType == CL_DEVICE_TYPE_CPU) {
+                std::cout << "cpu" << std::endl;
+            } else if(deviceType == CL_DEVICE_TYPE_GPU) {
+                std::cout << "gpu" << std::endl;
+            } else {
+                std::cout << "???" << std::endl;
+            }
+
+            size_t deviceMemSizeSize = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_SIZE, 0, nullptr, &deviceMemSizeSize));
+
+            cl_ulong deviceMemSize = 0;
+            clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_SIZE, deviceMemSizeSize, &deviceMemSize, nullptr);
+            std::cout << "        Device memsize in Mb: " << deviceMemSize / (1024 * 1024) << std::endl;
+
+            size_t deviceDriverVersionSize = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DRIVER_VERSION, 0, nullptr, &deviceDriverVersionSize));
+
+            std::vector<unsigned char> deviceDriverVersion(deviceDriverVersionSize, 0);
+            clGetDeviceInfo(device, CL_DRIVER_VERSION, deviceDriverVersionSize, deviceDriverVersion.data(), nullptr);
+            std::cout << "        Device driver version: " << deviceDriverVersion.data() << std::endl;
+
+            size_t deviceImage2dMaxHeightSize = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_IMAGE2D_MAX_HEIGHT, 0, nullptr, &deviceImage2dMaxHeightSize));
+
+            size_t deviceImage2dMaxHeight = 0;
+            clGetDeviceInfo(device, CL_DEVICE_IMAGE2D_MAX_HEIGHT, deviceImage2dMaxHeightSize, &deviceImage2dMaxHeight, nullptr);
+            std::cout << "        Device image 2d max height: " << deviceImage2dMaxHeight << std::endl;
+
+            size_t deviceImage2dMaxWidthSize = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_IMAGE2D_MAX_WIDTH, 0, nullptr, &deviceImage2dMaxWidthSize));
+
+            size_t deviceImage2dMaxWidth = 0;
+            clGetDeviceInfo(device, CL_DEVICE_IMAGE2D_MAX_WIDTH, deviceImage2dMaxWidthSize, &deviceImage2dMaxWidth, nullptr);
+            std::cout << "        Device image 2d max height: " << deviceImage2dMaxWidth << std::endl;
         }
     }
 
