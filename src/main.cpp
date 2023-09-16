@@ -130,7 +130,7 @@ void SelectDevice(cl_platform_id *pOutPlatformId, cl_device_id *pOutDeviceId) {
             OCL_SAFE_CALL(clGetDeviceInfo(deviceId, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(deviceMem), &deviceMem, nullptr));
 
             bool betterOption = bestMem == 0;
-            const cl_device_type IDEAL_TYPE = CL_DEVICE_TYPE_CPU;
+            const cl_device_type IDEAL_TYPE = CL_DEVICE_TYPE_GPU;
             betterOption |= deviceType == IDEAL_TYPE && bestType != IDEAL_TYPE;
             betterOption |= deviceMem > bestMem;
             betterOption &= !(deviceType != IDEAL_TYPE && bestType == IDEAL_TYPE);
