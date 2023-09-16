@@ -67,7 +67,7 @@ int main() {
 
         // TODO 1.2
         // Аналогично тому, как был запрошен список идентификаторов всех платформ - так и с названием платформы, теперь, когда известна длина названия - его можно запросить:
-        std::vector<unsigned char> platformName(platformNameSize + 1, 0);
+        std::vector<unsigned char> platformName(platformNameSize, 0);
         // clGetPlatformInfo(...);
         OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_NAME, platformNameSize, platformName.data(), nullptr));
         std::cout << "    Platform name: " << platformName.data() << std::endl;
@@ -76,7 +76,7 @@ int main() {
         // Запросите и напечатайте так же в консоль вендора данной платформы
         size_t vendorNameSize = 0;
         OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, 0, nullptr, &vendorNameSize));
-        std::vector<unsigned char> vendorName(vendorNameSize + 1, 0);
+        std::vector<unsigned char> vendorName(vendorNameSize, 0);
         OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, vendorNameSize, vendorName.data(), nullptr));
         std::cout << "    Vendor name: " << vendorName.data() << std::endl;
 
@@ -89,7 +89,6 @@ int main() {
 
         size_t infoSize = 0;
         std::vector<unsigned char> deviceInfo;
-        deviceInfo.assign(256, 0);
 
         std::cout << "    Number of Devices: " << devicesCount << std::endl;
         for (int deviceIndex = 0; deviceIndex < devicesCount; ++deviceIndex) {
@@ -100,10 +99,10 @@ int main() {
             // - Размер памяти устройства в мегабайтах
             // - Еще пару или более свойств устройства, которые вам покажутся наиболее интересными
             auto device_id = devices[deviceIndex];
-            std::cout << "        Device(" << device_id << "): #" << deviceIndex << '/' << devicesCount << std::endl;
+            std::cout << "        Device(" << device_id << "): #" << deviceIndex + 1 << '/' << devicesCount << std::endl;
 
             OCL_SAFE_CALL(clGetDeviceInfo(device_id, CL_DEVICE_NAME, 0, nullptr, &infoSize));
-            deviceInfo.resize(infoSize + 1, 0);
+            deviceInfo.resize(infoSize, 0);
             OCL_SAFE_CALL(clGetDeviceInfo(device_id, CL_DEVICE_NAME, infoSize, deviceInfo.data(), nullptr));
             std::cout << "            NAME: " << deviceInfo.data() << std::endl;
 
