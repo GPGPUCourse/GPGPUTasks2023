@@ -48,7 +48,7 @@ cl_device_id getDevice() {
     cl_platform_id *platforms = (cl_platform_id*)calloc(platformCount, sizeof(cl_platform_id));
     CATCH(clGetPlatformIDs(platformCount, platforms, NULL));
     bool found = findDevice(platforms, platformCount, CL_DEVICE_TYPE_GPU, &device);
-    if (!found) findDevice(platforms, platformCount, CL_DEVICE_TYPE_CPU, &device);
+    if (!found) found = findDevice(platforms, platformCount, CL_DEVICE_TYPE_CPU, &device);
     free(platforms);
     if (!found) CATCH(CL_DEVICE_NOT_FOUND);
     return device;
