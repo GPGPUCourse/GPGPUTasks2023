@@ -6,6 +6,7 @@
 #define APLUSB_HELPERS_H
 
 #include <CL/cl.h>
+#include <memory>
 
 #include "error_handler.h"
 
@@ -93,19 +94,36 @@ namespace helpers {
     class Holder
     {
     private:
-        T holder_;
-        F *release_ = nullptr;
+        struct Wrapper {
+            T holder_;
+            F *release_;
+
+            Wrapper(const T &t, const F &f) noexcept : holder_{t}, release_{f} {
+            }
+
+            ~Wrapper() {
+                release_(holder_);
+            }
+        };
+
+        std::shared_ptr<Wrapper> wrapper = nullptr;
 
     public:
-        Holder(const T &t, const F &f) noexcept : holder_{t}, release_{f} {
+        Holder(const T &t, const F &f) noexcept : wrapper{new Wrapper(t, f)} {
+        }
+
+        Holder(const Holder<T, F> &obj) noexcept : wrapper{obj.wrapper} {
+        }
+
+        Holder<T, F> &operator=(const Holder<T, F> &obj) noexcept {
+            if (this != &obj) {
+                wrapper = obj.wrapper;
+            }
+            return *this;
         }
 
         const T &get() const noexcept {
-            return holder_;
-        }
-
-        ~Holder() {
-            release_(holder_);
+            return wrapper->holder_;
         }
     };
 
