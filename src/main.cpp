@@ -31,6 +31,7 @@ void reportError(cl_int err, const std::string &filename, int line) {
 
 #define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
 
+constexpr double bytesInGB = 1024*1024*1024;
 
 int main() {
     // Пытаемся слинковаться с символами OpenCL API в runtime (через библиотеку clew)
@@ -105,14 +106,14 @@ int main() {
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
 
     unsigned int size = sizeof(float) * n;
-    cl_mem_flags ROFlags = CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR;
+    cl_mem_flags ROFlags = CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR;
 
     cl_mem asMem = clCreateBuffer(ctx, ROFlags, size, as.data(), &errcode_ret);
     OCL_SAFE_CALL(errcode_ret);
     cl_mem bsMem = clCreateBuffer(ctx, ROFlags, size, bs.data(), &errcode_ret);
     OCL_SAFE_CALL(errcode_ret);
 
-    cl_mem_flags WOFlags = CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR;
+    cl_mem_flags WOFlags = CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR;
 
     cl_mem csMem = clCreateBuffer(ctx, WOFlags, size, cs.data(), &errcode_ret);
     OCL_SAFE_CALL(errcode_ret);
@@ -206,6 +207,7 @@ int main() {
         // подробнее об этом - см. timer.lapsFiltered
         // P.S. чтобы в CLion быстро перейти к символу (функции/классу/много чему еще), достаточно нажать Ctrl+Shift+Alt+N -> lapsFiltered -> Enter
         std::cout << "Kernel average time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        double lapsPerSecond = ((double) 1) / t.lapAvg();
 
         // TODO 13 Рассчитайте достигнутые гигафлопcы:
         // - Всего элементов в массивах по n штук
@@ -213,7 +215,6 @@ int main() {
         // - Флопс - это число операций с плавающей точкой в секунду
         // - В гигафлопсе 10^9 флопсов
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
-        double lapsPerSecond = ((double) 1) / t.lapAvg();
         double flopPerLap = n;
         double flops = lapsPerSecond * flopPerLap;
         double GFlops = flops / ((double) 1e+9);
@@ -225,26 +226,35 @@ int main() {
         // - Обращений к видеопамяти 2*n*sizeof(float) байт на чтение и 1*n*sizeof(float) байт на запись, т.е. итого 3*n*sizeof(float) байт
         // - В гигабайте 1024*1024*1024 байт
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
-        std::cout << "VRAM bandwidth: " << 0 << " GB/s" << std::endl;
+        double RWOpsBytesPerLap = 3 * n * sizeof(float);
+        double RWOpsBytesPerSecond = RWOpsBytesPerLap * lapsPerSecond;
+        double RWOpsGBsPerSecond = RWOpsBytesPerSecond / bytesInGB;
+        std::cout << "VRAM bandwidth: " << RWOpsGBsPerSecond << " GB/s" << std::endl;
     }
 
     // TODO 15 Скачайте результаты вычислений из видеопамяти (VRAM) в оперативную память (RAM) - из cs_gpu в cs (и рассчитайте скорость трансфера данных в гигабайтах в секунду)
     {
         timer t;
         for (unsigned int i = 0; i < 20; ++i) {
-            // clEnqueueReadBuffer...
+            cl_event event;
+            OCL_SAFE_CALL(clEnqueueReadBuffer(queue, csMem, true, 0, size, cs.data(), 0, NULL, &event));
+            OCL_SAFE_CALL(clWaitForEvents(1, &event));
             t.nextLap();
         }
+        double lapsPerSecond = ((double) 1) / t.lapAvg();
+        double bytesPerLab = size;
+        double bytesPerSecond = lapsPerSecond * bytesPerLab;
+        double GBsPerSecond = bytesPerSecond / bytesInGB;
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "VRAM -> RAM bandwidth: " << 0 << " GB/s" << std::endl;
+        std::cout << "VRAM -> RAM bandwidth: " << GBsPerSecond << " GB/s" << std::endl;
     }
 
     // TODO 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
-    //    for (unsigned int i = 0; i < n; ++i) {
-    //        if (cs[i] != as[i] + bs[i]) {
-    //            throw std::runtime_error("CPU and GPU results differ!");
-    //        }
-    //    }
+    for (unsigned int i = 0; i < n; ++i) {
+        if (cs[i] != as[i] + bs[i]) {
+            throw std::runtime_error("CPU and GPU results differ!");
+        }
+    }
 
     // release section
     clReleaseMemObject(asMem);
