@@ -134,15 +134,16 @@ int main() {
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде
     // OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
     errcode_ret = 0;
-    cl_mem aBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * n, as.data(),
-                                    &errcode_ret);
+    cl_mem aBuffer =
+            clCreateBuffer(ctx, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * n, as.data(), &errcode_ret);
     OCL_SAFE_CALL(errcode_ret);
     errcode_ret = 0;
-    cl_mem bBuffer = clCreateBuffer(ctx, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * n, bs.data(),
-                                    &errcode_ret);
+    cl_mem bBuffer =
+            clCreateBuffer(ctx, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * n, bs.data(), &errcode_ret);
     OCL_SAFE_CALL(errcode_ret);
     errcode_ret = 0;
-    cl_mem cBuffer = clCreateBuffer(ctx, CL_MEM_WRITE_ONLY, sizeof(float) * cs.size(), nullptr, &errcode_ret);
+    cl_mem cBuffer = clCreateBuffer(ctx, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * cs.size(), cs.data(),
+                                    &errcode_ret);
     OCL_SAFE_CALL(errcode_ret);
 
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
@@ -229,7 +230,7 @@ int main() {
             // clEnqueueNDRangeKernel...
             cl_event kernelStartedEvent;
             OCL_SAFE_CALL(clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &global_work_size, nullptr, 0, nullptr,
-                                   &kernelStartedEvent));
+                                                 &kernelStartedEvent));
             // clWaitForEvents...
             cl_event events[] = {kernelStartedEvent};
             OCL_SAFE_CALL(clWaitForEvents(1, events));
@@ -248,15 +249,15 @@ int main() {
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
         std::cout << "GFlops: " << n / (t.lapAvg() * 1000 * 1000 * 1000) << std::endl;
 
-        // TODO 14 Рассчитайте используемую пропускную способность обращений к видеопамяти 
+        // TODO 14 Рассчитайте используемую пропускную способность обращений к видеопамяти
         // (в гигабайтах в секунду)
         // - Всего элементов в массивах по n штук
         // - Размер каждого элемента sizeof(float)=4 байта
-        // - Обращений к видеопамяти 2*n*sizeof(float) байт на чтение и 1*n*sizeof(float) 
+        // - Обращений к видеопамяти 2*n*sizeof(float) байт на чтение и 1*n*sizeof(float)
         // байт на запись, т.е. итого 3*n*sizeof(float) байт
         // - В гигабайте 1024*1024*1024 байт
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
-        std::cout << "VRAM bandwidth: " << 3.0 * n * sizeof(float) / (1024 * 1024 * 1024) << " GB/s" << std::endl;
+        std::cout << "VRAM bandwidth: " << 3.0 * n * sizeof(float) / (t.lapAvg() * 1024 * 1024 * 1024) << " GB/s" << std::endl;
     }
 
     // TODO 15 Скачайте результаты вычислений из видеопамяти (VRAM) в оперативную память (RAM)
@@ -264,11 +265,13 @@ int main() {
     {
         timer t;
         for (unsigned int i = 0; i < 20; ++i) {
-            OCL_SAFE_CALL(clEnqueueReadBuffer(queue, cBuffer, CL_TRUE, 0, sizeof(float) * n, cs.data(), 0, nullptr, nullptr));
+            OCL_SAFE_CALL(
+                    clEnqueueReadBuffer(queue, cBuffer, CL_TRUE, 0, sizeof(float) * n, cs.data(), 0, nullptr, nullptr));
             t.nextLap();
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "VRAM -> RAM bandwidth: " << n * sizeof(float) / (t.lapAvg() * 1024 * 1024 * 1024) << " GB/s" << std::endl;
+        std::cout << "VRAM -> RAM bandwidth: " << n * sizeof(float) / (t.lapAvg() * 1024 * 1024 * 1024) << " GB/s"
+                  << std::endl;
     }
 
     // TODO 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
