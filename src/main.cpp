@@ -211,8 +211,10 @@ int main() {
             cl_event event;
             OCL_SAFE_CALL(clEnqueueNDRangeKernel(command_queue, kernel, 1, nullptr, &global_work_size, &workGroupSize, 0, nullptr, &event));
             clWaitForEvents(1, &event);
+            OCL_SAFE_CALL(clReleaseEvent(event));
             t.nextLap();// При вызове nextLap секундомер запоминает текущий замер (текущий круг) и начинает замерять время следующего круга
         }
+
         // Среднее время круга (вычисления кернела) на самом деле считается не по всем замерам, а лишь с 20%-перцентайля по 80%-перцентайль (как и стандартное отклонение)
         // подробнее об этом - см. timer.lapsFiltered
         // P.S. чтобы в CLion быстро перейти к символу (функции/классу/много чему еще), достаточно нажать Ctrl+Shift+Alt+N -> lapsFiltered -> Enter
@@ -232,7 +234,7 @@ int main() {
         // - Обращений к видеопамяти 2*n*sizeof(float) байт на чтение и 1*n*sizeof(float) байт на запись, т.е. итого 3*n*sizeof(float) байт
         // - В гигабайте 1024*1024*1024 байт
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
-        std::cout << "VRAM bandwith: " << ((double) n*3*sizeof(float)) / (2L<<30) / t.lapAvg() << " GB/s"<<std::endl;
+        std::cout << "VRAM bandwith: " << ((double) n*3*sizeof(float)) / (1L<<30) / t.lapAvg() << " GB/s"<<std::endl;
         
     }
 
@@ -244,7 +246,7 @@ int main() {
             t.nextLap();
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "VRAM -> RAM bandwidth: " << ((double) n*sizeof(float))/(2<<10)/(2<<20)/t.lapAvg() << " GB/s" << std::endl;
+        std::cout << "VRAM -> RAM bandwidth: " << ((double) n*sizeof(float))/(1L<<30)/t.lapAvg() << " GB/s" << std::endl;
     }
 
     // TODO 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
@@ -255,7 +257,12 @@ int main() {
     }
 
     // Cleanup
-    clReleaseCommandQueue(command_queue);
-    clReleaseContext(context);
+    OCL_SAFE_CALL(clReleaseKernel(kernel));
+    OCL_SAFE_CALL(clReleaseProgram(program));
+    OCL_SAFE_CALL(clReleaseMemObject(a_buf));
+    OCL_SAFE_CALL(clReleaseMemObject(b_buf));
+    OCL_SAFE_CALL(clReleaseMemObject(c_buf));
+    OCL_SAFE_CALL(clReleaseCommandQueue(command_queue));
+    OCL_SAFE_CALL(clReleaseContext(context));
     return 0;
 }
