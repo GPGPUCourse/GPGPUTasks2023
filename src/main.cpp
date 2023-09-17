@@ -72,9 +72,14 @@ int main() {
     // или же через метод Buffer Objects -> clEnqueueWriteBuffer
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
     auto memorySize = n * sizeof(float);
-    auto aBuffer = Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, memorySize, as.data());
-    auto bBuffer = Buffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, memorySize, bs.data());
-    auto cBuffer = Buffer(context, CL_MEM_WRITE_ONLY, memorySize, nullptr);
+    auto isCPU = device.GetDeviceType() & CL_DEVICE_TYPE_CPU;
+    auto readMode = CL_MEM_READ_ONLY | (isCPU ? CL_MEM_USE_HOST_PTR : CL_MEM_COPY_HOST_PTR);
+    auto aBuffer = Buffer(context, readMode, memorySize, as.data());
+    auto bBuffer = Buffer(context, readMode, memorySize, bs.data());
+    auto cBuffer = Buffer(context,
+                          CL_MEM_WRITE_ONLY | (isCPU ? CL_MEM_USE_HOST_PTR : 0),
+                          memorySize,
+                          isCPU ? cs.data() : nullptr);
 
     //  6 Выполните  5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
@@ -167,14 +172,18 @@ int main() {
         std::cout << "VRAM bandwidth: " << 3 * memorySize / t.lapAvg() / (1<<30) << " GB/s" << std::endl;
     }
 
+    for (unsigned int i = 0; i < n; ++i) {
+        as[i] += bs[i];
+    }
+
     //  15 Скачайте результаты вычислений из видеопамяти (VRAM) в оперативную память (RAM) - из cs_gpu в cs (и рассчитайте скорость трансфера данных в гигабайтах в секунду)
     {
         timer t;
         for (unsigned int i = 0; i < 20; ++i) {
             OCL_SAFE_CALL(
-                    clEnqueueReadBuffer(commandQueue, cBuffer, true,
-                                        0, memorySize, cs.data(),
-                                        0, nullptr, nullptr));
+                        clEnqueueReadBuffer(commandQueue, cBuffer, true,
+                                            0, memorySize, isCPU ? bs.data() : cs.data(),
+                                            0, nullptr, nullptr));
             t.nextLap();
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
@@ -183,7 +192,7 @@ int main() {
 
     //  16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
     for (unsigned int i = 0; i < n; ++i) {
-        if (std::abs(cs[i] - (as[i] + bs[i])) > 1e-4) {
+        if (std::abs(cs[i] - as[i]) > 1e-4) {
             throw std::runtime_error("CPU and GPU results differ!");
         }
     }
