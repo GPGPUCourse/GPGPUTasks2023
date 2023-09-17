@@ -104,29 +104,33 @@ struct CLBuffer {
     cl_mem buffer = nullptr;
     size_t size = 0;
 
-    static CLBuffer createCopiedReadOnly(CLContext &context, void *data, size_t size) {
-        std::cerr << size << std::endl;
+    static CLBuffer createReadOnlyHost(CLContext &context, void *data, size_t size) {
         CLBuffer result;
         result.size = size;
         cl_int errorcode;
-        result.buffer =
-                clCreateBuffer(context.context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, size, data, &errorcode);
+        result.buffer = clCreateBuffer(context.context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, size, data, &errorcode);
         OCL_CHECK_EC(errorcode);
         return result;
     }
 
     template<typename T, typename = std::enable_if<std::is_pod<T>::value>>
-    static CLBuffer createCopiedReadOnly(CLContext &context, const std::vector<T> &vector) {
-        return createCopiedReadOnly(context, (void *) vector.data(), vector.size() * sizeof(T));
+    static CLBuffer createReadOnlyHost(CLContext &context, const std::vector<T> &vector) {
+        return createReadOnlyHost(context, (void *) vector.data(), vector.size() * sizeof(T));
     }
 
-    static CLBuffer createWriteOnly(CLContext &context, size_t size) {
+    static CLBuffer createWriteOnlyHost(CLContext &context, void *data, size_t size) {
         CLBuffer result;
         result.size = size;
         cl_int errorcode;
-        result.buffer = clCreateBuffer(context.context, CL_MEM_WRITE_ONLY, size, nullptr, &errorcode);
+        result.buffer =
+                clCreateBuffer(context.context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, size, data, &errorcode);
         OCL_CHECK_EC(errorcode);
         return result;
+    }
+
+    template<typename T, typename = std::enable_if<std::is_pod<T>::value>>
+    static CLBuffer createWriteOnlyHost(CLContext &context, std::vector<T> &vector) {
+        return createWriteOnlyHost(context, vector.data(), vector.size() * sizeof(T));
     }
 
     ~CLBuffer() {
@@ -283,9 +287,9 @@ int main() {
     // Данные в as и bs можно прогрузить этим же методом, скопировав данные из host_ptr=as.data() (и не забыв про битовый флаг, на это указывающий)
     // или же через метод Buffer Objects -> clEnqueueWriteBuffer
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
-    CLBuffer bufferA = CLBuffer::createCopiedReadOnly(context, as);
-    CLBuffer bufferB = CLBuffer::createCopiedReadOnly(context, bs);
-    CLBuffer bufferC = CLBuffer::createWriteOnly(context, n * sizeof(float));
+    CLBuffer bufferA = CLBuffer::createReadOnlyHost(context, as);
+    CLBuffer bufferB = CLBuffer::createReadOnlyHost(context, bs);
+    CLBuffer bufferC = CLBuffer::createWriteOnlyHost(context, cs);
     std::cout << "Buffers A, B, C created!" << std::endl;
 
     // 6 Выполните 5 (реализуйте кернел в src/cl/aplusb.cl)
