@@ -3,33 +3,12 @@
 #include <libutils/fast_random.h>
 #include <libutils/timer.h>
 
-#include <cassert>
 #include <fstream>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
-
-
-template<typename T>
-std::string to_string(T value) {
-    std::ostringstream ss;
-    ss << value;
-    return ss.str();
-}
-
-void reportError(cl_int err, const std::string &filename, int line) {
-    if (CL_SUCCESS == err)
-        return;
-
-    // Таблица с кодами ошибок:
-    // libs/clew/CL/cl.h:103
-    // P.S. Быстрый переход к файлу в CLion: Ctrl+Shift+N -> cl.h (или даже с номером строки: cl.h:103) -> Enter
-    std::string message = "OpenCL error code " + to_string(err) + " encountered at " + filename + ":" + to_string(line);
-    throw std::runtime_error(message);
-}
-
-#define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
+#include "ClObjects.h"
 
 
 int main() {
@@ -39,19 +18,38 @@ int main() {
 
     // TODO 1 По аналогии с предыдущим заданием узнайте, какие есть устройства, и выберите из них какое-нибудь
     // (если в списке устройств есть хоть одна видеокарта - выберите ее, если нету - выбирайте процессор)
+    auto platforms = getInfoVec<cl_platform_id, cl_uint>(clGetPlatformIDs);
+    cl_objects::Device selectedDevice;
+    for (auto platform: platforms) {
+        auto devices = getInfoVec<cl_device_id, cl_uint>(clGetDeviceIDs, platform, CL_DEVICE_TYPE_ALL);
+        for (auto device: devices) {
+            selectedDevice = cl_objects::Device(device);
+            if (selectedDevice.type() == "GPU")
+                break;
+        }
+        if (selectedDevice && selectedDevice.type() == "GPU")
+            break;
+    }
+    if (selectedDevice)
+        throw std::runtime_error("Device not selected ");
+
+    std::cout << "Selected device: " << selectedDevice.name() << std::endl;
+    std::cout << "  type: " << selectedDevice.type() << std::endl;
+    std::cout << "  global memory size(MB): " << selectedDevice.globalSize() / (1024 * 1024) << std::endl;
+    std::cout << "  local memory size(KB): " << selectedDevice.localSize() / 1024 << std::endl;
 
     // TODO 2 Создайте контекст с выбранным устройством
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Contexts -> clCreateContext
     // Не забывайте проверять все возвращаемые коды на успешность (обратите внимание, что в данном случае метод возвращает
     // код по переданному аргументом errcode_ret указателю)
     // И хорошо бы сразу добавить в конце clReleaseContext (да, не очень RAII, но это лишь пример)
-
+    cl_objects::WrapperRAII<cl_context, decltype(clReleaseContext)> context(clCreateContext, clReleaseContext, nullptr, 1, &(selectedDevice.getId()), nullptr, nullptr);
     // TODO 3 Создайте очередь выполняемых команд в рамках выбранного контекста и устройства
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Runtime APIs -> Command Queues -> clCreateCommandQueue
     // Убедитесь, что в соответствии с документацией вы создали in-order очередь задач
     // И хорошо бы сразу добавить в конце clReleaseQueue (не забывайте освобождать ресурсы)
-
-    unsigned int n = 1000 * 1000;
+    cl_objects::WrapperRAII<cl_command_queue, decltype(clReleaseCommandQueue)> cmdQueue(clCreateCommandQueue, clReleaseCommandQueue, context.getObject(), selectedDevice.getId(), 0);
+    unsigned int n = 100 * 1000 * 1000;
     // Создаем два массива псевдослучайных данных для сложения и массив для будущего хранения результата
     std::vector<float> as(n, 0);
     std::vector<float> bs(n, 0);
@@ -69,7 +67,11 @@ int main() {
     // Данные в as и bs можно прогрузить этим же методом, скопировав данные из host_ptr=as.data() (и не забыв про битовый флаг, на это указывающий)
     // или же через метод Buffer Objects -> clEnqueueWriteBuffer
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
-
+    size_t bufferSize = sizeof(float) * n;
+    cl_objects::WrapperRAII<cl_mem, decltype(clReleaseMemObject)>
+            buf_as(clCreateBuffer, clReleaseMemObject, context.getObject(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, bufferSize, as.data()),
+            buf_bs(clCreateBuffer, clReleaseMemObject, context.getObject(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, bufferSize, bs.data()),
+            buf_cs(clCreateBuffer, clReleaseMemObject, context.getObject(), CL_MEM_WRITE_ONLY , bufferSize, nullptr);
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
     // напечатав исходники в консоль (if проверяет, что удалось считать хоть что-то)
@@ -86,30 +88,37 @@ int main() {
     // TODO 7 Создайте OpenCL-подпрограмму с исходниками кернела
     // см. Runtime APIs -> Program Objects -> clCreateProgramWithSource
     // у string есть метод c_str(), но обратите внимание, что передать вам нужно указатель на указатель
-
+    std::vector<size_t> lengths = {kernel_sources.size()};
+    std::vector<const char*> sources = {kernel_sources.data()};
+    cl_objects::WrapperRAII<cl_program, decltype(clReleaseProgram)>
+            program(clCreateProgramWithSource, clReleaseProgram, context.getObject(), sizeof(sources.data()) / sizeof(char*), sources.data(), lengths.data());
     // TODO 8 Теперь скомпилируйте программу и напечатайте в консоль лог компиляции
     // см. clBuildProgram
-
+    const cl_device_id deviceList[] = {selectedDevice.getId()};
+    OCL_SAFE_CALL(clBuildProgram(program.getObject(), sizeof(deviceList) / sizeof(cl_device_id), deviceList, "", nullptr, nullptr));
     // А также напечатайте лог компиляции (он будет очень полезен, если в кернеле есть синтаксические ошибки - т.е. когда clBuildProgram вернет CL_BUILD_PROGRAM_FAILURE)
     // Обратите внимание, что при компиляции на процессоре через Intel OpenCL драйвер - в логе указывается, какой ширины векторизацию получилось выполнить для кернела
     // см. clGetProgramBuildInfo
-    //    size_t log_size = 0;
-    //    std::vector<char> log(log_size, 0);
-    //    if (log_size > 1) {
+    if (getInfo<cl_build_status>(clGetProgramBuildInfo, program.getObject(), selectedDevice.getId(), CL_PROGRAM_BUILD_STATUS) != CL_BUILD_SUCCESS)
+        throw std::runtime_error("build failed");
+
+    //    std::vector<char> log = getInfoVec<char, size_t>(clGetProgramBuildInfo, program.getObject(), selectedDevice.getId(), CL_PROGRAM_BUILD_LOG);
+    //    if (log.size() > 1) {
     //        std::cout << "Log:" << std::endl;
     //        std::cout << log.data() << std::endl;
     //    }
 
     // TODO 9 Создайте OpenCL-kernel в созданной подпрограмме (в одной подпрограмме может быть несколько кернелов, но в данном случае кернел один)
     // см. подходящую функцию в Runtime APIs -> Program Objects -> Kernel Objects
-
+    cl_objects::KernelsInProgram kernels(program.getObject());
+    cl_kernel kernel = kernels.getKernels()[0];
     // TODO 10 Выставите все аргументы в кернеле через clSetKernelArg (as_gpu, bs_gpu, cs_gpu и число значений, убедитесь, что тип количества элементов такой же в кернеле)
     {
-        // unsigned int i = 0;
-        // clSetKernelArg(kernel, i++, ..., ...);
-        // clSetKernelArg(kernel, i++, ..., ...);
-        // clSetKernelArg(kernel, i++, ..., ...);
-        // clSetKernelArg(kernel, i++, ..., ...);
+         unsigned int i = 0;
+         OCL_SAFE_CALL(clSetKernelArg(kernel, i++, sizeof(cl_mem), &buf_as.getObject()));
+         OCL_SAFE_CALL(clSetKernelArg(kernel, i++, sizeof(cl_mem), &buf_bs.getObject()));
+         OCL_SAFE_CALL(clSetKernelArg(kernel, i++, sizeof(cl_mem), &buf_cs.getObject()));
+         OCL_SAFE_CALL(clSetKernelArg(kernel, i++, sizeof(unsigned int), &n));
     }
 
     // TODO 11 Выше увеличьте n с 1000*1000 до 100*1000*1000 (чтобы дальнейшие замеры были ближе к реальности)
@@ -127,7 +136,10 @@ int main() {
         timer t;// Это вспомогательный секундомер, он замеряет время своего создания и позволяет усреднять время нескольких замеров
         for (unsigned int i = 0; i < 20; ++i) {
             // clEnqueueNDRangeKernel...
+            cl_event event;
+            OCL_SAFE_CALL(clEnqueueNDRangeKernel(cmdQueue.getObject(), kernel, 1, nullptr, &global_work_size, &workGroupSize, 0, nullptr, &event));
             // clWaitForEvents...
+            OCL_SAFE_CALL(clWaitForEvents(1, &event));
             t.nextLap();// При вызове nextLap секундомер запоминает текущий замер (текущий круг) и начинает замерять время следующего круга
         }
         // Среднее время круга (вычисления кернела) на самом деле считается не по всем замерам, а лишь с 20%-перцентайля по 80%-перцентайль (как и стандартное отклонение)
@@ -141,7 +153,7 @@ int main() {
         // - Флопс - это число операций с плавающей точкой в секунду
         // - В гигафлопсе 10^9 флопсов
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
-        std::cout << "GFlops: " << 0 << std::endl;
+        std::cout << "GFlops: " << n * 1e-9 / t.lapAvg() << std::endl;
 
         // TODO 14 Рассчитайте используемую пропускную способность обращений к видеопамяти (в гигабайтах в секунду)
         // - Всего элементов в массивах по n штук
@@ -149,7 +161,7 @@ int main() {
         // - Обращений к видеопамяти 2*n*sizeof(float) байт на чтение и 1*n*sizeof(float) байт на запись, т.е. итого 3*n*sizeof(float) байт
         // - В гигабайте 1024*1024*1024 байт
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
-        std::cout << "VRAM bandwidth: " << 0 << " GB/s" << std::endl;
+        std::cout << "VRAM bandwidth: " << 3 * n * sizeof(float) / ((1 << 30) * t.lapAvg()) << " GB/s" << std::endl;
     }
 
     // TODO 15 Скачайте результаты вычислений из видеопамяти (VRAM) в оперативную память (RAM) - из cs_gpu в cs (и рассчитайте скорость трансфера данных в гигабайтах в секунду)
@@ -157,18 +169,19 @@ int main() {
         timer t;
         for (unsigned int i = 0; i < 20; ++i) {
             // clEnqueueReadBuffer...
+            OCL_SAFE_CALL(clEnqueueReadBuffer(cmdQueue.getObject(), buf_cs.getObject(), true, 0, bufferSize, cs.data(), 0, nullptr,
+                                              nullptr));
             t.nextLap();
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "VRAM -> RAM bandwidth: " << 0 << " GB/s" << std::endl;
+        std::cout << "VRAM -> RAM bandwidth: " << (double)     bufferSize / (1<<30) / t.lapAvg() << " GB/s" << std::endl;
     }
 
     // TODO 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
-    //    for (unsigned int i = 0; i < n; ++i) {
-    //        if (cs[i] != as[i] + bs[i]) {
-    //            throw std::runtime_error("CPU and GPU results differ!");
-    //        }
-    //    }
-
+    for (unsigned int i = 0; i < n; ++i) {
+        if (cs[i] != as[i] + bs[i]) {
+            throw std::runtime_error("CPU and GPU results differ!");
+        }
+    }
     return 0;
 }
