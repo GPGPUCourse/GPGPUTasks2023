@@ -11,7 +11,7 @@ set(HEADERS
         src/ClWrappers/CommandQueue.h
         src/ClWrappers/Context.h
         src/ClWrappers/Device.h
-        src/ClWrappers/Kernel.cpp
+        src/ClWrappers/Kernel.h
         src/ClWrappers/Program.h
         )
 
