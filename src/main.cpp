@@ -31,6 +31,28 @@ void reportError(cl_int err, const std::string &filename, int line) {
 
 #define CATCH(expr) reportError(expr, __FILE__, __LINE__)
 
+bool findDevice(cl_platform_id* platforms, cl_uint count, cl_device_type type, cl_device_id *device) {
+    cl_int err;
+    for (int i = 0; i < count; i++) {
+        err = clGetDeviceIDs(platforms[i], type, 1, device, NULL);
+        if (err == CL_SUCCESS) return true;
+        if (err != CL_DEVICE_NOT_FOUND) CATCH(err);
+    }
+    return false;
+}
+
+cl_device_id getDevice() {
+    cl_device_id device;
+    cl_uint platformCount;
+    CATCH(clGetPlatformIDs(0, NULL, &platformCount));
+    cl_platform_id *platforms = (cl_platform_id*)calloc(platformCount, sizeof(cl_platform_id));
+    CATCH(clGetPlatformIDs(platformCount, platforms, NULL));
+    bool found = findDevice(platforms, platformCount, CL_DEVICE_TYPE_GPU, &device);
+    if (!found) findDevice(platforms, platformCount, CL_DEVICE_TYPE_CPU, &device);
+    free(platforms);
+    if (!found) CATCH(CL_DEVICE_NOT_FOUND);
+    return device;
+}
 
 int main() {
     // Пытаемся слинковаться с символами OpenCL API в runtime (через библиотеку clew)
@@ -40,13 +62,7 @@ int main() {
     cl_int err;
     // TODO 1 По аналогии с предыдущим заданием узнайте, какие есть устройства, и выберите из них какое-нибудь
     // (если в списке устройств есть хоть одна видеокарта - выберите ее, если нету - выбирайте процессор)
-    cl_device_id device;
-    err = clGetDeviceIDs(NULL, CL_DEVICE_TYPE_GPU, 1, &device, NULL);
-    if (err == CL_DEVICE_NOT_FOUND)
-        CATCH(clGetDeviceIDs(NULL, CL_DEVICE_TYPE_CPU, 1, &device, NULL));
-    else
-        CATCH(err);
-
+    cl_device_id device = getDevice();
 
     // TODO 2 Создайте контекст с выбранным устройством
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Contexts -> clCreateContext
@@ -82,9 +98,9 @@ int main() {
     // или же через метод Buffer Objects -> clEnqueueWriteBuffer
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
     size_t memorySize = n * sizeof(float);
-    cl_mem_flags readAndCopy = CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR;
-    cl_mem asBuffer = clCreateBuffer(context, readAndCopy, memorySize, as.data(), &err); CATCH(err);
-    cl_mem bsBuffer = clCreateBuffer(context, readAndCopy, memorySize, bs.data(), &err); CATCH(err);
+    cl_mem_flags readAndUse = CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR;
+    cl_mem asBuffer = clCreateBuffer(context, readAndUse, memorySize, as.data(), &err); CATCH(err);
+    cl_mem bsBuffer = clCreateBuffer(context, readAndUse, memorySize, bs.data(), &err); CATCH(err);
     cl_mem csBuffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, memorySize, NULL, &err); CATCH(err);
 
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
