@@ -43,7 +43,13 @@ int main() {
     cl_platform_id platform;
     OCL_SAFE_CALL(clGetPlatformIDs(1, &platform, nullptr));
     cl_device_id device;
-    OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &device, nullptr));
+    OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 1, &device, nullptr));
+
+    size_t deviceNameSize = 0;
+    OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &deviceNameSize));
+    std::vector<unsigned char> deviceName(deviceNameSize, 0);
+    OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, deviceNameSize, deviceName.data(), nullptr));
+    std::cout << "Device name: " << deviceName.data() << std::endl;
 
     // TODO 2 Создайте контекст с выбранным устройством
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Contexts -> clCreateContext
