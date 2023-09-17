@@ -127,7 +127,7 @@ int main() {
     cl_mem bs_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, size, bs.data(), &error_code);
     OCL_SAFE_CALL(error_code);
 
-    cl_mem cs_buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, size, nullptr, &error_code);
+    cl_mem cs_buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, size, cs.data(), &error_code);
     OCL_SAFE_CALL(error_code);
 
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
