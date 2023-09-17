@@ -31,9 +31,8 @@ int main() {
 
     cl_int errcode_ret = CL_SUCCESS;
 
-    helpers::Holder<cl_context, int (*)(_cl_context *)>
-            contextHolder(clCreateContext(nullptr, 1, &selectedDevice, nullptr, nullptr, &errcode_ret),
-                          clReleaseContext);
+    auto contextHolder = helpers::makeHolder(
+            clCreateContext(nullptr, 1, &selectedDevice, nullptr, nullptr, &errcode_ret), clReleaseContext);
 
     eh::OCL_SAFE_CALL(errcode_ret);
 
@@ -42,9 +41,8 @@ int main() {
     // Убедитесь, что в соответствии с документацией вы создали in-order очередь задач
     // И хорошо бы сразу добавить в конце clReleaseQueue (не забывайте освобождать ресурсы)
 
-    helpers::Holder<cl_command_queue, int (*)(_cl_command_queue *)>
-            queueHolder(clCreateCommandQueue(contextHolder.get(), selectedDevice, 0, &errcode_ret),
-                        clReleaseCommandQueue);
+    auto queueHolder = helpers::makeHolder(clCreateCommandQueue(contextHolder.get(), selectedDevice, 0, &errcode_ret),
+                                           clReleaseCommandQueue);
 
     if (errcode_ret != CL_SUCCESS) {
         eh::OCL_SAFE_CALL(errcode_ret);
@@ -72,29 +70,27 @@ int main() {
 
     const unsigned int sizeBuff = sizeof(float) * n;
 
-    helpers::Holder<cl_mem, int (*)(_cl_mem *)>
-            memAsHolder(clCreateBuffer(contextHolder.get(), CL_MEM_READ_ONLY, sizeBuff, nullptr, &errcode_ret),
-                        clReleaseMemObject);
+    auto memAsHolder = helpers::makeHolder(
+            clCreateBuffer(contextHolder.get(), CL_MEM_READ_ONLY, sizeBuff, nullptr, &errcode_ret), clReleaseMemObject);
     eh::OCL_SAFE_CALL(errcode_ret);
 
-    helpers::Holder<cl_mem, int (*)(_cl_mem *)>
-            memBsHolder(clCreateBuffer(contextHolder.get(), CL_MEM_READ_ONLY, sizeBuff, nullptr, &errcode_ret),
-                        clReleaseMemObject);
+    auto memBsHolder = helpers::makeHolder(
+            clCreateBuffer(contextHolder.get(), CL_MEM_READ_ONLY, sizeBuff, nullptr, &errcode_ret), clReleaseMemObject);
     eh::OCL_SAFE_CALL(errcode_ret);
 
-    helpers::Holder<cl_mem, int (*)(_cl_mem *)>
-            memCsHolder(clCreateBuffer(contextHolder.get(), CL_MEM_WRITE_ONLY, sizeBuff, nullptr, &errcode_ret),
-                        clReleaseMemObject);
+    auto memCsHolder =
+            helpers::makeHolder(clCreateBuffer(contextHolder.get(), CL_MEM_WRITE_ONLY, sizeBuff, nullptr, &errcode_ret),
+                                clReleaseMemObject);
     eh::OCL_SAFE_CALL(errcode_ret);
 
-    eh::OCL_SAFE_CALL(clEnqueueWriteBuffer(queueHolder.get(), memAsHolder.get(), CL_TRUE, 0, sizeBuff, as.data(),
-                                           0, nullptr, nullptr));
+    eh::OCL_SAFE_CALL(clEnqueueWriteBuffer(queueHolder.get(), memAsHolder.get(), CL_TRUE, 0, sizeBuff, as.data(), 0,
+                                           nullptr, nullptr));
 
-    eh::OCL_SAFE_CALL(clEnqueueWriteBuffer(queueHolder.get(), memBsHolder.get(), CL_TRUE, 0, sizeBuff, bs.data(),
-                                           0, nullptr, nullptr));
+    eh::OCL_SAFE_CALL(clEnqueueWriteBuffer(queueHolder.get(), memBsHolder.get(), CL_TRUE, 0, sizeBuff, bs.data(), 0,
+                                           nullptr, nullptr));
 
-    eh::OCL_SAFE_CALL(clEnqueueWriteBuffer(queueHolder.get(), memCsHolder.get(), CL_TRUE, 0, sizeBuff, cs.data(),
-                                           0, nullptr, nullptr));
+    eh::OCL_SAFE_CALL(clEnqueueWriteBuffer(queueHolder.get(), memCsHolder.get(), CL_TRUE, 0, sizeBuff, cs.data(), 0,
+                                           nullptr, nullptr));
 
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
@@ -114,14 +110,14 @@ int main() {
     // у string есть метод c_str(), но обратите внимание, что передать вам нужно указатель на указатель
 
     const char *ptr_kernel_sources = kernel_sources.c_str();
-    helpers::Holder<cl_program, int (*)(_cl_program *)>
-            programHolder(clCreateProgramWithSource(contextHolder.get(), 1, &ptr_kernel_sources, nullptr, &errcode_ret),
-                          clReleaseProgram);
+    auto programHolder = helpers::makeHolder(
+            clCreateProgramWithSource(contextHolder.get(), 1, &ptr_kernel_sources, nullptr, &errcode_ret),
+            clReleaseProgram);
 
     // TODO 8 Теперь скомпилируйте программу и напечатайте в консоль лог компиляции
     // см. clBuildProgram
 
-//    eh::OCL_SAFE_CALL(clBuildProgram(programHolder.get(), 1, &selectedDevice, nullptr, nullptr, nullptr));
+    //    eh::OCL_SAFE_CALL(clBuildProgram(programHolder.get(), 1, &selectedDevice, nullptr, nullptr, nullptr));
     errcode_ret = clBuildProgram(programHolder.get(), 1, &selectedDevice, nullptr, nullptr, nullptr);
 
     // А также напечатайте лог компиляции (он будет очень полезен, если в кернеле есть синтаксические ошибки - т.е. когда clBuildProgram вернет CL_BUILD_PROGRAM_FAILURE)
@@ -145,8 +141,8 @@ int main() {
     // TODO 9 Создайте OpenCL-kernel в созданной подпрограмме (в одной подпрограмме может быть несколько кернелов, но в данном случае кернел один)
     // см. подходящую функцию в Runtime APIs -> Program Objects -> Kernel Objects
 
-    helpers::Holder<cl_kernel, int (*)(_cl_kernel *)>
-            kernelHolder(clCreateKernel(programHolder.get(), "aplusb", &errcode_ret), clReleaseKernel);
+    auto kernelHolder =
+            helpers::makeHolder(clCreateKernel(programHolder.get(), "aplusb", &errcode_ret), clReleaseKernel);
     eh::OCL_SAFE_CALL(errcode_ret);
 
     // TODO 10 Выставите все аргументы в кернеле через clSetKernelArg (as_gpu, bs_gpu, cs_gpu и число значений, убедитесь, что тип количества элементов такой же в кернеле)
@@ -213,7 +209,7 @@ int main() {
         std::cout << "VRAM -> RAM bandwidth: " << 1. * sizeBuff / t.lapAvg() / (1 << 30) << " GB/s" << std::endl;
     }
 
-//     TODO 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
+    //     TODO 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
     for (unsigned int i = 0; i < n; ++i) {
         if (cs[i] != as[i] + bs[i]) {
             throw std::runtime_error("CPU and GPU results differ!");
