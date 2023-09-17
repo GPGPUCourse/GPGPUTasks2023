@@ -70,8 +70,8 @@ namespace helpers {
     }
 
     template<>
-    std::vector<unsigned char>
-    getInfo<std::vector<unsigned char>>(const cl_device_id &device, const cl_device_info &info) {
+    std::vector<unsigned char> getInfo<std::vector<unsigned char>>(const cl_device_id &device,
+                                                                   const cl_device_info &info) {
         size_t size = 0;
         eh::OCL_SAFE_CALL(clGetDeviceInfo(device, info, 0, nullptr, &size));
 
@@ -90,18 +90,29 @@ namespace helpers {
     }
 
     template<typename T, typename F>
-    class Holder {
+    class Holder
+    {
     private:
         T holder_;
-        F release_;
+        F *release_ = nullptr;
 
     public:
-        Holder(const T &o, const F &f) noexcept: holder_{o}, release_{f} {}
+        Holder(const T &t, const F &f) noexcept : holder_{t}, release_{f} {
+        }
 
-        const T &get() const noexcept { return holder_; }
+        const T &get() const noexcept {
+            return holder_;
+        }
 
-        ~Holder() { release_(holder_); }
+        ~Holder() {
+            release_(holder_);
+        }
     };
-}
 
-#endif //APLUSB_HELPERS_H
+    template<typename T, typename F>
+    Holder<T, F> makeHolder(const T &t, const F &f) {
+        return Holder<T, F>(t, f);
+    }
+}// namespace helpers
+
+#endif//APLUSB_HELPERS_H
