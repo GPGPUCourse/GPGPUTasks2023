@@ -70,27 +70,23 @@ int main() {
 
     const unsigned int sizeBuff = sizeof(float) * n;
 
+    cl_device_info type = helpers::getInfo<cl_device_type>(selectedDevice, CL_DEVICE_TYPE);
+    cl_mem_flags behaviour = (type == CL_DEVICE_TYPE_CPU) ? CL_MEM_USE_HOST_PTR : CL_MEM_COPY_HOST_PTR;
+
     auto memAsHolder = helpers::makeHolder(
-            clCreateBuffer(contextHolder.get(), CL_MEM_READ_ONLY, sizeBuff, nullptr, &errcode_ret), clReleaseMemObject);
+            clCreateBuffer(contextHolder.get(), CL_MEM_READ_ONLY | behaviour, sizeBuff, as.data(), &errcode_ret),
+            clReleaseMemObject);
     eh::OCL_SAFE_CALL(errcode_ret);
 
     auto memBsHolder = helpers::makeHolder(
-            clCreateBuffer(contextHolder.get(), CL_MEM_READ_ONLY, sizeBuff, nullptr, &errcode_ret), clReleaseMemObject);
+            clCreateBuffer(contextHolder.get(), CL_MEM_READ_ONLY | behaviour, sizeBuff, bs.data(), &errcode_ret),
+            clReleaseMemObject);
     eh::OCL_SAFE_CALL(errcode_ret);
 
-    auto memCsHolder =
-            helpers::makeHolder(clCreateBuffer(contextHolder.get(), CL_MEM_WRITE_ONLY, sizeBuff, nullptr, &errcode_ret),
-                                clReleaseMemObject);
+    auto memCsHolder = helpers::makeHolder(
+            clCreateBuffer(contextHolder.get(), CL_MEM_WRITE_ONLY | behaviour, sizeBuff, cs.data(), &errcode_ret),
+            clReleaseMemObject);
     eh::OCL_SAFE_CALL(errcode_ret);
-
-    eh::OCL_SAFE_CALL(clEnqueueWriteBuffer(queueHolder.get(), memAsHolder.get(), CL_TRUE, 0, sizeBuff, as.data(), 0,
-                                           nullptr, nullptr));
-
-    eh::OCL_SAFE_CALL(clEnqueueWriteBuffer(queueHolder.get(), memBsHolder.get(), CL_TRUE, 0, sizeBuff, bs.data(), 0,
-                                           nullptr, nullptr));
-
-    eh::OCL_SAFE_CALL(clEnqueueWriteBuffer(queueHolder.get(), memCsHolder.get(), CL_TRUE, 0, sizeBuff, cs.data(), 0,
-                                           nullptr, nullptr));
 
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
