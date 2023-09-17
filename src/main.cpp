@@ -87,17 +87,17 @@ int main() {
     // код по переданному аргументом errcode_ret указателю)
     // И хорошо бы сразу добавить в конце clReleaseContext (да, не очень RAII, но это лишь пример)
 
-    int errcode_ret = 0;
-    cl_context context = clCreateContext(nullptr, 1, &device_id, nullptr, nullptr, &errcode_ret);
-    reportError(errcode_ret, __FILE__, __LINE__);
+    int error_code = 0;
+    cl_context context = clCreateContext(nullptr, 1, &device_id, nullptr, nullptr, &error_code);
+    OCL_SAFE_CALL(error_code);
 
     // TODO 3 Создайте очередь выполняемых команд в рамках выбранного контекста и устройства
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Runtime APIs -> Command Queues -> clCreateCommandQueue
     // Убедитесь, что в соответствии с документацией вы создали in-order очередь задач
     // И хорошо бы сразу добавить в конце clReleaseQueue (не забывайте освобождать ресурсы)
 
-    cl_command_queue queue = clCreateCommandQueue(context, device_id, 0, &errcode_ret);
-    reportError(errcode_ret, __FILE__, __LINE__);
+    cl_command_queue queue = clCreateCommandQueue(context, device_id, 0, &error_code);
+    OCL_SAFE_CALL(error_code);
 
 //    unsigned int n = 1000 * 1000;
     unsigned int n = 100*1000*1000;
@@ -121,14 +121,14 @@ int main() {
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
 
     size_t size = sizeof(float) * n;
-    cl_mem as_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, size, as.data(), &errcode_ret);
-    reportError(errcode_ret, __FILE__, __LINE__);
+    cl_mem as_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, size, as.data(), &error_code);
+    OCL_SAFE_CALL(error_code);
 
-    cl_mem bs_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, size, bs.data(), &errcode_ret);
-    reportError(errcode_ret, __FILE__, __LINE__);
+    cl_mem bs_buffer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, size, bs.data(), &error_code);
+    OCL_SAFE_CALL(error_code);
 
-    cl_mem cs_buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY, size, nullptr, &errcode_ret);
-    reportError(errcode_ret, __FILE__, __LINE__);
+    cl_mem cs_buffer = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, size, nullptr, &error_code);
+    OCL_SAFE_CALL(error_code);
 
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
@@ -148,8 +148,8 @@ int main() {
     // у string есть метод c_str(), но обратите внимание, что передать вам нужно указатель на указатель
 
     const char* source_array = kernel_sources.c_str();
-    cl_program program = clCreateProgramWithSource(context, 1, &source_array, nullptr, &errcode_ret);
-    reportError(errcode_ret, __FILE__, __LINE__);
+    cl_program program = clCreateProgramWithSource(context, 1, &source_array, nullptr, &error_code);
+    OCL_SAFE_CALL(error_code);
 
     // TODO 8 Теперь скомпилируйте программу и напечатайте в консоль лог компиляции
     // см. clBuildProgram
@@ -174,8 +174,8 @@ int main() {
     // TODO 9 Создайте OpenCL-kernel в созданной подпрограмме (в одной подпрограмме может быть несколько кернелов, но в данном случае кернел один)
     // см. подходящую функцию в Runtime APIs -> Program Objects -> Kernel Objects
 
-    cl_kernel kernel = clCreateKernel(program, "aplusb", &errcode_ret);
-    reportError(errcode_ret, __FILE__, __LINE__);
+    cl_kernel kernel = clCreateKernel(program, "aplusb", &error_code);
+    OCL_SAFE_CALL(error_code);
 
 
     // TODO 10 Выставите все аргументы в кернеле через clSetKernelArg (as_gpu, bs_gpu, cs_gpu и число значений, убедитесь, что тип количества элементов такой же в кернеле)
