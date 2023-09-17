@@ -38,7 +38,7 @@ int main() {
         throw std::runtime_error("Can't init OpenCL driver!");
 
     // TODO 1 По аналогии с предыдущим заданием узнайте, какие есть устройства, и выберите из них какое-нибудь
-    // (если в списке устройств есть хоть одна видеокарта - выберите ее, если нету - выбирайте процессор)
+	    // (если в списке устройств есть хоть одна видеокарта - выберите ее, если нету - выбирайте процессор)
     cl_uint platformsCount = 0;
     OCL_SAFE_CALL(clGetPlatformIDs(0, nullptr, &platformsCount));
     std::cout << "Number of OpenCL platforms: " << platformsCount << std::endl;
@@ -46,45 +46,45 @@ int main() {
     std::vector<cl_platform_id> platforms(platformsCount);
     OCL_SAFE_CALL(clGetPlatformIDs(platformsCount, platforms.data(), nullptr));
 
-    for (int platformIndex = 0; platformIndex < platformsCount; ++platformIndex) {
-        std::cout << "Platform #" << (platformIndex + 1) << "/" << platformsCount << std::endl;
-        cl_platform_id platform = platforms[platformIndex];
+//     for (int platformIndex = 0; platformIndex < platformsCount; ++platformIndex) {
+//         std::cout << "Platform #" << (platformIndex + 1) << "/" << platformsCount << std::endl;
+//         cl_platform_id platform = platforms[platformIndex];
 
            
-        size_t platformNameSize = 0;
-        OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_NAME, 0, nullptr, &platformNameSize));
-        std::vector<unsigned char> platformName(platformNameSize, 0);
-        OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_NAME, platformNameSize, platformName.data(), &platformNameSize));
-        std::cout << "    Platform name: " << platformName.data() << std::endl;
+//         size_t platformNameSize = 0;
+//         OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_NAME, 0, nullptr, &platformNameSize));
+//         std::vector<unsigned char> platformName(platformNameSize, 0);
+//         OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_NAME, platformNameSize, platformName.data(), &platformNameSize));
+//         std::cout << "    Platform name: " << platformName.data() << std::endl;
         
-        cl_uint devicesCount = 0;
-        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &devicesCount));
-        std::cout << "    Number of platform devices: " << devicesCount << std::endl;
+//         cl_uint devicesCount = 0;
+//         OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &devicesCount));
+//         std::cout << "    Number of platform devices: " << devicesCount << std::endl;
         
-        // Хотим получить идентификаторы всех девайсов
-        std::vector<cl_device_id> devices(devicesCount);
-        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, devicesCount, devices.data(), nullptr));
+//         // Хотим получить идентификаторы всех девайсов
+//         std::vector<cl_device_id> devices(devicesCount);
+//         OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, devicesCount, devices.data(), nullptr));
         
-        for (int deviceIndex = 0; deviceIndex < devicesCount; ++deviceIndex) {
-            std::cout << "    Device #" << (deviceIndex + 1) << "/" << devicesCount << std::endl;
-            // TODO 2.2
-            // Запросите и напечатайте в консоль:
-            // - Название устройства
-            // - Тип устройства (видеокарта/процессор/что-то странное)
-            // - Размер памяти устройства в мегабайтах
-            // - Еще пару или более свойств устройства, которые вам покажутся наиболее интересными
+//         for (int deviceIndex = 0; deviceIndex < devicesCount; ++deviceIndex) {
+//             std::cout << "    Device #" << (deviceIndex + 1) << "/" << devicesCount << std::endl;
+//             // TODO 2.2
+//             // Запросите и напечатайте в консоль:
+//             // - Название устройства
+//             // - Тип устройства (видеокарта/процессор/что-то странное)
+//             // - Размер памяти устройства в мегабайтах
+//             // - Еще пару или более свойств устройства, которые вам покажутся наиболее интересными
             
-            cl_device_id device = devices[deviceIndex];
+//             cl_device_id device = devices[deviceIndex];
             
-            // name CL_DEVICE_NAME
-            size_t deviceNameSize = 0;
-            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &deviceNameSize));
+//             // name CL_DEVICE_NAME
+//             size_t deviceNameSize = 0;
+//             OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &deviceNameSize));
             
-            std::vector<unsigned char> deviceName(deviceNameSize, 0);
-            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, deviceNameSize, deviceName.data(), &deviceNameSize));
-            std::cout << "        Device name: " << deviceName.data() << std::endl;
-        }
-    }
+//             std::vector<unsigned char> deviceName(deviceNameSize, 0);
+//             OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, deviceNameSize, deviceName.data(), &deviceNameSize));
+//             std::cout << "        Device name: " << deviceName.data() << std::endl;
+//         }
+//     }
     
     cl_platform_id platform = platforms[1];
     size_t platformNameSize = 0;
@@ -303,7 +303,7 @@ int main() {
         // - В гигабайте 1024*1024*1024 байт
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
         
-        double bandwidth = n * 4 * 3 * n * 4 / 1024 / 1024 / 1024 * t.lapAvg();
+        double bandwidth = n * sizeof(float) * 3 * n * sizeof(float) / 1024 / 1024 / 1024 * t.lapAvg();
         
         std::cout << "VRAM bandwidth: " << bandwidth << " GB/s" << std::endl;
     }
@@ -316,7 +316,7 @@ int main() {
             OCL_SAFE_CALL(t.nextLap());
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        double bandwidth = n * 4 * 3 * n * 4 / 1024 / 1024 / 1024 * t.lapAvg();
+        double bandwidth = n * sizeof(float) * 3 * n * sizeof(float) / 1024 / 1024 / 1024 * t.lapAvg();
         std::cout << "VRAM -> RAM bandwidth: " << bandwidth << " GB/s" << std::endl;
     }
 
