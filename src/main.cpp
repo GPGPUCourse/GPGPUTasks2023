@@ -176,7 +176,7 @@ int main() {
         // - Флопс - это число операций с плавающей точкой в секунду
         // - В гигафлопсе 10^9 флопсов
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
-        std::cout << "GFlops: " << n / t.lapAvg() / pow(10, 9) << std::endl;
+        std::cout << "GFlops: " << n / t.lapAvg() / 1e9 << std::endl;
 
         // TODO 14 Рассчитайте используемую пропускную способность обращений к видеопамяти (в гигабайтах в секунду)
         // - Всего элементов в массивах по n штук
@@ -202,11 +202,11 @@ int main() {
     }
 
     // TODO 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
-       for (unsigned int i = 0; i < n; ++i) {
-           if (cs[i] != as[i] + bs[i]) {
-               throw std::runtime_error("CPU and GPU results differ!");
-           }
-       }
+    for (unsigned int i = 0; i < n; ++i) {
+        if (cs[i] != as[i] + bs[i]) {
+            throw std::runtime_error("CPU and GPU results differ!");
+        }
+    }
 
     OCL_SAFE_CALL(clReleaseKernel(kernel));
     OCL_SAFE_CALL(clReleaseProgram(program));
