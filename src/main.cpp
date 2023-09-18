@@ -66,7 +66,8 @@ int main() {
 
     cl_int errcode_res = CL_SUCCESS;
 
-    cl_context context = clCreateContext(nullptr, 1, &device, nullptr, nullptr, &errcode_res);;
+    cl_context context = clCreateContext(nullptr, 1, &device, nullptr, nullptr, &errcode_res);
+    ;
     OCL_SAFE_CALL(errcode_res);
 
     // TODO 3 Создайте очередь выполняемых команд в рамках выбранного контекста и устройства
@@ -95,12 +96,13 @@ int main() {
     // Данные в as и bs можно прогрузить этим же методом, скопировав данные из host_ptr=as.data() (и не забыв про битовый флаг, на это указывающий)
     // или же через метод Buffer Objects -> clEnqueueWriteBuffer
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
-    cl_mem as_buf = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(float) * n, as.data(), &errcode_res);
+    cl_mem as_buf = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * n, as.data(), &errcode_res);
     OCL_SAFE_CALL(errcode_res);
-    cl_mem bs_buf = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(float) * n, bs.data(), &errcode_res);
+    cl_mem bs_buf = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * n, bs.data(), &errcode_res);
     OCL_SAFE_CALL(errcode_res);
-    cl_mem cs_buf = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, sizeof(float) * n, cs.data(), &errcode_res);
+    cl_mem cs_buf = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, sizeof(float) * n, cs.data(), &errcode_res);
     OCL_SAFE_CALL(errcode_res);
+
 
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
@@ -112,14 +114,14 @@ int main() {
         if (kernel_sources.size() == 0) {
             throw std::runtime_error("Empty source file! May be you forgot to configure working directory properly?");
         }
-//         std::cout << kernel_sources << std::endl;
+        //         std::cout << kernel_sources << std::endl;
     }
 
     // TODO 7 Создайте OpenCL-подпрограмму с исходниками кернела
     // см. Runtime APIs -> Program Objects -> clCreateProgramWithSource
     // у string есть метод c_str(), но обратите внимание, что передать вам нужно указатель на указатель
     const char *source_ptr = kernel_sources.c_str();
-    cl_program  program = clCreateProgramWithSource(context, 1, &source_ptr, nullptr, &errcode_res);
+    cl_program program = clCreateProgramWithSource(context, 1, &source_ptr, nullptr, &errcode_res);
     OCL_SAFE_CALL(errcode_res);
 
 
@@ -141,17 +143,17 @@ int main() {
 
     // TODO 9 Создайте OpenCL-kernel в созданной подпрограмме (в одной подпрограмме может быть несколько кернелов, но в данном случае кернел один)
     // см. подходящую функцию в Runtime APIs -> Program Objects -> Kernel Objects
-    const char kernel_name[]= "aplusb";
-    cl_kernel  kernel = clCreateKernel(program, kernel_name, &errcode_res);
+    const char kernel_name[] = "aplusb";
+    cl_kernel kernel = clCreateKernel(program, kernel_name, &errcode_res);
     OCL_SAFE_CALL(errcode_res);
 
     // TODO 10 Выставите все аргументы в кернеле через clSetKernelArg (as_gpu, bs_gpu, cs_gpu и число значений, убедитесь, что тип количества элементов такой же в кернеле)
     {
-         unsigned int i = 0;
-         clSetKernelArg(kernel, i++, sizeof(cl_mem), &as_buf);
-         clSetKernelArg(kernel, i++, sizeof(cl_mem), &bs_buf);
-         clSetKernelArg(kernel, i++, sizeof(cl_mem), &cs_buf);
-         clSetKernelArg(kernel, i++, sizeof(unsigned int), &n);
+        unsigned int i = 0;
+        clSetKernelArg(kernel, i++, sizeof(cl_mem), &as_buf);
+        clSetKernelArg(kernel, i++, sizeof(cl_mem), &bs_buf);
+        clSetKernelArg(kernel, i++, sizeof(cl_mem), &cs_buf);
+        clSetKernelArg(kernel, i++, sizeof(unsigned int), &n);
     }
 
     // TODO 11 Выше увеличьте n с 1000*1000 до 100*1000*1000 (чтобы дальнейшие замеры были ближе к реальности)
@@ -169,7 +171,8 @@ int main() {
         timer t;// Это вспомогательный секундомер, он замеряет время своего создания и позволяет усреднять время нескольких замеров
         for (unsigned int i = 0; i < 20; ++i) {
             cl_event start_kernel;
-            OCL_SAFE_CALL(clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &global_work_size, nullptr, 0, nullptr, &start_kernel));
+            OCL_SAFE_CALL(clEnqueueNDRangeKernel(queue, kernel, 1, nullptr, &global_work_size, nullptr, 0, nullptr,
+                                                 &start_kernel));
             OCL_SAFE_CALL(clWaitForEvents(1, &start_kernel));
             t.nextLap();// При вызове nextLap секундомер запоминает текущий замер (текущий круг) и начинает замерять время следующего круга
         }
@@ -192,7 +195,8 @@ int main() {
         // - Обращений к видеопамяти 2*n*sizeof(float) байт на чтение и 1*n*sizeof(float) байт на запись, т.е. итого 3*n*sizeof(float) байт
         // - В гигабайте 1024*1024*1024 байт
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
-        std::cout << "VRAM bandwidth: " << (double)3 * n * sizeof(float) / t.lapAvg() / (1024*1024*1024) << " GB/s" << std::endl;
+        std::cout << "VRAM bandwidth: " << (double) 3 * n * sizeof(float) / t.lapAvg() / (1024 * 1024 * 1024) << " GB/s"
+                  << std::endl;
     }
 
     // TODO 15 Скачайте результаты вычислений из видеопамяти (VRAM) в оперативную память (RAM) - из cs_gpu в cs (и рассчитайте скорость трансфера данных в гигабайтах в секунду)
@@ -200,12 +204,14 @@ int main() {
         timer t;
         for (unsigned int i = 0; i < 20; ++i) {
             cl_event read_event;
-            OCL_SAFE_CALL(clEnqueueReadBuffer(queue, cs_buf, CL_TRUE, 0, sizeof(float) * n, cs.data(), 0, nullptr, &read_event));
+            OCL_SAFE_CALL(clEnqueueReadBuffer(queue, cs_buf, CL_TRUE, 0, sizeof(float) * n, cs.data(), 0, nullptr,
+                                              &read_event));
             OCL_SAFE_CALL(clWaitForEvents(1, &read_event));
             t.nextLap();
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "VRAM -> RAM bandwidth: " << (double)n * sizeof(float) / t.lapAvg() / (1024*1024*1024) << " GB/s" << std::endl;
+        std::cout << "VRAM -> RAM bandwidth: " << (double) n * sizeof(float) / t.lapAvg() / (1024 * 1024 * 1024)
+                  << " GB/s" << std::endl;
     }
 
     // TODO 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
