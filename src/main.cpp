@@ -201,6 +201,7 @@ int main() {
             OCL_SAFE_CALL(
                     clEnqueueNDRangeKernel(queue, kernel, 1, NULL, &global_work_size, &workGroupSize, 0, NULL, &event));
             OCL_SAFE_CALL(clWaitForEvents(1, &event));
+            clReleaseEvent(event);
             t.nextLap();// При вызове nextLap секундомер запоминает текущий замер (текущий круг) и начинает замерять время следующего круга
         }
         // Среднее время круга (вычисления кернела) на самом деле считается не по всем замерам, а лишь с 20%-перцентайля по 80%-перцентайль (как и стандартное отклонение)
@@ -239,6 +240,7 @@ int main() {
             cl_event event;
             OCL_SAFE_CALL(clEnqueueReadBuffer(queue, csMem, true, 0, size, cs.data(), 0, NULL, &event));
             OCL_SAFE_CALL(clWaitForEvents(1, &event));
+            clReleaseEvent(event);
             t.nextLap();
         }
         double lapsPerSecond = ((double) 1) / t.lapAvg();
@@ -260,6 +262,8 @@ int main() {
     clReleaseMemObject(asMem);
     clReleaseMemObject(bsMem);
     clReleaseMemObject(csMem);
+    clReleaseProgram(program);
+    clReleaseKernel(kernel);
     clReleaseCommandQueue(queue);
     clReleaseContext(ctx);
 
