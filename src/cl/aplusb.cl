@@ -12,7 +12,7 @@
 // - Четвертым и последним аргументом должно быть передано количество элементов в каждом массиве (unsigned int, главное, чтобы тип был согласован с типом в соответствующем clSetKernelArg в T0D0 10)
 
 
-__kernel void aplusb(__global float *a, __global float *b, __global float *c, unsigned int count) {
+__kernel void aplusb(__global const float *a, __global const float *b, __global float *c, unsigned int count) {
     const unsigned int gid = get_global_id(0);
     const unsigned int lid = get_local_id(0);
     const unsigned int wid = get_group_id(0);
