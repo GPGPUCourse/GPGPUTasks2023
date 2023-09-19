@@ -100,11 +100,11 @@ int main() {
     // или же через метод Buffer Objects -> clEnqueueWriteBuffer
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
 
-    cl_mem as_gpu = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(float), nullptr, &err);
+    cl_mem as_gpu = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(float), as.data(), &err);
 	OCL_SAFE_CALL(err);
-    cl_mem bs_gpu = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(float), nullptr, &err);
+    cl_mem bs_gpu = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(float), bs.data(), &err);
 	OCL_SAFE_CALL(err);
-    cl_mem cs_gpu = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(float), nullptr, &err);
+    cl_mem cs_gpu = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(float), cs.data(), &err);
 	OCL_SAFE_CALL(err);
 
     OCL_SAFE_CALL(clEnqueueWriteBuffer(queue, as_gpu, CL_TRUE, 0, n * sizeof(float), as.data(), 0, nullptr, nullptr));
