@@ -52,6 +52,8 @@ namespace images {
         mouse_click_t getMouseClick();
         int getMouseX();
         int getMouseY();
+        int getWheel();
+        bool resetWheel();
 
         size_t width();
         size_t height();

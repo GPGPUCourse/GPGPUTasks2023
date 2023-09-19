@@ -327,6 +327,14 @@ int ImageWindow::getMouseY() {
     return cimg_display->display.mouse_y();
 }
 
+int ImageWindow::getWheel() {
+    return cimg_display->display.wheel();
+}
+
+bool ImageWindow::resetWheel() {
+    return cimg_display->display.set_wheel();
+}
+
 size_t ImageWindow::width() {
     return cimg_display->display.window_width();
 }
