@@ -8,7 +8,7 @@ typedef unsigned int uint_;
 
 __kernel void mandelbrot(__global float *results, const uint_ width, const uint_ height, const float fromX,
                          const float fromY, const float sizeX, const float sizeY, const uint_ iters,
-                         const uint_ smoothing) {
+                         const char smoothing) {
     const float threshold = 256.0f;
     const float threshold2 = threshold * threshold;
 

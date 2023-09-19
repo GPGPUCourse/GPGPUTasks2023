@@ -126,9 +126,10 @@ int main(int argc, char **argv) {
 
         const unsigned int workGroupSize = 128;
         const unsigned int global_work_size = (size + workGroupSize - 1) / workGroupSize * workGroupSize;
+        const char smoothing = 0;
 
         kernel.exec(gpu::WorkSize(workGroupSize, global_work_size), cl_results, width, height, fromX, fromY, sizeX,
-                    sizeY, iterationsLimit, false);
+                    sizeY, iterationsLimit, smoothing);
     }
 
     //    {
