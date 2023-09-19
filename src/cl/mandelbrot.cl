@@ -4,10 +4,10 @@
 
 #line 6
 
-__kernel void mandelbrot(__global float *out_buf,
+__kernel void mandelbrot(__global float *outBuf,
                          uint nx, uint ny,
-                         float from_x, float from_y,
-                         float size_x, float size_y,
+                         float fromX, float fromY,
+                         float sizeX, float sizeY,
                          uint iterations, int smoothing)
 {
     const float THRESHOLD = 256.0;
@@ -18,15 +18,15 @@ __kernel void mandelbrot(__global float *out_buf,
     if (ix >= nx || iy >= ny) {
         return;
     }
-    size_t flat_idx = ix + nx * iy;
+    size_t flatIdx = ix + nx * iy;
 
     float2 z0;
     // 2 * 4 = 8 ops
-    z0.x = from_x + (ix + 0.5f) * size_x / nx;
-    z0.y = from_y + (iy + 0.5f) * size_y / ny;
+    z0.x = fromX + (ix + 0.5f) * sizeX / nx;
+    z0.y = fromY + (iy + 0.5f) * sizeY / ny;
     float2 z = z0;
 
-    float z_sqr = 0.0f;
+    float zSqr = 0.0f;
     uint iter = 0;
     // 10 ops / iter
     for (; iter < iterations; ++iter) {
@@ -37,19 +37,19 @@ __kernel void mandelbrot(__global float *out_buf,
         z = z1;
 
         // 3 ops
-        z_sqr = z.x * z.x + z.y * z.y;
-        if (z_sqr >= THRESHOLD_SQR) {
+        zSqr = z.x * z.x + z.y * z.y;
+        if (zSqr >= THRESHOLD_SQR) {
             break;
         }
     }
 
     float result = iter;
     if (smoothing && iter != iterations) {
-        result = result - log(log(sqrt(z_sqr)) / log(THRESHOLD)) / log(2.0f);
+        result = result - log(log(sqrt(zSqr)) / log(THRESHOLD)) / log(2.0f);
     }
     // 1 op (when measuring)
     result /= iterations;
-    out_buf[flat_idx] = result;
+    outBuf[flatIdx] = result;
 
     // Total: (9 + 10 * iter) ops
 

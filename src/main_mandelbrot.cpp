@@ -124,38 +124,38 @@ int main(int argc, char **argv)
         // DONE близко к ЦПУ-версии, включая рассчет таймингов, гигафлопс, Real iterations fraction и сохранение в файл
         // результат должен оказаться в gpu_results
 
-        gpu::gpu_mem_32f out_buf;
-        out_buf.resizeN(width * height);
+        gpu::gpu_mem_32f outBuf;
+        outBuf.resizeN(width * height);
 
         timer t;
-        float from_x = centralX - 0.5f * sizeX;
-        float from_y = centralY - 0.5f * sizeY;
+        float fromX = centralX - 0.5f * sizeX;
+        float fromY = centralY - 0.5f * sizeY;
         for (int i = 0; i < benchmarkingIters; ++i) {
             kernel.exec(gpu::WorkSize(256, 1, width, height),
-                        out_buf.clmem(),
+                        outBuf.clmem(),
                         width, height,
-                        from_x, from_y,
+                        fromX, fromY,
                         sizeX, sizeY,
                         iterationsLimit, 0);
             t.nextLap();
         }
 
-        out_buf.readN(gpu_results.ptr(), width * height);
+        outBuf.readN(gpu_results.ptr(), width * height);
 
-        const size_t ops_const = 9;
-        const size_t ops_loop = 10;
-        size_t max_ops = (ops_const + iterationsLimit * ops_loop) * width * height;
-        double gflops = max_ops / (1e9 * t.lapAvg());
+        size_t opsConst = 9;
+        size_t opsLoop = 10;
+        size_t maxOps = (opsConst + iterationsLimit * opsLoop) * width * height;
+        double gflops = maxOps / (1e9 * t.lapAvg());
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "GPU: " << gflops << " GFlops" << std::endl;
 
-        double real_iter_frac = 0.0;
+        double realIterFrac = 0.0;
         for (int j = 0; j < height; ++j) {
             for (int i = 0; i < width; ++i) {
-                real_iter_frac += gpu_results.ptr()[j * width + i];
+                realIterFrac += gpu_results.ptr()[j * width + i];
             }
         }
-        std::cout << "    Real iterations fraction: " << 100.0 * real_iter_frac / (width * height) << "%" << std::endl;
+        std::cout << "    Real iterations fraction: " << 100.0 * realIterFrac / (width * height) << "%" << std::endl;
 
         renderToColor(gpu_results.ptr(), image.ptr(), width, height);
         image.savePNG("mandelbrot_gpu.png");
