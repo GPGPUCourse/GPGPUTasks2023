@@ -150,28 +150,6 @@ int main(int argc, char **argv) {
     }
 
     {
-        ocl::Kernel kernel(sum_kernel, sum_kernel_length, "sum3_loop_coalesced", defines);
-        size_t workSize = (n + VALUES_PER_WORKITEM - 1) / VALUES_PER_WORKITEM;
-        timer t;
-        for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            cl_uint sum = 0;
-            buf1.writeN(&sum, 1);
-            kernel.exec(gpu::WorkSize(WORKGROUP_SIZE, workSize), bufA.clmem(), buf1.clmem(), cl_ulong(n));
-            buf1.readN(&sum, 1);
-            EXPECT_THE_SAME(reference_sum, sum, "GPU result should be consistent!");
-            t.nextLap();
-        }
-        t.stop();
-        double lapAvg = t.lapAvg();
-        double lapStd = t.lapStd();
-
-        double speed = n / (1e6 * lapAvg);
-
-        std::cout << "Coalesced loop: " << lapAvg << "+-" << lapStd << " s\n"
-                  << "Coalesced loop: " << speed << " M/s\n";
-    }
-
-    {
         ocl::Kernel kernel(sum_kernel, sum_kernel_length, "sum4_local_mem", defines);
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
