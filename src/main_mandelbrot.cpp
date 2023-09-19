@@ -7,6 +7,7 @@
 #include <libutils/timer.h>
 
 #include "cl/mandelbrot_cl.h"
+#include "utils.h"
 
 
 void mandelbrotCPU(float *results, unsigned int width, unsigned int height, float fromX, float fromY, float sizeX,
@@ -108,7 +109,7 @@ int main(int argc, char **argv) {
     context.activate();
     {
         gpu::gpu_mem_32f cl_results;
-        const unsigned int size = gpu_results.width * gpu_results.height;
+        const unsigned int size = width * height;
         cl_results.resizeN(size);
 
         ocl::Kernel kernel(mandelbrot_kernel, mandelbrot_kernel_length, "mandelbrot");
@@ -124,34 +125,63 @@ int main(int argc, char **argv) {
         // TODO близко к ЦПУ-версии, включая рассчет таймингов, гигафлопс, Real iterations fraction и сохранение в файл
         // результат должен оказаться в gpu_results
 
-        const unsigned int workGroupSize = 128;
-        const unsigned int global_work_size = (size + workGroupSize - 1) / workGroupSize * workGroupSize;
-        const char smoothing = 0;
+        const unsigned int workGroupSizeX = 16;
+        const unsigned int global_work_size_x = (width + workGroupSizeX - 1) / workGroupSizeX * workGroupSizeX;
 
-        kernel.exec(gpu::WorkSize(workGroupSize, global_work_size), cl_results, width, height, fromX, fromY, sizeX,
-                    sizeY, iterationsLimit, smoothing);
+        const unsigned int workGroupSizeY = 16;
+        const unsigned int global_work_size_y = (height + workGroupSizeY - 1) / workGroupSizeY * workGroupSizeY;
+
+        const int smoothing = 0;
+
+        timer t;
+        for (int i = 0; i < benchmarkingIters; ++i) {
+            kernel.exec(gpu::WorkSize(workGroupSizeX, workGroupSizeY, global_work_size_x, global_work_size_y),
+                        cl_results, width, height, fromX, fromY, sizeX, sizeY, iterationsLimit, smoothing);
+            t.nextLap();
+        }
+        size_t flopsInLoop = 10;
+        size_t maxApproximateFlops = width * height * iterationsLimit * flopsInLoop;
+        size_t gflops = 1000 * 1000 * 1000;
+
+        std::string name = utils::trim(device.name);
+        std::cout << name << ": " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << name << ": " << maxApproximateFlops / gflops / t.lapAvg() << " GFlops" << std::endl;
+
+        cl_results.readN(gpu_results.ptr(), size);
+
+        double realIterationsFraction = 0.0;
+        for (int j = 0; j < height; ++j) {
+            for (int i = 0; i < width; ++i) {
+                realIterationsFraction += gpu_results.ptr()[j * width + i];
+            }
+        }
+        std::cout << "    Real iterations fraction: " << 100.0 * realIterationsFraction / (width * height) << "%"
+                  << std::endl;
+
+        renderToColor(gpu_results.ptr(), image.ptr(), width, height);
+        image.savePNG("mandelbrot_gpu.png");
     }
 
-    //    {
-    //        double errorAvg = 0.0;
-    //        for (int j = 0; j < height; ++j) {
-    //            for (int i = 0; i < width; ++i) {
-    //                errorAvg += fabs(gpu_results.ptr()[j * width + i] - cpu_results.ptr()[j * width + i]);
-    //            }
-    //        }
-    //        errorAvg /= width * height;
-    //        std::cout << "GPU vs CPU average results difference: " << 100.0 * errorAvg << "%" << std::endl;
-    //
-    //        if (errorAvg > 0.03) {
-    //            throw std::runtime_error("Too high difference between CPU and GPU results!");
-    //        }
-    //    }
+    {
+        double errorAvg = 0.0;
+        for (int j = 0; j < height; ++j) {
+            for (int i = 0; i < width; ++i) {
+                errorAvg += fabs(gpu_results.ptr()[j * width + i] - cpu_results.ptr()[j * width + i]);
+            }
+        }
+        errorAvg /= width * height;
+        std::cout << "GPU vs CPU average results difference: " << 100.0 * errorAvg << "%" << std::endl;
+
+        if (errorAvg > 0.03) {
+            throw std::runtime_error("Too high difference between CPU and GPU results!");
+        }
+    }
 
     // Это бонус в виде интерактивной отрисовки, не забудьте запустить на ГПУ, чтобы посмотреть, в какой момент числа итераций/точности single float перестанет хватать
     // Кликами мышки можно смещать ракурс
     // Но в Pull-request эти две строки должны быть закомментированы, т.к. на автоматическом тестировании нет оконной подсистемы
-    //    bool useGPU = false;
-    //    renderInWindow(centralX, centralY, iterationsLimit, useGPU);
+    bool useGPU = true;
+    renderInWindow(centralX, centralY, iterationsLimit, useGPU);
 
     return 0;
 }
