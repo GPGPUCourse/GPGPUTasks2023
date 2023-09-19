@@ -66,6 +66,10 @@ namespace cl_objects {
                 releaseFunc(cl_object);
         }
     };
+    template<typename CREATE_FUNC, typename RELEASE_FUNC, typename... Args>
+    auto makeWrapper(CREATE_FUNC createFunc, RELEASE_FUNC* releaseFunc, Args... args) -> WrapperRAII<decltype(createFunc(args..., nullptr)), RELEASE_FUNC> {
+        return WrapperRAII<decltype(createFunc(args..., nullptr)), RELEASE_FUNC>(createFunc, releaseFunc, args...);
+    }
 
     class KernelsInProgram {
         std::vector<cl_kernel> kernels;

@@ -43,12 +43,12 @@ int main() {
     // Не забывайте проверять все возвращаемые коды на успешность (обратите внимание, что в данном случае метод возвращает
     // код по переданному аргументом errcode_ret указателю)
     // И хорошо бы сразу добавить в конце clReleaseContext (да, не очень RAII, но это лишь пример)
-    cl_objects::WrapperRAII<cl_context, decltype(clReleaseContext)> context(clCreateContext, clReleaseContext, nullptr, 1, &(selectedDevice.getId()), nullptr, nullptr);
+    auto context = cl_objects::makeWrapper(clCreateContext, clReleaseContext, nullptr, 1, &(selectedDevice.getId()), nullptr, nullptr);
     // TODO 3 Создайте очередь выполняемых команд в рамках выбранного контекста и устройства
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Runtime APIs -> Command Queues -> clCreateCommandQueue
     // Убедитесь, что в соответствии с документацией вы создали in-order очередь задач
     // И хорошо бы сразу добавить в конце clReleaseQueue (не забывайте освобождать ресурсы)
-    cl_objects::WrapperRAII<cl_command_queue, decltype(clReleaseCommandQueue)> cmdQueue(clCreateCommandQueue, clReleaseCommandQueue, context.getObject(), selectedDevice.getId(), 0);
+    auto cmdQueue = cl_objects::makeWrapper(clCreateCommandQueue, clReleaseCommandQueue, context.getObject(), selectedDevice.getId(), 0);
     unsigned int n = 100 * 1000 * 1000;
     // Создаем два массива псевдослучайных данных для сложения и массив для будущего хранения результата
     std::vector<float> as(n, 0);
@@ -68,10 +68,10 @@ int main() {
     // или же через метод Buffer Objects -> clEnqueueWriteBuffer
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
     size_t bufferSize = sizeof(float) * n;
-    cl_objects::WrapperRAII<cl_mem, decltype(clReleaseMemObject)>
-            buf_as(clCreateBuffer, clReleaseMemObject, context.getObject(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, bufferSize, as.data()),
-            buf_bs(clCreateBuffer, clReleaseMemObject, context.getObject(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, bufferSize, bs.data()),
-            buf_cs(clCreateBuffer, clReleaseMemObject, context.getObject(), CL_MEM_WRITE_ONLY , bufferSize, nullptr);
+    auto copyFlag = selectedDevice.type() == "CPU" ? CL_MEM_USE_HOST_PTR : CL_MEM_COPY_HOST_PTR;
+    auto buf_as = cl_objects::makeWrapper(clCreateBuffer, clReleaseMemObject, context.getObject(), CL_MEM_READ_ONLY | copyFlag, bufferSize, as.data()),
+        buf_bs = cl_objects::makeWrapper(clCreateBuffer, clReleaseMemObject, context.getObject(), CL_MEM_READ_ONLY | copyFlag, bufferSize, bs.data()),
+        buf_cs = cl_objects::makeWrapper(clCreateBuffer, clReleaseMemObject, context.getObject(), CL_MEM_WRITE_ONLY , bufferSize, nullptr);
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
     // напечатав исходники в консоль (if проверяет, что удалось считать хоть что-то)
@@ -90,8 +90,7 @@ int main() {
     // у string есть метод c_str(), но обратите внимание, что передать вам нужно указатель на указатель
     std::vector<size_t> lengths = {kernel_sources.size()};
     std::vector<const char*> sources = {kernel_sources.data()};
-    cl_objects::WrapperRAII<cl_program, decltype(clReleaseProgram)>
-            program(clCreateProgramWithSource, clReleaseProgram, context.getObject(), sizeof(sources.data()) / sizeof(char*), sources.data(), lengths.data());
+    auto program = cl_objects::makeWrapper(clCreateProgramWithSource, clReleaseProgram, context.getObject(), sizeof(sources.data()) / sizeof(char*), sources.data(), lengths.data());
     // TODO 8 Теперь скомпилируйте программу и напечатайте в консоль лог компиляции
     // см. clBuildProgram
     const cl_device_id deviceList[] = {selectedDevice.getId()};
