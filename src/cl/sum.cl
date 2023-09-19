@@ -1,5 +1,8 @@
 typedef unsigned int uint_;
 
+#define VALUES_PER_WORK_ITEM 128
+#define WORKGROUP_SIZE 128
+
 __kernel void sum1(__global const uint_ *src, __global uint_ *res, const uint_ size) {
     const uint_ id = get_global_id(0);
 
@@ -9,8 +12,6 @@ __kernel void sum1(__global const uint_ *src, __global uint_ *res, const uint_ s
 
     atomic_add(res, src[id]);
 }
-
-#define VALUES_PER_WORK_ITEM 128
 
 __kernel void sum2(__global const uint_ *src, __global uint_ *res, const uint_ size) {
     const uint_ id = get_global_id(0);
@@ -39,8 +40,6 @@ __kernel void sum3(__global const uint_ *src, __global uint_ *res, const uint_ s
     }
     atomic_add(res, value);
 }
-
-#define WORKGROUP_SIZE 128
 
 __kernel void sum4(__global const uint_ *src, __global uint_ *res, const uint_ size) {
     const uint_ gid = get_global_id(0);

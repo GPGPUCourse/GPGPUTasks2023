@@ -18,39 +18,46 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 
-void sum(const gpu::WorkSize &work_size, const std::vector<unsigned int> as, const unsigned int src_n,
-         const unsigned int res_n, const unsigned int benchmarkingIters, const unsigned int expect,
-         const std::string &device, const std::string &name) {
+struct Params {
+    const std::string& device;
+    std::vector<unsigned int>& as;
+    unsigned int benchmarking_iters;
+    unsigned int expect;
+    unsigned int src_n;
+    unsigned int res_n;
+};
+
+void sum(const gpu::WorkSize &work_size, const Params &params, const std::string &name) {
     ocl::Kernel adder(sum_kernel, sum_kernel_length, name);
     adder.compile();
 
     gpu::gpu_mem_32u src_gpu, res_gpu;
-    src_gpu.resizeN(src_n);
-    src_gpu.writeN(as.data(), src_n);
+    src_gpu.resizeN(params.src_n);
+    src_gpu.writeN(params.as.data(), params.src_n);
 
-    res_gpu.resizeN(res_n);
+    res_gpu.resizeN(params.res_n);
 
     timer t;
-    for (int iter = 0; iter < benchmarkingIters; ++iter) {
-        std::vector<unsigned int> sum(res_n, 0);
-        res_gpu.writeN(sum.data(), res_n);
+    for (int iter = 0; iter < params.benchmarking_iters; ++iter) {
+        std::vector<unsigned int> sum(params.res_n, 0);
+        res_gpu.writeN(sum.data(), params.res_n);
 
-        adder.exec(work_size, src_gpu, res_gpu, src_n);
+        adder.exec(work_size, src_gpu, res_gpu, params.src_n);
 
-        res_gpu.readN(sum.data(), res_n, 0);
+        res_gpu.readN(sum.data(), params.res_n, 0);
 
         sum[0] = std::accumulate(sum.begin(), sum.end(), 0);
 
-        EXPECT_THE_SAME(expect, sum[0], "the \"" + name + "\" method does not sum correctly!");
+        EXPECT_THE_SAME(params.expect, sum[0], "the \"" + name + "\" method does not sum correctly!");
         t.nextLap();
     }
-    std::cout << device << ": " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-    std::cout << device << ": " << (src_n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
+    std::cout << params.device << ": " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+    std::cout << params.device << ": " << (params.src_n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
     std::cout << std::endl;
 }
 
 int main(int argc, char **argv) {
-    int benchmarkingIters = 10;
+    unsigned int benchmarkingIters = 10;
     unsigned int n = 100 * 1000 * 1000;
 
     unsigned int reference_sum = 0;
@@ -93,7 +100,6 @@ int main(int argc, char **argv) {
     }
 
     {
-        // TODO: implement on OpenCL
         gpu::Device device = gpu::chooseGPUDevice(argc, argv);
 
         gpu::Context context;
@@ -102,24 +108,20 @@ int main(int argc, char **argv) {
         std::cout << std::endl;
 
         unsigned int workGroupSize = 128;
-        unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
+        const unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
 
-        sum(gpu::WorkSize(workGroupSize, global_work_size), as, n, 1, benchmarkingIters, reference_sum,
-            trimmed(device.name), "sum1");
+        Params params{trimmed(device.name), as, benchmarkingIters, reference_sum, n, 1};
 
-        global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize / 128;
-        sum(gpu::WorkSize(workGroupSize, global_work_size), as, n, 1, benchmarkingIters, reference_sum,
-            trimmed(device.name), "sum2");
+        sum(gpu::WorkSize(workGroupSize, global_work_size), params, "sum1");
 
-        sum(gpu::WorkSize(workGroupSize, global_work_size), as, n, 1, benchmarkingIters, reference_sum,
-            trimmed(device.name), "sum3");
+        unsigned int temp = global_work_size / 128;
+        sum(gpu::WorkSize(workGroupSize, temp), params, "sum2");
 
-        global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
-        sum(gpu::WorkSize(workGroupSize, global_work_size), as, n, 1, benchmarkingIters, reference_sum,
-            trimmed(device.name), "sum4");
+        sum(gpu::WorkSize(workGroupSize, temp), params, "sum3");
 
-        global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
-        sum(gpu::WorkSize(workGroupSize, global_work_size), as, n, global_work_size / 128, benchmarkingIters, reference_sum,
-            trimmed(device.name), "sum5");
+        sum(gpu::WorkSize(workGroupSize, global_work_size), params, "sum4");
+
+        params.res_n = global_work_size / workGroupSize;
+        sum(gpu::WorkSize(workGroupSize, global_work_size), params, "sum5");
     }
 }
