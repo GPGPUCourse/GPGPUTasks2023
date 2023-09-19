@@ -11,7 +11,11 @@
 
 #define half float
 
-struct float2 { float x;          };
+using uint = unsigned int;
+using ulong = unsigned long;
+using size_t = ulong;
+
+struct float2 { float x, y;       };
 struct float3 { float x, y, z;    };
 struct float4 { float x, y, z, w; };
 
@@ -71,5 +75,8 @@ void atomic_add(...);
 
 // 64 for AMD, 32 for NVidia, 8 for intel GPUs, 1 for CPU
 #define WARP_SIZE 64
+
+#define VALUES_PER_WORKITEM 64
+#define WORKGROUP_SIZE 64
 
 #endif // pragma once
