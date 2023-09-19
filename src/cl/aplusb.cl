@@ -11,8 +11,8 @@
 // - На вход дано три массива float чисел; единственное, чем они отличаются от обычных указателей - модификатором __global, т.к. это глобальная память устройства (видеопамять)
 // - Четвертым и последним аргументом должно быть передано количество элементов в каждом массиве (unsigned int, главное, чтобы тип был согласован с типом в соответствующем clSetKernelArg в T0D0 10)
 
-__kernel void aplusb(__global float *a,
-                     __global float *b,
+__kernel void aplusb(__global const float *a,
+                     __global const float *b,
                      __global float *c,
                      unsigned int size) {
     int i = get_global_id(0);

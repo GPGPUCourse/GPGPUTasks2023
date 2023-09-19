@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <vector>
 
+#define SHOW_LOG_ON_SUCCESS 1 // otherwise shows log only on failure
 
 template<typename T>
 std::string to_string(T value) {
@@ -69,14 +70,14 @@ int main() {
     // И хорошо бы сразу добавить в конце clReleaseContext (да, не очень RAII, но это лишь пример)
     cl_int err;
     cl_context context = clCreateContext(nullptr, 1, &device, nullptr, nullptr, &err);
-    reportError(err, __FILE__, __LINE__);
+    OCL_SAFE_CALL(err);
 
     // TODO 3 Создайте очередь выполняемых команд в рамках выбранного контекста и устройства
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Runtime APIs -> Command Queues -> clCreateCommandQueue
     // Убедитесь, что в соответствии с документацией вы создали in-order очередь задач
     // И хорошо бы сразу добавить в конце clReleaseQueue (не забывайте освобождать ресурсы)
     cl_command_queue queue = clCreateCommandQueue(context, device, 0, &err);
-    reportError(err, __FILE__, __LINE__);
+	OCL_SAFE_CALL(err);
 
     unsigned int n = 100 * 1000 * 1000;
     // Создаем два массива псевдослучайных данных для сложения и массив для будущего хранения результата
@@ -99,12 +100,12 @@ int main() {
     // или же через метод Buffer Objects -> clEnqueueWriteBuffer
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
 
-    cl_mem as_gpu = clCreateBuffer(context, CL_MEM_READ_ONLY, n * sizeof(float), nullptr, &err);
-    reportError(err, __FILE__, __LINE__);
-    cl_mem bs_gpu = clCreateBuffer(context, CL_MEM_READ_ONLY, n * sizeof(float), nullptr, &err);
-    reportError(err, __FILE__, __LINE__);
-    cl_mem cs_gpu = clCreateBuffer(context, CL_MEM_WRITE_ONLY, n * sizeof(float), nullptr, &err);
-    reportError(err, __FILE__, __LINE__);
+    cl_mem as_gpu = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(float), nullptr, &err);
+	OCL_SAFE_CALL(err);
+    cl_mem bs_gpu = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(float), nullptr, &err);
+	OCL_SAFE_CALL(err);
+    cl_mem cs_gpu = clCreateBuffer(context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, n * sizeof(float), nullptr, &err);
+	OCL_SAFE_CALL(err);
 
     OCL_SAFE_CALL(clEnqueueWriteBuffer(queue, as_gpu, CL_TRUE, 0, n * sizeof(float), as.data(), 0, nullptr, nullptr));
     OCL_SAFE_CALL(clEnqueueWriteBuffer(queue, bs_gpu, CL_TRUE, 0, n * sizeof(float), bs.data(), 0, nullptr, nullptr));
@@ -142,18 +143,26 @@ int main() {
         cl_build_status buildStatus;
         OCL_SAFE_CALL(clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_STATUS, sizeof(buildStatus), &buildStatus,
                                             nullptr));
-        if (CL_BUILD_SUCCESS != buildStatus) {
-            std::cout << "Build status: " << buildStatus << std::endl;
-            size_t log_size = 0;
-            OCL_SAFE_CALL(clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size));
-            std::vector<char> log(log_size, 0);
+#if !SHOW_LOG_ON_SUCCESS
+		if (CL_BUILD_SUCCESS != buildStatus)
+#endif
+		{
+			std::cout << "Build status: " << buildStatus << std::endl;
+			size_t log_size = 0;
+			OCL_SAFE_CALL(clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size));
+			std::vector<char> log(log_size, 0);
 
-            if (log_size > 1) {
-                OCL_SAFE_CALL(
-                        clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log_size, log.data(), nullptr));
-                std::cout << "Log:" << std::endl;
-                std::cout << log.data() << std::endl << std::endl;
-            }
+			if (log_size > 1)
+			{
+				OCL_SAFE_CALL(
+						clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, log_size, log.data(), nullptr));
+				std::cout << "Log:" << std::endl;
+				std::cout << log.data() << std::endl << std::endl;
+			}
+		}
+
+        if (CL_BUILD_SUCCESS != buildStatus) {
+			throw std::runtime_error("Kernel compilation failed!");
         }
     }
     // TODO 9 Создайте OpenCL-kernel в созданной подпрограмме (в одной подпрограмме может быть несколько кернелов, но в данном случае кернел один)
