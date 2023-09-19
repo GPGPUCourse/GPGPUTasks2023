@@ -1,34 +1,33 @@
-#include "CL/cl.h"
-#include "CL/cl_platform.h"
-#include <cmath>
 #ifdef __CLION_IDE__
     #include <libgpu/opencl/cl/clion_defines.cl>
 #endif
 
 #line 6
 
-__kernel void mandelbrot(__global cl_float *results, const cl_uint width, const cl_uint height, const cl_float fromX,
-                         const cl_float fromY, const cl_float sizeX, const cl_float sizeY, const cl_uint iters,
-                         const cl_bool smoothing) {
-    const cl_float threshold = 256.0f;
-    const cl_float threshold2 = threshold * threshold;
+typedef unsigned int uint_;
 
-    cl_uint id = get_global_id(0);
+__kernel void mandelbrot(__global float *results, const uint_ width, const uint_ height, const float fromX,
+                         const float fromY, const float sizeX, const float sizeY, const uint_ iters,
+                         const uint_ smoothing) {
+    const float threshold = 256.0f;
+    const float threshold2 = threshold * threshold;
 
-    cl_uint i = id % width;
-    cl_uint j = id / width;
+    uint_ id = get_global_id(0);
+
+    uint_ i = id % width;
+    uint_ j = id / width;
 
     if (!(i < width && j < height)) return;
 
-    cl_float x0 = fromX + (i + 0.5f) * sizeX / width;
-    cl_float y0 = fromY + (j + 0.5f) * sizeY / height;
+    float x0 = fromX + (i + 0.5f) * sizeX / width;
+    float y0 = fromY + (j + 0.5f) * sizeY / height;
 
-    cl_float x = x0;
-    cl_float y = y0;
+    float x = x0;
+    float y = y0;
 
-    cl_int iter = 0;
+    uint_ iter = 0;
     for (; iter < iters; ++iter) {
-        cl_float xPrev = x;
+        float xPrev = x;
         x = x * x - y * y + x0;
         y = 2.0f * xPrev * y + y0;
         if ((x * x + y * y) > threshold2) {
@@ -36,9 +35,9 @@ __kernel void mandelbrot(__global cl_float *results, const cl_uint width, const 
         }
     }
 
-    cl_float result = iter;
+    float result = iter;
     if (smoothing && iter != iters) {
-        result = result - logf(logf(sqrtf(x * x + y * y)) / logf(threshold)) / logf(2.0f);
+        result = result - log(log(sqrt(x * x + y * y)) / log(threshold)) / log(2.0f);
     }
 
     result = 1.0f * result / iters;
