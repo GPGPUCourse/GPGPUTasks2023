@@ -15,7 +15,7 @@ void mandelbrotCPU(float *results, unsigned int width, unsigned int height, floa
     const float threshold = 256.0f;
     const float threshold2 = threshold * threshold;
 
-    #pragma omp parallel for
+#pragma omp parallel for
     for (int j = 0; j < height; ++j) {
         for (int i = 0; i < width; ++i) {
             float x0 = fromX + (i + 0.5f) * sizeX / width;
@@ -52,11 +52,11 @@ void renderInWindow(float centralX, float centralY, unsigned int iterationsLimit
 int main(int argc, char **argv) {
     gpu::Device device = gpu::chooseGPUDevice(argc, argv);
 
-    unsigned int benchmarkingIters = 10;
+    const unsigned int benchmarkingIters = 10;
 
-    unsigned int width = 2048;
-    unsigned int height = 2048;
-    unsigned int iterationsLimit = 256;
+    const unsigned int width = 2048;
+    const unsigned int height = 2048;
+    const unsigned int iterationsLimit = 256;
 
     float centralX = -0.789136f;
     float centralY = -0.150316f;
