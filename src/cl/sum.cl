@@ -47,7 +47,7 @@ __kernel void sum4(__global const uint_ *src, __global uint_ *res, const uint_ s
     const uint_ lid = get_local_id(0);
 
     __local uint_ buff[WORKGROUP_SIZE];
-    buff[lid] = src[gid];
+    buff[lid] = gid < size ? src[gid] : 0;
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
@@ -57,5 +57,30 @@ __kernel void sum4(__global const uint_ *src, __global uint_ *res, const uint_ s
             value += buff[i];
         }
         atomic_add(res, value);
+    }
+}
+
+__kernel void sum5(__global const uint_ *src, __global uint_ *res, const uint_ size) {
+    const uint_ gid = get_global_id(0);
+    const uint_ lid = get_local_id(0);
+    const uint_ wid = get_group_id(0);
+
+    __local uint_ buff[WORKGROUP_SIZE];
+    buff[lid] = gid < size ? src[gid] : 0;
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    for (uint_ i = WORKGROUP_SIZE; i > 1; i /= 2) {
+        if (2 * lid < i) {
+            uint_ a = buff[lid];
+            uint_ b = buff[lid + i / 2];
+
+            buff[lid] = a + b;
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    if (lid == 0) {
+        res[wid] = buff[0];
     }
 }

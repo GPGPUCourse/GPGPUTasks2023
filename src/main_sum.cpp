@@ -3,6 +3,7 @@
 #include <libutils/fast_random.h>
 #include <libutils/misc.h>
 #include <libutils/timer.h>
+#include <numeric>
 
 #include "cl/sum_cl.h"
 #include "libgpu/work_size.h"
@@ -36,7 +37,10 @@ void sum(const gpu::WorkSize &work_size, const std::vector<unsigned int> as, con
 
         adder.exec(work_size, src_gpu, res_gpu, src_n);
 
-        res_gpu.readN(sum.data(), 1, 0);
+        res_gpu.readN(sum.data(), res_n, 0);
+
+        sum[0] = std::accumulate(sum.begin(), sum.end(), 0);
+
         EXPECT_THE_SAME(expect, sum[0], "the \"" + name + "\" method does not sum correctly!");
         t.nextLap();
     }
@@ -113,5 +117,9 @@ int main(int argc, char **argv) {
         global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
         sum(gpu::WorkSize(workGroupSize, global_work_size), as, n, 1, benchmarkingIters, reference_sum,
             trimmed(device.name), "sum4");
+
+        global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
+        sum(gpu::WorkSize(workGroupSize, global_work_size), as, n, global_work_size / 128, benchmarkingIters, reference_sum,
+            trimmed(device.name), "sum5");
     }
 }
