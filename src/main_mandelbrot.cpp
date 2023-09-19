@@ -7,7 +7,6 @@
 #include <libutils/timer.h>
 
 #include "cl/mandelbrot_cl.h"
-#include "utils.h"
 
 
 void mandelbrotCPU(float *results, unsigned int width, unsigned int height, float fromX, float fromY, float sizeX,
@@ -141,7 +140,7 @@ int main(int argc, char **argv) {
             t.nextLap();
         }
 
-        std::string name = utils::trim(device.name);
+        std::string name = trimmed(device.name);
         std::cout << name << ": " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << name << ": " << maxApproximateFlops / gflops / t.lapAvg() << " GFlops" << std::endl;
 
