@@ -39,7 +39,7 @@ void execKernel(ocl::Kernel &kernel, gpu::gpu_mem_32u const &aGpu, gpu::gpu_mem_
 int main(int argc, char **argv) {
     gpu::Device device = gpu::chooseGPUDevice(argc, argv);
 
-    int benchmarkingIters = 10;
+    int benchmarkingIters = 40;
 
     unsigned int reference_sum = 0;
     unsigned int n = 100 * 1000 * 1000;
