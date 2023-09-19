@@ -132,11 +132,11 @@ int main() {
             return buffer;
         };
 
-        cl_mem_flags srcFlags = CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR;
+        cl_mem_flags srcFlags = CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR;
         aGpuBuff = create_buffer(as.data(), srcFlags);
         bGpuBuff = create_buffer(bs.data(), srcFlags);
 
-        cGpuBuff = create_buffer(nullptr, CL_MEM_WRITE_ONLY);
+        cGpuBuff = create_buffer(cs.data(), CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR);
     }
     
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
