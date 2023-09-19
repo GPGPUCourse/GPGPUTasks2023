@@ -106,5 +106,8 @@ int main(int argc, char **argv) {
         global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize / 64;
         sum(gpu::WorkSize(workGroupSize, global_work_size), as, n, 1, benchmarkingIters, reference_sum,
             trimmed(device.name), "sum2");
+
+        sum(gpu::WorkSize(workGroupSize, global_work_size), as, n, 1, benchmarkingIters, reference_sum,
+            trimmed(device.name), "sum3");
     }
 }
