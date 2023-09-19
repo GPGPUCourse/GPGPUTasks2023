@@ -15,7 +15,7 @@ void mandelbrotCPU(float *results, unsigned int width, unsigned int height, floa
     const float threshold = 256.0f;
     const float threshold2 = threshold * threshold;
 
-#pragma omp parallel for
+    #pragma omp parallel for
     for (int j = 0; j < height; ++j) {
         for (int i = 0; i < width; ++i) {
             float x0 = fromX + (i + 0.5f) * sizeX / width;
@@ -68,23 +68,24 @@ int main(int argc, char **argv) {
     //    float sizeX = 2.0f;
 
     images::Image<float> cpu_results(width, height, 1);
-    images::Image<float> gpu_results(width, height, 1);
     images::Image<unsigned char> image(width, height, 3);
 
-    float sizeY = sizeX * height / width;
+    const float sizeY = sizeX * height / width;
 
-    float fromX = centralX - sizeX / 2.0f;
-    float fromY = centralY - sizeY / 2.0f;
+    const float fromX = centralX - sizeX / 2.0f;
+    const float fromY = centralY - sizeY / 2.0f;
 
+    const size_t flopsInLoop = 10;
+    const size_t maxApproximateFlops = width * height * iterationsLimit * flopsInLoop;
+    const size_t gflops = 1000 * 1000 * 1000;
+
+    std::cout << std::endl;
     {
         timer t;
         for (int i = 0; i < benchmarkingIters; ++i) {
             mandelbrotCPU(cpu_results.ptr(), width, height, fromX, fromY, sizeX, sizeY, iterationsLimit, false);
             t.nextLap();
         }
-        size_t flopsInLoop = 10;
-        size_t maxApproximateFlops = width * height * iterationsLimit * flopsInLoop;
-        size_t gflops = 1000 * 1000 * 1000;
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "CPU: " << maxApproximateFlops / gflops / t.lapAvg() << " GFlops" << std::endl;
 
@@ -100,13 +101,13 @@ int main(int argc, char **argv) {
         renderToColor(cpu_results.ptr(), image.ptr(), width, height);
         image.savePNG("mandelbrot_cpu.png");
     }
-
-
-    // Раскомментируйте это:
+    images::Image<float> gpu_results(width, height, 1);
 
     gpu::Context context;
     context.init(device.device_id_opencl);
     context.activate();
+
+    std::cout << std::endl;
     {
         gpu::gpu_mem_32f cl_results;
         const unsigned int size = width * height;
@@ -139,9 +140,6 @@ int main(int argc, char **argv) {
                         cl_results, width, height, fromX, fromY, sizeX, sizeY, iterationsLimit, smoothing);
             t.nextLap();
         }
-        size_t flopsInLoop = 10;
-        size_t maxApproximateFlops = width * height * iterationsLimit * flopsInLoop;
-        size_t gflops = 1000 * 1000 * 1000;
 
         std::string name = utils::trim(device.name);
         std::cout << name << ": " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
@@ -162,6 +160,7 @@ int main(int argc, char **argv) {
         image.savePNG("mandelbrot_gpu.png");
     }
 
+    std::cout << std::endl;
     {
         double errorAvg = 0.0;
         for (int j = 0; j < height; ++j) {
