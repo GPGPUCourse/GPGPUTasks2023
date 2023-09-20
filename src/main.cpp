@@ -240,6 +240,7 @@ int main() {
         }
     }
 
+    OCL_SAFE_CALL(clReleaseKernel(kernel));
     OCL_SAFE_CALL(clReleaseProgram(program));
     OCL_SAFE_CALL(clReleaseMemObject(arrayC));
     OCL_SAFE_CALL(clReleaseMemObject(arrayB));
