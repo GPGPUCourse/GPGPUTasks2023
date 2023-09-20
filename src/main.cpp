@@ -172,7 +172,7 @@ int main() {
     std::string kernel_sources;
     {
         
-      // std::ifstream file("/home/boris/Documents/courses_2023_2024/GPGPUTasks2023/src/cl/aplusb.cl"); // !!!
+        //std::ifstream file("/home/boris/Documents/courses_2023_2024/GPGPUTasks2023/src/cl/aplusb.cl"); // !!!
         std::ifstream file("src/cl/aplusb.cl");
         kernel_sources = std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
         if (kernel_sources.size() == 0) {
@@ -186,7 +186,7 @@ int main() {
     // у string есть метод c_str(), но обратите внимание, что передать вам нужно указатель на указатель
         
     
-    // std::ifstream file("/home/boris/Documents/courses_2023_2024/GPGPUTasks2023/src/cl/aplusb.cl"); // !!!
+    //std::ifstream file("/home/boris/Documents/courses_2023_2024/GPGPUTasks2023/src/cl/aplusb.cl"); // !!!
     std::ifstream file("src/cl/aplusb.cl");
     cl_uint count = 1;
     std::string s;
@@ -292,7 +292,7 @@ int main() {
         // - В гигафлопсе 10^9 флопсов
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
         
-        double gflops = n * n / t.lapAvg() / 1e+9;
+        double gflops = n / t.lapAvg() / 1e9;
         
         std::cout << "GFlops: " << gflops << std::endl;
 
@@ -316,7 +316,7 @@ int main() {
             OCL_SAFE_CALL(t.nextLap());
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        double bandwidth = 3 * n * sizeof(float) / 1024 / 1024 / 1024 / t.lapAvg();
+        double bandwidth = n * sizeof(float) / 1024.0 / 1024 / 1024 / t.lapAvg();
         std::cout << "VRAM -> RAM bandwidth: " << bandwidth << " GB/s" << std::endl;
     }
 
