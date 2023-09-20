@@ -303,7 +303,7 @@ int main() {
         // - В гигабайте 1024*1024*1024 байт
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
         
-        double bandwidth = n * sizeof(float) * 3 * n * sizeof(float) / 1024 / 1024 / 1024 / t.lapAvg();
+        double bandwidth = sizeof(float) * 3 * n * sizeof(float) / 1024 / 1024 / 1024 / t.lapAvg();
         
         std::cout << "VRAM bandwidth: " << bandwidth << " GB/s" << std::endl;
     }
@@ -316,7 +316,7 @@ int main() {
             OCL_SAFE_CALL(t.nextLap());
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        double bandwidth = n * sizeof(float) * 3 * n * sizeof(float) / 1024 / 1024 / 1024 / t.lapAvg();
+        double bandwidth = sizeof(float) * 3 * n * sizeof(float) / 1024 / 1024 / 1024 / t.lapAvg();
         std::cout << "VRAM -> RAM bandwidth: " << bandwidth << " GB/s" << std::endl;
     }
 
