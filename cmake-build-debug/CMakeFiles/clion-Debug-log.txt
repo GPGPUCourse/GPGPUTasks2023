@@ -1,1 +1,0 @@
-CMakeLists.txt not found in /home/ilia/GPGPUTasks2023 Select CMakeLists.txt
