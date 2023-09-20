@@ -4,21 +4,9 @@ __kernel void atomicAddSum(__global const unsigned int *a, __global unsigned int
     atomic_add(sum, a[gid]);
 }
 
-
-#define SMALL_VALUES_PER_WORKITEM 4
-__kernel void smallLoopSum(__global const unsigned int *a, __global unsigned int *sum, unsigned int n) {
-    size_t gid = get_global_id(0);
-    unsigned int res = 0;
-    for (int i = 0; i < SMALL_VALUES_PER_WORKITEM; i++) {
-        int idx = SMALL_VALUES_PER_WORKITEM * gid + i;
-        if (idx < n)
-            res += a[idx];
-    }
-
-    atomic_add(sum, res);
-}
-
-#define VALUES_PER_WORKITEM 32
+#ifndef VALUES_PER_WORKITEM
+    #define VALUES_PER_WORKITEM 32
+#endif
 __kernel void loopSum(__global const unsigned int *a, __global unsigned int *sum, unsigned int n) {
     size_t gid = get_global_id(0);
     unsigned int res = 0;

@@ -3,3 +3,6 @@
 build
 cmake-build*
 .vs
+.vscode
+.cache
+compile_commands.json
