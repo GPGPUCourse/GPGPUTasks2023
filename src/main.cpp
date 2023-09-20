@@ -172,7 +172,7 @@ int main() {
     std::string kernel_sources;
     {
         
-      //  std::ifstream file("/home/boris/Documents/courses_2023_2024/GPGPUTasks2023/src/cl/aplusb.cl"); // !!!
+      // std::ifstream file("/home/boris/Documents/courses_2023_2024/GPGPUTasks2023/src/cl/aplusb.cl"); // !!!
         std::ifstream file("src/cl/aplusb.cl");
         kernel_sources = std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
         if (kernel_sources.size() == 0) {
@@ -303,7 +303,7 @@ int main() {
         // - В гигабайте 1024*1024*1024 байт
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
         
-        double bandwidth = sizeof(float) * 3 * n * sizeof(float) / 1024 / 1024 / 1024 / t.lapAvg();
+        double bandwidth = 3 * n * sizeof(float) / 1024 / 1024 / 1024 / t.lapAvg();
         
         std::cout << "VRAM bandwidth: " << bandwidth << " GB/s" << std::endl;
     }
@@ -316,7 +316,7 @@ int main() {
             OCL_SAFE_CALL(t.nextLap());
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        double bandwidth = sizeof(float) * 3 * n * sizeof(float) / 1024 / 1024 / 1024 / t.lapAvg();
+        double bandwidth = 3 * n * sizeof(float) / 1024 / 1024 / 1024 / t.lapAvg();
         std::cout << "VRAM -> RAM bandwidth: " << bandwidth << " GB/s" << std::endl;
     }
 
