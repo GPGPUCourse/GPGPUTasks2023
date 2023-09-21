@@ -27,7 +27,7 @@ struct Params {
     unsigned int res_n;
 };
 
-void sum(const gpu::WorkSize &work_size, const Params &params, const std::string &name) {
+void sum(const gpu::WorkSize &work_size, const Params &params, const std::string& msg, const std::string &name) {
     ocl::Kernel adder(sum_kernel, sum_kernel_length, name);
     adder.compile();
 
@@ -51,8 +51,8 @@ void sum(const gpu::WorkSize &work_size, const Params &params, const std::string
         EXPECT_THE_SAME(params.expect, sum[0], "the \"" + name + "\" method does not sum correctly!");
         t.nextLap();
     }
-    std::cout << params.device << ": " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-    std::cout << params.device << ": " << (params.src_n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
+    std::cout << msg << ": " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+    std::cout << msg << ": " << (params.src_n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
     std::cout << std::endl;
 }
 
@@ -78,8 +78,8 @@ int main(int argc, char **argv) {
             EXPECT_THE_SAME(reference_sum, sum, "CPU result should be consistent!");
             t.nextLap();
         }
-        std::cout << "CPU:     " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "CPU:     " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "summation on CPU:     " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "summation on CPU:     " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
         std::cout << std::endl;
     }
 
@@ -94,8 +94,8 @@ int main(int argc, char **argv) {
             EXPECT_THE_SAME(reference_sum, sum, "CPU OpenMP result should be consistent!");
             t.nextLap();
         }
-        std::cout << "CPU OMP: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "CPU OMP: " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "summation on CPU OMP: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "summation on CPU OMP: " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
         std::cout << std::endl;
     }
 
@@ -112,16 +112,16 @@ int main(int argc, char **argv) {
 
         Params params{trimmed(device.name), as, benchmarkingIters, reference_sum, n, 1};
 
-        sum(gpu::WorkSize(workGroupSize, global_work_size), params, "sum1");
+        sum(gpu::WorkSize(workGroupSize, global_work_size), params, "with global atomic add", "sum1");
 
         unsigned int temp = global_work_size / 128;
-        sum(gpu::WorkSize(workGroupSize, temp), params, "sum2");
+        sum(gpu::WorkSize(workGroupSize, temp), params, "with loop", "sum2");
 
-        sum(gpu::WorkSize(workGroupSize, temp), params, "sum3");
+        sum(gpu::WorkSize(workGroupSize, temp), params, "with loop and coalesced access", "sum3");
 
-        sum(gpu::WorkSize(workGroupSize, global_work_size), params, "sum4");
+        sum(gpu::WorkSize(workGroupSize, global_work_size), params, "with local memory and global thread", "sum4");
 
         params.res_n = global_work_size / workGroupSize;
-        sum(gpu::WorkSize(workGroupSize, global_work_size), params, "sum5");
+        sum(gpu::WorkSize(workGroupSize, global_work_size), params, "with tree", "sum5");
     }
 }
