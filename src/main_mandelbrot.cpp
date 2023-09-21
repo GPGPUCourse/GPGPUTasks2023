@@ -213,8 +213,16 @@ void renderInWindow(float centralX, float centralY, unsigned int iterationsLimit
             mandelbrotCPU(results.ptr(), width, height, centralX - sizeX / 2.0f, centralY - sizeY / 2.0f, sizeX, sizeY,
                           iterationsLimit, true);
         } else {
-            kernel.exec(gpu::WorkSize(16, 16, width, height), results_vram, width, height, centralX - sizeX / 2.0f,
-                        centralY - sizeY / 2.0f, sizeX, sizeY, iterationsLimit, 1);
+            kernel.exec(
+                gpu::WorkSize (128, 64, width, height), 
+                results_vram, // __global float *results
+                iterationsLimit, // const unsigned int iters
+                centralX - sizeX / 2.0f, // const float fromX
+                centralY - sizeY / 2.0f, // const float fromY
+                sizeX, // const float sizeX
+                sizeY, // const float sizeY
+                0 // const int smoothing
+                );
             results_vram.readN(results.ptr(), width * height);
         }
         renderToColor(results.ptr(), image.ptr(), width, height);
