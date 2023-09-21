@@ -2,6 +2,7 @@
 #include "libgpu/context.h"
 #include "libgpu/shared_device_buffer.h"
 #include <cassert>
+#include <fstream>
 #include <libutils/fast_random.h>
 #include <libutils/misc.h>
 #include <libutils/timer.h>
@@ -28,8 +29,8 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 
 
-void execKernel(ocl::Kernel &kernel, gpu::gpu_mem_32u const &aGpu, gpu::gpu_mem_32u &resGPU, uint workGroupSize, uint globalWorkSize, uint n, uint expectedSum,
-                uint benchmarkingIters, std::string kernelName) {
+double execKernel(ocl::Kernel &kernel, gpu::gpu_mem_32u const &aGpu, gpu::gpu_mem_32u &resGPU, uint workGroupSize, uint globalWorkSize, uint n,
+                  uint expectedSum, uint benchmarkingIters, std::string kernelName) {
     timer t;
     for (int iter = 0; iter < benchmarkingIters; ++iter) {
         uint actualSum = 0;
@@ -41,13 +42,15 @@ void execKernel(ocl::Kernel &kernel, gpu::gpu_mem_32u const &aGpu, gpu::gpu_mem_
     }
 
     std::cout << "GPU (" << kernelName << "):     " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-    std::cout << "GPU (" << kernelName << "):     " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
+    double ops = (n / 1000.0 / 1000.0) / t.lapAvg();
+    std::cout << "GPU (" << kernelName << "):     " << ops << " millions/s" << std::endl;
+    return ops;
 }
 
 int main(int argc, char **argv) {
     gpu::Device device = gpu::chooseGPUDevice(argc, argv);
-
-    int benchmarkingIters = 40;
+    std::string outputFolder = to_string("temp/", argv[1], "-");
+    int benchmarkingIters = 20;
 
     unsigned int reference_sum = 0;
     unsigned int n = 100 * 1000 * 1000;
@@ -100,22 +103,25 @@ int main(int argc, char **argv) {
         aGpu.resizeN(globalWorkSize);
         as.resize(globalWorkSize);
         resGPU.resizeN(1);
-        aGpu.writeN(as.data(), n);
+        aGpu.writeN(as.data(), globalWorkSize);
         {
             ocl::Kernel atomicAddSum(sum_kernel, sum_kernel_length, "atomicAddSum");
             execKernel(atomicAddSum, aGpu, resGPU, workGroupSize, globalWorkSize, as.size(), reference_sum, benchmarkingIters, "atomicAddSum");
         }
 
-        uint valuesPerItem = 64;
         {
-            assert(globalWorkSize % valuesPerItem == 0);
+            uint valuesPerItem = 64;
+            uint workSize = (globalWorkSize + valuesPerItem - 1) / valuesPerItem;
             ocl::Kernel loopSum(sum_kernel, sum_kernel_length, "loopSum", to_string("-DVALUES_PER_WORKITEM=", valuesPerItem));
             execKernel(loopSum, aGpu, resGPU, workGroupSize, globalWorkSize / valuesPerItem, as.size(), reference_sum, benchmarkingIters,
                        to_string("loopSum (", valuesPerItem, ")"));
         }
+
         {
+            uint valuesPerItem = 64;
+            uint workSize = (globalWorkSize + valuesPerItem - 1) / valuesPerItem;
             ocl::Kernel loopCoalesedSum(sum_kernel, sum_kernel_length, "loopCoalesedSum", to_string("-DVALUES_PER_WORKITEM=", valuesPerItem));
-            execKernel(loopCoalesedSum, aGpu, resGPU, workGroupSize, globalWorkSize / valuesPerItem, as.size(), reference_sum, benchmarkingIters,
+            execKernel(loopCoalesedSum, aGpu, resGPU, workGroupSize, workSize, as.size(), reference_sum, benchmarkingIters,
                        "loopCoalesedSum (" + std::to_string(valuesPerItem) + ")");
         }
 
@@ -131,22 +137,48 @@ int main(int argc, char **argv) {
         }
 
         {
+            std::ofstream fout(outputFolder + "loopSum");
             std::cout << "diff loop sizes:" << std::endl;
-            for (int valuesPerItem : std::vector<int>{1, 2, 4, 6, 8, 12, 16, 32, 128, 512}) {
+            for (int valuesPerItem : std::vector<int>{1, 2, 4, 6, 8, 12, 16, 32, 128, 512, 1024, 4096, 8192}) {
                 int workSize = (globalWorkSize + valuesPerItem - 1) / valuesPerItem;
                 ocl::Kernel loopSum(sum_kernel, sum_kernel_length, "loopSum", to_string("-DVALUES_PER_WORKITEM=", valuesPerItem));
-                execKernel(loopSum, aGpu, resGPU, workGroupSize, workSize, as.size(), reference_sum, benchmarkingIters,
-                           "loopSum (" + std::to_string(valuesPerItem) + ")");
+                double ops = execKernel(loopSum, aGpu, resGPU, workGroupSize, workSize, as.size(), reference_sum, benchmarkingIters,
+                                        to_string("loopSum (", valuesPerItem, ")"));
+                fout << valuesPerItem << ' ' << ops << std::endl;
             }
         }
 
         {
+            std::ofstream fout(outputFolder + "loopCoalesedSum");
             std::cout << "diff loop coalesed sizes:" << std::endl;
-            for (int valuesPerItem : std::vector<int>{1, 2, 4, 6, 8, 12, 16, 32, 128, 512}) {
+            for (int valuesPerItem : std::vector<int>{1, 2, 4, 6, 8, 12, 16, 32, 128, 512, 1024, 4096, 8192}) {
                 int workSize = (globalWorkSize + valuesPerItem - 1) / valuesPerItem;
                 ocl::Kernel loopCoalesedSum(sum_kernel, sum_kernel_length, "loopCoalesedSum", to_string("-DVALUES_PER_WORKITEM=", valuesPerItem));
-                execKernel(loopCoalesedSum, aGpu, resGPU, workGroupSize, workSize, as.size(), reference_sum, benchmarkingIters,
-                           "loopCoalesedSum (" + std::to_string(valuesPerItem) + ")");
+                double ops = execKernel(loopCoalesedSum, aGpu, resGPU, workGroupSize, workSize, as.size(), reference_sum, benchmarkingIters,
+                                        to_string("loopCoalesedSum (", valuesPerItem, ")"));
+                fout << valuesPerItem << ' ' << ops << std::endl;
+            }
+        }
+
+        {
+            std::ofstream fout(outputFolder + "localMemSum");
+            std::cout << "diff localMem sizes:" << std::endl;
+            for (int workGroupSize : std::vector<int>{1, 2, 4, 6, 8, 12, 16, 32, 64, 128, 192, 256}) {
+                ocl::Kernel localMemSum(sum_kernel, sum_kernel_length, "localMemSum", to_string("-DWORKGROUP_SIZE=", workGroupSize));
+                double ops = execKernel(localMemSum, aGpu, resGPU, workGroupSize, globalWorkSize, as.size(), reference_sum, benchmarkingIters,
+                                        to_string("localMemSum (", workGroupSize, ")"));
+                fout << workGroupSize << ' ' << ops << std::endl;
+            }
+        }
+
+        {
+            std::ofstream fout(outputFolder + "treeSum");
+            std::cout << "diff tree sizes:" << std::endl;
+            for (int workGroupSize : std::vector<int>{1, 2, 4, 8, 16, 32, 64, 128, 256}) {
+                ocl::Kernel localMemSum(sum_kernel, sum_kernel_length, "treeSum", to_string("-DWORKGROUP_SIZE=", workGroupSize));
+                double ops = execKernel(localMemSum, aGpu, resGPU, workGroupSize, globalWorkSize, as.size(), reference_sum, benchmarkingIters,
+                                        to_string("treeSum (", workGroupSize, ")"));
+                fout << workGroupSize << ' ' << ops << std::endl;
             }
         }
     }

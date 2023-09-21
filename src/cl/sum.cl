@@ -33,8 +33,9 @@ __kernel void loopCoalesedSum(__global const unsigned int *a, __global unsigned 
     atomic_add(sum, res);
 }
 
-
-#define WORKGROUP_SIZE 64
+#ifndef WORKGROUP_SIZE
+    #define WORKGROUP_SIZE 64
+#endif
 __kernel void localMemSum(__global const unsigned int *a, __global unsigned int *sum, unsigned int n) {
     __local unsigned int buffer[WORKGROUP_SIZE];
     size_t lid = get_local_id(0);
