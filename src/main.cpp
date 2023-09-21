@@ -82,7 +82,7 @@ int main() {
     // или же через метод Buffer Objects -> clEnqueueWriteBuffer
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
 
-    size_t bufSize = 4 * n;
+    size_t bufSize = sizeof(float) * n;
     cl_mem asBuf = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, bufSize, as.data(), &errcode_ret);
     OCL_SAFE_CALL(errcode_ret);
     cl_mem bsBuf = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, bufSize, bs.data(), &errcode_ret);
@@ -184,8 +184,8 @@ int main() {
         // - Обращений к видеопамяти 2*n*sizeof(float) байт на чтение и 1*n*sizeof(float) байт на запись, т.е. итого 3*n*sizeof(float) байт
         // - В гигабайте 1024*1024*1024 байт
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
-        std::cout << "VRAM bandwidth: " << 3 * n * sizeof(float) / (1024 * 1024 * 1024) / t.lapAvg() << " GB/s"
-                  << std::endl;
+        std::cout << "VRAM bandwidth: " << (float) (3 * n * sizeof(float)) / (1024 * 1024 * 1024) / t.lapAvg()
+                  << " GB/s" << std::endl;
     }
 
     // TODO 15 Скачайте результаты вычислений из видеопамяти (VRAM) в оперативную память (RAM) - из cs_gpu в cs (и рассчитайте скорость трансфера данных в гигабайтах в секунду)
@@ -193,12 +193,14 @@ int main() {
         timer t;
         for (unsigned int i = 0; i < 20; ++i) {
             cl_event event;
-            OCL_SAFE_CALL(clEnqueueReadBuffer(commandQueue, csBuf, CL_TRUE, 0, n * sizeof(float), &cs[0], 0, nullptr, &event));
+            OCL_SAFE_CALL(clEnqueueReadBuffer(commandQueue, csBuf, CL_TRUE, 0, n * sizeof(float), &cs[0], 0, nullptr,
+                                              &event));
             OCL_SAFE_CALL(clWaitForEvents(1, &event));
             t.nextLap();
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "VRAM -> RAM bandwidth: " << bufSize / t.lapAvg() / (1024 * 1024 * 1024) << " GB/s" << std::endl;
+        std::cout << "VRAM -> RAM bandwidth: " << (float) bufSize / (1024 * 1024 * 1024) / t.lapAvg() << " GB/s"
+                  << std::endl;
     }
 
     // TODO 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
