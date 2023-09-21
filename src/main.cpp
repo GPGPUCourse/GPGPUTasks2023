@@ -147,31 +147,31 @@ int main() {
     // или же через метод Buffer Objects -> clEnqueueWriteBuffer
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
     cl_mem as_buffer = clCreateBuffer
-    (
-          context
-        , CL_MEM_READ_ONLY |  CL_MEM_COPY_HOST_PTR
-        , sizeof(float) * n
-        , as.data()
-        , &errCode
-    );
+            (
+                    context
+                    , CL_MEM_READ_ONLY |  CL_MEM_USE_HOST_PTR
+                    , sizeof(float) * n
+                    , as.data()
+                    , &errCode
+            );
     OCL_SAFE_CALL(errCode);
     cl_mem bs_buffer = clCreateBuffer
-    (
-          context
-        , CL_MEM_READ_ONLY |  CL_MEM_COPY_HOST_PTR
-        , sizeof(float) * n
-        , bs.data()
-        , &errCode
-    );
+            (
+                    context
+                    , CL_MEM_READ_ONLY |  CL_MEM_USE_HOST_PTR
+                    , sizeof(float) * n
+                    , bs.data()
+                    , &errCode
+            );
     OCL_SAFE_CALL(errCode);
     cl_mem cs_buffer = clCreateBuffer
-    (
-          context
-        , CL_MEM_WRITE_ONLY |  CL_MEM_COPY_HOST_PTR
-        , sizeof(float) * n
-        , cs.data()
-        , &errCode
-    );
+            (
+                    context
+                    , CL_MEM_WRITE_ONLY |  CL_MEM_USE_HOST_PTR
+                    , sizeof(float) * n
+                    , cs.data()
+                    , &errCode
+            );
     OCL_SAFE_CALL(errCode);
 
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
