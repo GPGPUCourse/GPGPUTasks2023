@@ -27,8 +27,8 @@ struct Params {
     unsigned int res_n;
 };
 
-void sum(const gpu::WorkSize &work_size, const Params &params, const std::string& msg, const std::string &name) {
-    ocl::Kernel adder(sum_kernel, sum_kernel_length, name);
+void sum(const gpu::WorkSize &work_size, const Params &params, const std::string& msg, const std::string &func) {
+    ocl::Kernel adder(sum_kernel, sum_kernel_length, func);
     adder.compile();
 
     gpu::gpu_mem_32u src_gpu, res_gpu;
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
         std::cout << std::endl;
 
         unsigned int workGroupSize = 128;
-        const unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
+        unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
 
         Params params{trimmed(device.name), as, benchmarkingIters, reference_sum, n, 1};
 

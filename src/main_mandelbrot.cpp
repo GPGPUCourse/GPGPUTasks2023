@@ -51,11 +51,11 @@ void renderInWindow(float centralX, float centralY, unsigned int iterationsLimit
 int main(int argc, char **argv) {
     gpu::Device device = gpu::chooseGPUDevice(argc, argv);
 
-    const unsigned int benchmarkingIters = 10;
+    unsigned int benchmarkingIters = 10;
 
-    const unsigned int width = 2048;
-    const unsigned int height = 2048;
-    const unsigned int iterationsLimit = 256;
+    unsigned int width = 2048;
+    unsigned int height = 2048;
+    unsigned int iterationsLimit = 256;
 
     float centralX = -0.789136f;
     float centralY = -0.150316f;
@@ -69,14 +69,14 @@ int main(int argc, char **argv) {
     images::Image<float> cpu_results(width, height, 1);
     images::Image<unsigned char> image(width, height, 3);
 
-    const float sizeY = sizeX * height / width;
+    float sizeY = sizeX * height / width;
 
-    const float fromX = centralX - sizeX / 2.0f;
-    const float fromY = centralY - sizeY / 2.0f;
+    float fromX = centralX - sizeX / 2.0f;
+    float fromY = centralY - sizeY / 2.0f;
 
-    const size_t flopsInLoop = 10;
-    const size_t maxApproximateFlops = width * height * iterationsLimit * flopsInLoop;
-    const size_t gflops = 1000 * 1000 * 1000;
+    size_t flopsInLoop = 10;
+    size_t maxApproximateFlops = width * height * iterationsLimit * flopsInLoop;
+    size_t gflops = 1000 * 1000 * 1000;
 
     std::cout << std::endl;
     {
@@ -125,13 +125,13 @@ int main(int argc, char **argv) {
         // TODO близко к ЦПУ-версии, включая рассчет таймингов, гигафлопс, Real iterations fraction и сохранение в файл
         // результат должен оказаться в gpu_results
 
-        const unsigned int workGroupSizeX = 16;
-        const unsigned int global_work_size_x = (width + workGroupSizeX - 1) / workGroupSizeX * workGroupSizeX;
+        unsigned int workGroupSizeX = 16;
+        unsigned int global_work_size_x = (width + workGroupSizeX - 1) / workGroupSizeX * workGroupSizeX;
 
-        const unsigned int workGroupSizeY = 16;
-        const unsigned int global_work_size_y = (height + workGroupSizeY - 1) / workGroupSizeY * workGroupSizeY;
+        unsigned int workGroupSizeY = 16;
+        unsigned int global_work_size_y = (height + workGroupSizeY - 1) / workGroupSizeY * workGroupSizeY;
 
-        const int smoothing = 0;
+        int smoothing = 0;
 
         timer t;
         for (int i = 0; i < benchmarkingIters; ++i) {
