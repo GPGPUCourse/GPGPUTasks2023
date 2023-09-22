@@ -48,7 +48,7 @@ void sum(const gpu::WorkSize &work_size, const Params &params, const std::string
 
         sum[0] = std::accumulate(sum.begin(), sum.end(), 0);
 
-        EXPECT_THE_SAME(params.expect, sum[0], "the \"" + name + "\" method does not sum correctly!");
+        EXPECT_THE_SAME(params.expect, sum[0], "the \"" + func + "\" method does not sum correctly!");
         t.nextLap();
     }
     std::cout << msg << ": " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
