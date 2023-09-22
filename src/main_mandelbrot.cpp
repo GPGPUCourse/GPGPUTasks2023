@@ -102,7 +102,7 @@ int main(int argc, char **argv)
         std::cout << "    Real iterations fraction: " << 100.0 * realIterationsFraction / (width * height) << "%" << std::endl;
 
         renderToColor(cpu_results.ptr(), image.ptr(), width, height);
-        image.savePNG("data/debug/mandelbrot_cpu.png");
+        image.savePNG("mandelbrot_cpu.png");
     }
 
 
@@ -157,7 +157,7 @@ int main(int argc, char **argv)
         std::cout << "    Real iterations fraction: " << 100.0 * realIterationsFraction / (width * height) << "%" << std::endl;
 
         renderToColor(gpu_results.ptr(), image.ptr(), width, height);
-        image.savePNG("data/debug/mandelbrot_gpu.png");
+        image.savePNG("mandelbrot_gpu.png");
     }
 
     {
