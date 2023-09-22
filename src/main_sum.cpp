@@ -1,6 +1,7 @@
+#include "libgpu/shared_device_buffer.h"
+#include <libutils/fast_random.h>
 #include <libutils/misc.h>
 #include <libutils/timer.h>
-#include <libutils/fast_random.h>
 
 
 template<typename T>
@@ -59,6 +60,10 @@ int main(int argc, char **argv)
 
     {
         // TODO: implement on OpenCL
-        // gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+        gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+
+        gpu::gpu_mem_32u as_gpu;
+        as_gpu.resizeN(as.size());
+        as_gpu.writeN(as.data(), as.size());
     }
 }
