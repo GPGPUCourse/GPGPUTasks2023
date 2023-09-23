@@ -61,13 +61,13 @@ cl_device_type printDeviceInfoAndGetTypeDevice(cl_device_id deviceId) {
         OCL_SAFE_CALL(clGetDeviceInfo(deviceId, CL_DEVICE_TYPE, sizeof(deviceType), &deviceType, nullptr));
 
         std::cout << "        Device type: ";
-        if (deviceType & CL_DEVICE_TYPE_CPU)
+        if (deviceType == CL_DEVICE_TYPE_CPU)
             std::cout << "CPU ";
-        if (deviceType & CL_DEVICE_TYPE_GPU)
-            std::cout << "GPU ";
-        if (deviceType & CL_DEVICE_TYPE_ACCELERATOR)
+        else if (deviceType == CL_DEVICE_TYPE_GPU)
+            std::cout   << "GPU ";
+        else if (deviceType == CL_DEVICE_TYPE_ACCELERATOR)
             std::cout << "ACCELERATOR ";
-        if (deviceType & CL_DEVICE_TYPE_DEFAULT)
+        else if (deviceType == CL_DEVICE_TYPE_DEFAULT)
             std::cout << "DEFAULT TYPE ";
         std::cout << std::endl;
 
@@ -85,7 +85,7 @@ int main() {
     std::vector<cl_platform_id> platforms(platformsCount);
     OCL_SAFE_CALL(clGetPlatformIDs(platformsCount, platforms.data(), nullptr));
 
-    cl_device_id currentDevice;
+    cl_device_id currentDevice = nullptr;
 
     for (int platformIndex = 0; platformIndex < platformsCount; ++platformIndex) {
         cl_platform_id platform = platforms[platformIndex];
