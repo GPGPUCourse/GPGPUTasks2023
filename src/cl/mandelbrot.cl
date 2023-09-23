@@ -35,9 +35,9 @@ __kernel void mandelbrot(__global float *results, const unsigned int iters, cons
         cnt += (!threshold_surpassed);
     }
     float result = cnt;
-    // if (smoothing && iter != iters) {
-    //     result = result - logf(logf(sqrtf(x * x + y * y)) / logf(threshold)) / logf(2.0f);
-    // }
+    if (smoothing && iter != iters) {
+        result = result - log(log(sqrt(x * x + y * y)) / log(threshold)) / log(2.0f);
+    }
 
     result = 1.0f * result / iters;
     results[j * width + i] = result;
