@@ -34,19 +34,19 @@ int main(int argc, char **argv) {
         reference_sum += as[i];
     }
 
-    // {
-    //     timer t;
-    //     for (int iter = 0; iter < benchmarkingIters; ++iter) {
-    //         unsigned int sum = 0;
-    //         for (int i = 0; i < n; ++i) {
-    //             sum += as[i];
-    //         }
-    //         EXPECT_THE_SAME(reference_sum, sum, "CPU result should be consistent!");
-    //         t.nextLap();
-    //     }
-    //     std::cout << "CPU:     " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-    //     std::cout << "CPU:     " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
-    // }
+    {
+        timer t;
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
+            unsigned int sum = 0;
+            for (int i = 0; i < n; ++i) {
+                sum += as[i];
+            }
+            EXPECT_THE_SAME(reference_sum, sum, "CPU result should be consistent!");
+            t.nextLap();
+        }
+        std::cout << "CPU:     " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "CPU:     " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
+    }
 
     {
         timer t;
