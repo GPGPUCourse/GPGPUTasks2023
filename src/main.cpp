@@ -140,11 +140,11 @@ int main() {
     std::cout << "Data generated for n=" << n << "!" << std::endl;
 
     size_t sizeBuffer = n * sizeof(float);
-    // Я попытался сделать так и пытался 3+ часа понять, что не так. А потом понял, что OpenCL почему-то считает
-    // 8-ую Вегу (Ryzen 7 5800H) -- GPU и если в нём юзать `CL_MEM_COPY_HOST_PTR`, то в кернеле оказывается всё по нулям. :skull:
-    // Почему? А хрен его знает. И я не знаю, что будет ли правильно уже работать дискретка при `CL_MEM_USE_HOST_PTR` всегда,
-    // потому что лень OpenCL ставить на основной комп (учитывая, что там ещё винда), а не ноута.
     // cl_mem_flags flagUseHost = deviceType == CL_DEVICE_TYPE_CPU ? CL_MEM_USE_HOST_PTR : CL_MEM_COPY_HOST_PTR;
+    // Я попытался сделать так (как в строчке выше) и пытался 3+ часа понять, что не так. А потом понял, что почему-то на
+    // 8-ой Веге (Ryzen 7 5800H), если юзать `CL_MEM_COPY_HOST_PTR` -- то в кёрнеле оказывается всё по нулям. :skull:
+    // Почему? А хрен его знает. И я не знаю, что будет ли правильно работать дискретка при `CL_MEM_USE_HOST_PTR` всегда,
+    // потому что лень OpenCL ставить на основной комп (учитывая, что там ещё винда).
     cl_mem_flags flagUseHost = CL_MEM_USE_HOST_PTR;
     cl_mem firstArrayBuffer = clCreateBuffer(context, CL_MEM_READ_ONLY | flagUseHost, sizeBuffer, firstArray.data(), &errorCreate);
     OCL_SAFE_CALL(errorCreate);
