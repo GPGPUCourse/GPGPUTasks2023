@@ -4,15 +4,15 @@
 
 #line 6
 
-const float threshold = 256.0f;
-const float threshold2 = threshold * threshold;
-
 __kernel void mandelbrot(__global float *results,
                         unsigned int width, unsigned int height,
                         float fromX, float fromY,
                         float sizeX, float sizeY,
                         unsigned int iters, int smoothing)
 {
+    const float threshold = 256.0f;
+    const float threshold2 = threshold * threshold;
+
     const unsigned int i = get_global_id(0);
     const unsigned int j = get_global_id(1);
 
