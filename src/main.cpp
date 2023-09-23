@@ -162,8 +162,12 @@ int main() {
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
 
     cl_mem_flags readBufferFlags = 0, writeBufferFlags = 0;
-    readBufferFlags |= CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR;
     writeBufferFlags |= CL_MEM_WRITE_ONLY | CL_MEM_ALLOC_HOST_PTR;
+    if (gpuDeviceFound) {
+        readBufferFlags |= CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR;
+    } else {
+        readBufferFlags |= CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR;
+    }
 
     cl_mem bufferA, bufferB, bufferC;
     bufferA = clCreateBuffer(context, readBufferFlags, sizeof(float) * n, as.data(), &error_code);
