@@ -1,6 +1,9 @@
 #ifndef clion_defines_cl // pragma once
 #define clion_defines_cl
 
+#include <cstddef>
+#include <cmath>
+
 #ifdef __CLION_IDE__
 
 #ifndef STATIC_KEYWORD
@@ -14,6 +17,7 @@
 #define __private
 
 #define half float
+#define uint unsigned int
 
 struct float2 { float x;          };
 struct float3 { float x, y, z;    };

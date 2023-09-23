@@ -56,17 +56,17 @@ int main(int argc, char **argv)
 {
     gpu::Device device = gpu::chooseGPUDevice(argc, argv);
 
-    unsigned int benchmarkingIters = 10;
+    uint benchmarkingIters = 10;
 
-    unsigned int width = 2048;
-    unsigned int height = 2048;
-    unsigned int iterationsLimit = 256;
+    uint width = 2048;
+    uint height = 2048;
+    uint iterationsLimit = 256;
 
     float centralX = -0.789136f;
     float centralY = -0.150316f;
     float sizeX = 0.00239f;
 
-//    // Менее красивый ракурс, но в этом ракурсе виден весь фрактал:
+    // Менее красивый ракурс, но в этом ракурсе виден весь фрактал:
 //    float centralX = -0.5f;
 //    float centralY = 0.0f;
 //    float sizeX = 2.0f;
@@ -78,20 +78,20 @@ int main(int argc, char **argv)
     float sizeY = sizeX * height / width;
 
     {
-        timer t;
+        timer timer;
         for (int i = 0; i < benchmarkingIters; ++i) {
             mandelbrotCPU(cpu_results.ptr(),
                           width, height,
                           centralX - sizeX / 2.0f, centralY - sizeY / 2.0f,
                           sizeX, sizeY,
                           iterationsLimit, false);
-            t.nextLap();
+            timer.nextLap();
         }
         size_t flopsInLoop = 10;
         size_t maxApproximateFlops = width * height * iterationsLimit * flopsInLoop;
-        size_t gflops = 1000*1000*1000;
-        std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "CPU: " << maxApproximateFlops / gflops / t.lapAvg() << " GFlops" << std::endl;
+        size_t gflops = 1e9;
+        std::cout << "CPU: " << timer.lapAvg() << "+-" << timer.lapStd() << " s" << std::endl;
+        std::cout << "CPU: " << maxApproximateFlops / gflops / timer.lapAvg() << " GFlops" << std::endl;
 
         double realIterationsFraction = 0.0;
         for (int j = 0; j < height; ++j) {
@@ -105,46 +105,61 @@ int main(int argc, char **argv)
         image.savePNG("mandelbrot_cpu.png");
     }
 
+    gpu::Context context;
+    context.init(device.device_id_opencl);
+    context.activate();
+    {
+        ocl::Kernel kernel(mandelbrot_kernel, mandelbrot_kernel_length, "mandelbrot");
+        // Если у вас есть интеловский драйвер для запуска на процессоре - попробуйте запустить на нем и взгляните на лог,
+        // передав printLog=true - скорее всего, в логе будет строчка вроде
+        // Kernel <mandelbrot> was successfully vectorized (8)
+        // это означает, что драйвер смог векторизовать вычисления с помощью интринсик, и если множитель векторизации 8, то
+        // это означает, что одно ядро процессит сразу 8 workItems, а т.к. все вычисления в float, то
+        // это означает, что используются 8 x float регистры (т.е. 256-битные, т.е. AVX)
+        // обратите внимание, что и произвдительность относительно референсной ЦПУ реализации выросла почти в восемь раз
+        bool printLog = false;
+        kernel.compile(printLog);
 
-//    // Раскомментируйте это:
-//
-//    gpu::Context context;
-//    context.init(device.device_id_opencl);
-//    context.activate();
-//    {
-//        ocl::Kernel kernel(mandelbrot_kernel, mandelbrot_kernel_length, "mandelbrot");
-//        // Если у вас есть интеловский драйвер для запуска на процессоре - попробуйте запустить на нем и взгляните на лог,
-//        // передав printLog=true - скорее всего, в логе будет строчка вроде
-//        // Kernel <mandelbrot> was successfully vectorized (8)
-//        // это означает, что драйвер смог векторизовать вычисления с помощью интринсик, и если множитель векторизации 8, то
-//        // это означает, что одно ядро процессит сразу 8 workItems, а т.к. все вычисления в float, то
-//        // это означает, что используются 8 x float регистры (т.е. 256-битные, т.е. AVX)
-//        // обратите внимание, что и произвдительность относительно референсной ЦПУ реализации выросла почти в восемь раз
-//        bool printLog = false;
-//        kernel.compile(printLog);
-//        // TODO близко к ЦПУ-версии, включая рассчет таймингов, гигафлопс, Real iterations fraction и сохранение в файл
-//        // результат должен оказаться в gpu_results
-//    }
-//
-//    {
-//        double errorAvg = 0.0;
-//        for (int j = 0; j < height; ++j) {
-//            for (int i = 0; i < width; ++i) {
-//                errorAvg += fabs(gpu_results.ptr()[j * width + i] - cpu_results.ptr()[j * width + i]);
-//            }
-//        }
-//        errorAvg /= width * height;
-//        std::cout << "GPU vs CPU average results difference: " << 100.0 * errorAvg << "%" << std::endl;
-//
-//        if (errorAvg > 0.03) {
-//            throw std::runtime_error("Too high difference between CPU and GPU results!");
-//        }
-//    }
+        gpu::gpu_mem_32f result;
+        result.resizeN(width * height);
 
-    // Это бонус в виде интерактивной отрисовки, не забудьте запустить на ГПУ, чтобы посмотреть, в какой момент числа итераций/точности single float перестанет хватать
-    // Кликами мышки можно смещать ракурс
-    // Но в Pull-request эти две строки должны быть закомментированы, т.к. на автоматическом тестировании нет оконной подсистемы 
-//    bool useGPU = false;
+        timer timer;
+        for (int i = 0; i < benchmarkingIters; ++i) {
+            kernel.exec(gpu::WorkSize(16, 16, width, height),
+                        result, width, height,
+                        centralX - sizeX / 2.0f, centralY - sizeY / 2.0f,
+                        sizeX, sizeY,
+                        iterationsLimit, false);
+            timer.nextLap();
+        }
+        size_t flopsInLoop = 10;
+        size_t maxApproximateFlops = width * height * iterationsLimit * flopsInLoop;
+        size_t gflops = 1e9;
+        std::cout << "GPU: " << timer.lapAvg() << "+-" << timer.lapStd() << " s" << std::endl;
+        std::cout << "GPU: " << maxApproximateFlops / gflops / timer.lapAvg() << " GFlops" << std::endl;
+
+        result.readN(gpu_results.ptr(), width * height);
+    }
+
+    {
+        double errorAvg = 0.0;
+        for (int j = 0; j < height; ++j) {
+            for (int i = 0; i < width; ++i) {
+                errorAvg += fabs(gpu_results.ptr()[j * width + i] - cpu_results.ptr()[j * width + i]);
+            }
+        }
+        errorAvg /= width * height;
+        std::cout << "GPU vs CPU average results difference: " << 100.0 * errorAvg << "%" << std::endl;
+
+        if (errorAvg > 0.03) {
+            throw std::runtime_error("Too high difference between CPU and GPU results!");
+        }
+    }
+
+//     Это бонус в виде интерактивной отрисовки, не забудьте запустить на ГПУ, чтобы посмотреть, в какой момент числа итераций/точности single float перестанет хватать
+//     Кликами мышки можно смещать ракурс
+//     Но в Pull-request эти две строки должны быть закомментированы, т.к. на автоматическом тестировании нет оконной подсистемы
+//    bool useGPU = true;
 //    renderInWindow(centralX, centralY, iterationsLimit, useGPU);
 
     return 0;
@@ -183,7 +198,7 @@ void renderInWindow(float centralX, float centralY, unsigned int iterationsLimit
                         results_vram, width, height,
                         centralX - sizeX / 2.0f, centralY - sizeY / 2.0f,
                         sizeX, sizeY,
-                        iterationsLimit, 1);
+                        iterationsLimit, true);
             results_vram.readN(results.ptr(), width * height);
         }
         renderToColor(results.ptr(), image.ptr(), width, height);
