@@ -7,6 +7,10 @@
 
 #include "cl/sum_cl.h"
 
+const int benchmarkingIters = 10;
+const uint32_t n = 100 * 1000 * 1000;
+uint32_t reference_sum = 0;
+
 template<typename T>
 void raiseFail(const T &a, const T &b, std::string message, std::string filename, int line) {
     if (a != b) {
@@ -17,12 +21,34 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 
+void next_sum(const std::string& function_name, unsigned int numWorkItems, const std::string& description, gpu::gpu_mem_32u& as_gpu) {                                            
+    ocl::Kernel kernel(sum_kernel, sum_kernel_length, function_name);    
+    bool printLog = false;                                                   
+    kernel.compile(printLog);                                               
+    {                                                                       
+        gpu::WorkSize workSize(128, numWorkItems);                                     
+        timer t;                                                            
+        uint32_t sum = 0;                                                   
+        gpu::gpu_mem_32u gpu_sum;                                           
+        gpu_sum.resizeN(1);                                                 
+        for (int i = 0; i < benchmarkingIters; ++i) {                       
+            uint32_t zero = 0;                                              
+            gpu_sum.writeN(&zero, 1);                                       
+            kernel.exec(workSize,                                           
+                        as_gpu,                                             
+                        gpu_sum,                                            
+                        n                                                   
+            );                                                              
+            gpu_sum.readN(&sum, 1);                                         
+            EXPECT_THE_SAME(reference_sum, sum, "GPU result should be consistent!");    
+            t.nextLap();                                                    
+        }                                                                   
+        std::cout << description << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;   
+        std::cout << description << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;    
+    }                                                                       
+} 
 
 int main(int argc, char **argv) {
-    int benchmarkingIters = 10;
-
-    uint32_t reference_sum = 0;
-    uint32_t n = 100 * 1000 * 1000;
     std::vector<uint32_t> as(n, 0);
     FastRandom r(42);
     for (int i = 0; i < n; ++i) {
@@ -71,36 +97,13 @@ int main(int argc, char **argv) {
         as_gpu.resizeN(n);
         as_gpu.writeN(as.data(), n);
 
-        {
-            ocl::Kernel kernel(sum_kernel, sum_kernel_length, "sum_gpu_atomic");
+        #define VALUES_PER_WORKITEM 64
 
-            bool printLog = true;
-            kernel.compile(printLog);
-            {
-                gpu::WorkSize workSize(128, n);
-
-                timer t;
-                uint32_t sum = 0;
-                gpu::gpu_mem_32u gpu_sum;
-                gpu_sum.resizeN(1);
-
-                for (int i = 0; i < benchmarkingIters; ++i) {
-                    uint32_t zero = 0;
-                    gpu_sum.writeN(&zero, 1);
-
-                    kernel.exec(workSize,
-                                as_gpu, // __global const uint32_t *as_gpu
-                                gpu_sum // __global uint32_t *sum
-                    );
-
-                    gpu_sum.readN(&sum, 1);
-                    EXPECT_THE_SAME(reference_sum, sum, "GPU result should be consistent!");
-
-                    t.nextLap();
-                }
-                std::cout << "GPU atomic:     " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-                std::cout << "GPU atomic:     " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
-            }
-        }
+        next_sum("sum_gpu_2", n, "GPU atomic: ", as_gpu);
+        int new_n = n / VALUES_PER_WORKITEM;
+        next_sum("sum_gpu_3", new_n, "GPU poorly coalesced: ", as_gpu);
+        next_sum("sum_gpu_4", new_n, "GPU truly coalesced: ", as_gpu);
+        next_sum("sum_gpu_5", n, "GPU w/local mem: ", as_gpu);
+        next_sum("sum_gpu_6", n, "GPU tree-like: ", as_gpu);
     }
 }
