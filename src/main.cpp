@@ -31,6 +31,27 @@ void reportError(cl_int err, const std::string &filename, int line) {
 
 #define OCL_SAFE_CALL(expr) reportError(expr, __FILE__, __LINE__)
 
+cl_device_id lookupDevice(cl_device_type type) {
+    cl_uint platformsCount = 0;
+    OCL_SAFE_CALL(clGetPlatformIDs(0, nullptr, &platformsCount));
+    std::vector<cl_platform_id> platforms(platformsCount);
+    OCL_SAFE_CALL(clGetPlatformIDs(platformsCount, platforms.data(), nullptr));
+    for(int i = 0; i < platformsCount; i++) {
+        cl_platform_id platform = platforms[i];
+        cl_uint devicesCount = 0;
+        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &devicesCount));
+        std::vector<cl_device_id> devices(devicesCount);
+        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, devicesCount, devices.data(), nullptr));
+        for(int j = 0; j < devicesCount; j++) {
+            cl_device_id device = devices[j];
+            cl_device_type deviceType = 0;
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_TYPE, sizeof(deviceType), (void*)&deviceType, nullptr));
+            if(deviceType == type)
+                return device;
+        }
+    }
+    return 0;
+}
 
 int main() {
     std::string project_root = PROJECT_ROOT;
@@ -41,16 +62,17 @@ int main() {
     // TODO 1 По аналогии с предыдущим заданием узнайте, какие есть устройства, и выберите из них какое-нибудь
     // (если в списке устройств есть хоть одна видеокарта - выберите ее, если нету - выбирайте процессор)
 
-    cl_uint platformsCount = 0;
-    OCL_SAFE_CALL(clGetPlatformIDs(0, nullptr, &platformsCount));
-    std::vector<cl_platform_id> platforms(platformsCount);
-    OCL_SAFE_CALL(clGetPlatformIDs(platformsCount, platforms.data(), nullptr));
-    cl_platform_id platform = platforms[0];
-    cl_uint devicesCount = 0;
-    OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &devicesCount));
-    std::vector<cl_device_id> devices(devicesCount);
-    OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, devicesCount, devices.data(), nullptr));
-    cl_device_id device = devices[0];
+    cl_device_id device = lookupDevice(CL_DEVICE_TYPE_GPU);
+    if(device == 0)
+        device = lookupDevice(CL_DEVICE_TYPE_CPU);
+    if(device == 0)
+        throw std::runtime_error("Can't find devices!");
+
+    size_t deviceNameSize = 0;
+    OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, 0, nullptr, &deviceNameSize));
+    std::vector<unsigned char> deviceName(deviceNameSize, 0);
+    OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_NAME, deviceNameSize, deviceName.data(), nullptr));
+    std::cout << "Device name: " << deviceName.data() << std::endl;
 
     // TODO 2 Создайте контекст с выбранным устройством
     // См. документацию https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/ -> OpenCL Runtime -> Contexts -> clCreateContext
@@ -189,7 +211,9 @@ int main() {
         // - Обращений к видеопамяти 2*n*sizeof(float) байт на чтение и 1*n*sizeof(float) байт на запись, т.е. итого 3*n*sizeof(float) байт
         // - В гигабайте 1024*1024*1024 байт
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
-        std::cout << "VRAM bandwidth: " << (int)((double)(3 * n * sizeof(float)) / (pow(1024, 3) * t.lapAvg())) << " GB/s" << std::endl;
+        double numerator = (3.0 * n * sizeof(float));
+        double denominator = 1024.0 * 1024.0 * 1024.0 * t.lapAvg();
+        std::cout << "VRAM bandwidth: " << std::setprecision(3) << (int)(numerator / denominator) << " GB/s" << std::endl;
     }
 
     // TODO 15 Скачайте результаты вычислений из видеопамяти (VRAM) в оперативную память (RAM) - из cs_gpu в cs (и рассчитайте скорость трансфера данных в гигабайтах в секунду)
@@ -197,21 +221,30 @@ int main() {
         timer t;
         for (unsigned int i = 0; i < 20; ++i) {          
             cl_event event;
-            OCL_SAFE_CALL(clEnqueueReadBuffer(command_queue, cs_buf, true, 0, n, cs.data(), 0, NULL, &event));
+            OCL_SAFE_CALL(clEnqueueReadBuffer(command_queue, cs_buf, true, 0, n * sizeof(float), cs.data(), 0, NULL, &event));
             t.nextLap();
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "VRAM -> RAM bandwidth: " << std::setprecision(3) << (double)(3 * n * sizeof(float)) / (pow(1024, 3) * t.lapAvg()) << " GB/s" << std::endl;
+        double numerator = (3.0 * n * sizeof(float));
+        double denominator = 1024.0 * 1024.0 * 1024.0 * t.lapAvg();
+        std::cout << "VRAM -> RAM bandwidth: " << std::setprecision(3) << (int)(numerator / denominator) << " GB/s" << std::endl;
     }
 
     // TODO 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
     for (unsigned int i = 0; i < n; ++i) {
+    	//std::cout << cs[i] << " " << as[i] + bs[i] << "\n";
         if (cs[i] != as[i] + bs[i]) {
+            std::cout << "fail: " << i << "\n";
             throw std::runtime_error("CPU and GPU results differ!");
         }
     }
 
-    clReleaseCommandQueue(command_queue);
-    clReleaseContext(context);
+    OCL_SAFE_CALL(clReleaseCommandQueue(command_queue));
+    OCL_SAFE_CALL(clReleaseContext(context));
+    OCL_SAFE_CALL(clReleaseKernel(kernel));
+    OCL_SAFE_CALL(clReleaseProgram(program));
+    OCL_SAFE_CALL(clReleaseMemObject(cs_buf));
+    OCL_SAFE_CALL(clReleaseMemObject(bs_buf));
+    OCL_SAFE_CALL(clReleaseMemObject(as_buf));
     return 0;
 }
