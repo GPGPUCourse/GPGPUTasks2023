@@ -150,9 +150,9 @@ int main() {
     // И хорошо бы сразу добавить в конце clReleaseMemObject (аналогично, все дальнейшие ресурсы вроде OpenCL под-программы, кернела и т.п. тоже нужно освобождать)
 
     size_t buf_size = sizeof(float) * n;
-    auto as_buf = safeCreate<cl_mem>(clCreateBuffer, context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, buf_size, as.data());
-    auto bs_buf = safeCreate<cl_mem>(clCreateBuffer, context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, buf_size, bs.data());
-    auto cs_buf = safeCreate<cl_mem>(clCreateBuffer, context, CL_MEM_WRITE_ONLY | CL_MEM_COPY_HOST_PTR, buf_size, cs.data());
+    auto as_buf = safeCreate<cl_mem>(clCreateBuffer, context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, buf_size, as.data());
+    auto bs_buf = safeCreate<cl_mem>(clCreateBuffer, context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR, buf_size, bs.data());
+    auto cs_buf = safeCreate<cl_mem>(clCreateBuffer, context, CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR, buf_size, cs.data());
 
     // TODO 6 Выполните TODO 5 (реализуйте кернел в src/cl/aplusb.cl)
     // затем убедитесь, что выходит загрузить его с диска (убедитесь что Working directory выставлена правильно - см. описание задания),
@@ -245,7 +245,7 @@ int main() {
         // - Обращений к видеопамяти 2*n*sizeof(float) байт на чтение и 1*n*sizeof(float) байт на запись, т.е. итого 3*n*sizeof(float) байт
         // - В гигабайте 1024*1024*1024 байт
         // - Среднее время выполнения кернела равно t.lapAvg() секунд
-        std::cout << "VRAM bandwidth: " << pow(2, -30) * 3 * n * sizeof(float) / t.lapAvg() << " GB/s" << std::endl;
+        std::cout << "VRAM bandwidth: " << 3.0 * n * sizeof(float) / t.lapAvg() / (1 << 30) << " GB/s" << std::endl;
     }
 
     // TODO 15 Скачайте результаты вычислений из видеопамяти (VRAM) в оперативную память (RAM) - из cs_gpu в cs (и рассчитайте скорость трансфера данных в гигабайтах в секунду)
@@ -256,7 +256,7 @@ int main() {
             t.nextLap();
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "VRAM -> RAM bandwidth: " << pow(2, -30) * n * sizeof(float) / t.lapAvg() << " GB/s" << std::endl;
+        std::cout << "VRAM -> RAM bandwidth: " << 1.0 * n * sizeof(float) / t.lapAvg() / (1 << 30) << " GB/s" << std::endl;
     }
 
     // TODO 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
@@ -265,6 +265,9 @@ int main() {
             throw std::runtime_error("CPU and GPU results differ!");
         }
     }
+
+    OCL_SAFE_CALL(clReleaseKernel(kernel));
+    OCL_SAFE_CALL(clReleaseProgram(program));
 
     OCL_SAFE_CALL(clReleaseMemObject(as_buf));
     OCL_SAFE_CALL(clReleaseMemObject(bs_buf));
