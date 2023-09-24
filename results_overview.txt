@@ -1,0 +1,12 @@
+CPU:               445.106 millions/s
+CPU OMP:           2748.9 millions/s
+sum_dummy:         2082.15 millions/s
+sum_global_atomic: 120.412 millions/s
+sum_loop:          4772.43 millions/s
+sum_loop_coalesced:3134.8 millions/s
+sum_local_memory:  5612.41 millions/s
+sum_tree:          1736.58 millions/s
+
+- Непонятно, почему sum_dummy сильно быстрее CPU, хотя принцип один и тот же. 
+- Неожиданно sum_loop_coalesced оказлся медленнее sum_loop. Вероятно прирост производительности от быстрого чтения кэш-линий не заметен из-за возросшего количества арифметических операций для каждого work item (для подсчёта индексов).
+
