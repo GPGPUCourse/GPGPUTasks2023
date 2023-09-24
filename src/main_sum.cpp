@@ -106,7 +106,7 @@ int main(int argc, char **argv) {
         wg_size = 128;
         grid_size = wg_size * cu_count * wave_slots_per_simd;
         sum_gpu_bench("sum_local", gpu_data, reference_sum, n, wg_size, grid_size);
-        wg_size = 256;
+        wg_size = 128;
         grid_size = wg_size * cu_count * wave_slots_per_simd;
         sum_gpu_bench("sum_tree", gpu_data, reference_sum, n, wg_size, grid_size);
     }

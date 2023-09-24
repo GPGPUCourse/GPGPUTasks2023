@@ -132,14 +132,16 @@ __kernel void sum_tree(__global unsigned int *res, __global const unsigned int *
     barrier(CLK_LOCAL_MEM_FENCE);
 
     if (wave_id < 4) {
-        sum += lds_buf[(wave_id + 4) * WAVE_SIZE + lane_id];
-        lds_buf[wave_id * WAVE_SIZE + lane_id] = sum;
-        barrier(CLK_LOCAL_MEM_FENCE);
+        if (wg_size > 128) {
+            sum += lds_buf[(wave_id + 4) * WAVE_SIZE + lane_id];
+            lds_buf[wave_id * WAVE_SIZE + lane_id] = sum;
+            barrier(CLK_LOCAL_MEM_FENCE);
+        }
         if (wave_id < 2) {
             sum += lds_buf[(wave_id + 2) * WAVE_SIZE + lane_id];
             lds_buf[wave_id * WAVE_SIZE + lane_id] = sum;
             barrier(CLK_LOCAL_MEM_FENCE);
-            if(wave_id == 0) {
+            if (wave_id == 0) {
                 sum += lds_buf[(wave_id + 1) * WAVE_SIZE + lane_id];
                 atomic_add(res, sum);
             }
