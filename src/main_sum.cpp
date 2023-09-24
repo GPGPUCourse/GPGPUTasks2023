@@ -23,19 +23,19 @@ void sum_gpu_bench(const std::string &kernel_name, const gpu::gpu_mem_32u &gpu_d
     ocl::Kernel sum_gpu(sum_kernel, sum_kernel_length, kernel_name);
     sum_gpu.compile();
     timer t;
-    for (int iter = 0; iter < benchmark_iters; ++iter) {
-        unsigned int sum = 0;
-        gpu::gpu_mem_32u gpu_sum;
-        gpu_sum.resizeN(1);
-        gpu_sum.writeN(&sum, 1);
 
+    gpu::gpu_mem_32u gpu_sum;
+    gpu_sum.resizeN(1);
+    unsigned int sum = 0;
+    for (int iter = 0; iter < benchmark_iters; ++iter) {
+        sum = 0;
+        gpu_sum.writeN(&sum, 1);
         sum_gpu.exec(gpu::WorkSize(wg_size, grid_size),
                      gpu_sum, gpu_data, n);
-
-        gpu_sum.readN(&sum, 1);
-        EXPECT_THE_SAME(reference_sum, sum, kernel_name + " result should be consistent!");
         t.nextLap();
     }
+    gpu_sum.readN(&sum, 1);
+    EXPECT_THE_SAME(reference_sum, sum, kernel_name + " result should be consistent!");
     std::cout << kernel_name << ":     " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
     std::cout << kernel_name << ":     " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
 }
@@ -88,12 +88,10 @@ int main(int argc, char **argv) {
         context.init(device.device_id_opencl);
         context.activate();
 
-        // 4 x wave32 on Navi3
-
         unsigned wg_size = 32;
         // on Navi3 doesn't return the number of CUs, but the number of SAs
         unsigned cu_count = device.compute_units * 2;
-        unsigned wave_slots_per_simd = 16;
+        unsigned wave_slots_per_simd = 12;
 
         unsigned grid_size = wg_size * cu_count * wave_slots_per_simd;
         gpu::gpu_mem_32u gpu_data;
@@ -106,7 +104,7 @@ int main(int argc, char **argv) {
         wg_size = 128;
         grid_size = wg_size * cu_count * wave_slots_per_simd;
         sum_gpu_bench("sum_local", gpu_data, reference_sum, n, wg_size, grid_size);
-        wg_size = 128;
+        wg_size = 64;
         grid_size = wg_size * cu_count * wave_slots_per_simd;
         sum_gpu_bench("sum_tree", gpu_data, reference_sum, n, wg_size, grid_size);
     }

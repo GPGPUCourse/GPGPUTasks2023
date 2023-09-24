@@ -98,7 +98,8 @@ __kernel void sum_local(__global unsigned int *res, __global const unsigned int 
 
     sum = 0;
     if (wave_id == 0) {
-        for (int i = 0; i < 4; ++i) {
+        #pragma unroll 4
+        for (int i = 0; i < wg_size / WAVE_SIZE; ++i) {
             sum += lds_buf[i * WAVE_SIZE + lane_id];
         }
         // there should be a cross-lane reduction

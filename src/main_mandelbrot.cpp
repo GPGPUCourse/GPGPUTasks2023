@@ -125,21 +125,20 @@ int main(int argc, char **argv) {
         unsigned group_size = 32;
         // on Navi3 doesn't return the number of CUs, but the number of SAs
         unsigned cu_count = device.compute_units * 2;
-        unsigned wave_slots_per_simd = 16;
+        unsigned wave_slots_per_simd = 12;
         gpu::gpu_mem_32f result_buffer;
         result_buffer.resizeN(width * height);
         {
             timer t;
-            for (int i = 0; i < benchmarkingIters; ++i) {
-                // create 16 waves per CU
+            for (int i = 0; i < benchmarkingIters * 100; ++i) {
                 kernel.exec(gpu::WorkSize(group_size, 1,  wave_slots_per_simd * cu_count * group_size, 1),
                             result_buffer, width, height,
                             centralX - sizeX / 2.0f, centralY - sizeY / 2.0f,
                             sizeX, sizeY,
                             iterationsLimit, 0);
-                result_buffer.readN(gpu_results.ptr(), width * height);
                 t.nextLap();
             }
+            result_buffer.readN(gpu_results.ptr(), width * height);
             size_t flopsInLoop = 10;
             size_t maxApproximateFlops = width * height * iterationsLimit * flopsInLoop;
             size_t giga = 1000 * 1000 * 1000;

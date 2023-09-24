@@ -12,8 +12,8 @@ __kernel void mandelbrot(__global float *out,
                          float fromX, float fromY,
                          float sizeX, float sizeY,
                          unsigned int iterationsLimit, unsigned int smoothing) {
-
-    const float threshold = 256.0f * 256.0f;
+    const float threshold = 256.0f;
+    const float threshold2 = 65536.0f;
 
     const unsigned thread_id = get_local_id(0);
     const unsigned wg_size = get_local_size(0);
@@ -34,7 +34,7 @@ __kernel void mandelbrot(__global float *out,
 
     while (thread_offset < end_offset) {
 
-        float i, j;
+        int i, j;
         float x0, y0, x, y, it;
 
 
@@ -58,7 +58,7 @@ __kernel void mandelbrot(__global float *out,
             x = fma(y, -y, fma(x, x, x0));
             y = fma(2.0f * xPrev, y, y0);
 
-            if ((fma(x, x, y * y)) > threshold) {
+            if ((fma(x, x, y * y)) > threshold2) {
                 it += iter;
                 // hack to avoid creating instructions to change exec mask
                 x = 0;
