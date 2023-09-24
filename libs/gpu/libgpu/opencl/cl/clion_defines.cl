@@ -46,6 +46,8 @@ void	barrier(cl_mem_fence_flags flags);
 gentypen	vload4			(size_t offset, const gentype *p);
 void		vstore4			(gentypen data, size_t offset, gentype *p);
 void		vstore4			(gentypen data, size_t offset, gentype *p);
+gentype     fma             (gentype a, gentype b, gentype c);
+gentypen    fma             (gentypen a, gentypen b, gentypen c);
 #undef gentypen
 #undef gentype
 float		vload_half		(size_t offset, const half *p);
@@ -67,7 +69,7 @@ uint	get_work_dim		();
 
 // Defined in libs/gpu/libgpu/opencl/engine.cpp:584
 // 64 for AMD, 32 for NVidia, 8 for intel GPUs, 1 for CPU
-#define WARP_SIZE 64
+#define WARP_SIZE 32
 
 #endif
 
