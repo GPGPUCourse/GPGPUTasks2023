@@ -54,7 +54,10 @@ namespace utils {
             res_gpu.resizeN(1);
         }
 
-        inline void initMem(gpu::gpu_mem_32u &src_gpu, gpu::gpu_mem_32u &res_gpu, const ParamsTree &params) {
+        inline void initMem(gpu::gpu_mem_32u &start_src_gpu, gpu::gpu_mem_32u &src_gpu, gpu::gpu_mem_32u &res_gpu,
+                            const ParamsTree &params) {
+            start_src_gpu.resizeN(params.src_n);
+            start_src_gpu.writeN(params.as.data(), params.src_n);
             src_gpu.resizeN(params.src_n);
             src_gpu.writeN(params.as.data(), params.src_n);
             res_gpu.resizeN(params.res_n);
@@ -84,17 +87,37 @@ namespace utils {
                     const std::string &func) {
         ocl::Kernel adder(sum_kernel, sum_kernel_length, func);
         adder.compile();
+        gpu::gpu_mem_32u start_src_gpu, src_gpu, res_gpu;
+        initMem(start_src_gpu, src_gpu, res_gpu, params);
 
-        gpu::gpu_mem_32u src_gpu, res_gpu;
-        initMem(src_gpu, res_gpu, params);
-
+        const unsigned int group_size = *work_size.clLocalSize();
         timer t;
         for (int iter = 0; iter < params.benchmarking_iters; ++iter) {
             std::vector<unsigned int> sum(params.res_n, 0);
-            res_gpu.writeN(sum.data(), params.res_n);
-            adder.exec(work_size, src_gpu, res_gpu, params.src_n);
-            res_gpu.readN(sum.data(), params.res_n, 0);
-            sum[0] = std::accumulate(sum.begin(), sum.end(), 0);
+            unsigned int global_size = *work_size.clGlobalSize();
+            unsigned int src_n = params.src_n;
+            bool swapped = false;
+            bool firstly = true;
+            std::swap(start_src_gpu, src_gpu);
+
+            while (global_size > group_size) {
+                adder.exec(gpu::WorkSize(group_size, global_size), src_gpu, res_gpu, src_n);
+                if (firstly) {
+                    firstly = false;
+                    std::swap(start_src_gpu, src_gpu);
+                }
+                src_n = global_size / group_size;
+                global_size = (src_n + group_size - 1) / group_size * group_size;
+                std::swap(res_gpu, src_gpu);
+                swapped = true;
+            }
+            if (swapped) {
+                std::swap(res_gpu, src_gpu);
+            }
+
+            res_gpu.readN(sum.data(), src_n, 0);
+
+            sum[0] = std::accumulate(sum.begin(), sum.begin() + src_n, 0);
             eh::EXPECT_THE_SAME(params.expect, sum[0], "the \"" + func + "\" method does not sum correctly!");
             t.nextLap();
         }
