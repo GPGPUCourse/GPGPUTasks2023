@@ -38,7 +38,9 @@ int main(int argc, char **argv)
 
     as_gpu.writeN(as.data(), M*K);
 
-    ocl::Kernel matrix_transpose_kernel(matrix_transpose, matrix_transpose_length, "matrix_transpose");
+    const size_t TILE_SIZE = 16;
+    std::string defines = "-DTILE_SIZE=" + std::to_string(TILE_SIZE);
+    ocl::Kernel matrix_transpose_kernel(matrix_transpose, matrix_transpose_length, "matrix_transpose", defines);
     matrix_transpose_kernel.compile();
 
     {
