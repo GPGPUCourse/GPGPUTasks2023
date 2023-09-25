@@ -108,7 +108,8 @@ int main(int argc, char **argv)
 			unsigned int sum = 0;
 			unsigned int workGroupSize = 128;
 			output_gpu.writeN(&sum, 1);
-			kernel.exec(gpu::WorkSize(workGroupSize, n), input_gpu, output_gpu, n);
+            unsigned int workSize = (n + workGroupSize - 1) / workGroupSize;
+			kernel.exec(gpu::WorkSize(workGroupSize, workSize), input_gpu, output_gpu, n);
 			output_gpu.readN(&sum, 1);
 			EXPECT_THE_SAME(reference_sum, sum, "GPU result should be consistent!");
 			t.nextLap();
@@ -128,7 +129,8 @@ int main(int argc, char **argv)
 		for (int iter = 0; iter < benchmarkingIters; ++iter) {
 			unsigned int sum = 0;
 			output_gpu.writeN(&sum, 1);
-			kernel.exec(gpu::WorkSize(workGroupSize, n), input_gpu, output_gpu, n);
+            unsigned int workSize = (n + workGroupSize - 1) / workGroupSize;
+			kernel.exec(gpu::WorkSize(workGroupSize, workSize), input_gpu, output_gpu, n);
 			output_gpu.readN(&sum, 1);
 			EXPECT_THE_SAME(reference_sum, sum, "GPU result should be consistent!");
 			t.nextLap();
