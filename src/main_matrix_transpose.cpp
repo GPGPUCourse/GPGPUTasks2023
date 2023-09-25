@@ -49,8 +49,8 @@ int main(int argc, char **argv)
             // В CLion удобно смотреть какие есть вариант аргументов в конструкторах:
             // поставьте каретку редактирования кода внутри скобок конструктора WorkSize -> Ctrl+P -> заметьте что есть 2, 4 и 6 параметров
             // - для 1D, 2D и 3D рабочего пространства соответственно
-            gpu::WorkSize ws(16, 16, M, K);
-            matrix_transpose_kernel.exec(ws, as_gpu, as_t_gpu, M, K);
+            gpu::WorkSize ws(16, 16, K, M);
+            matrix_transpose_kernel.exec(ws, as_gpu, as_t_gpu, K, M);
 
             t.nextLap();
         }
