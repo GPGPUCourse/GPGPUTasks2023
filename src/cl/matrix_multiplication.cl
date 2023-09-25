@@ -37,6 +37,10 @@ __kernel void matrix_multiplication_1_local(__global const float *matr_a, __glob
     float sum = 0.0f;
 
     for (size_t tile_k = 0; tile_k < K; tile_k += TILE_SIZE) {
+        if (tile_k != 0) {
+            barrier(CLK_LOCAL_MEM_FENCE);
+        }
+
         if (is_real && tile_k + lx < N) {
             tile_a[ly][lx] = matr_a[gy * K + (tile_k + lx)];
         } else {
