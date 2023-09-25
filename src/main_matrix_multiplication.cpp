@@ -1,35 +1,51 @@
-#include <libutils/misc.h>
-#include <libutils/timer.h>
-#include <libutils/fast_random.h>
 #include <libgpu/context.h>
 #include <libgpu/shared_device_buffer.h>
+#include <libutils/fast_random.h>
+#include <libutils/misc.h>
+#include <libutils/timer.h>
 
 #include "cl/matrix_multiplication_cl.h"
 
-#include <vector>
 #include <iostream>
 #include <stdexcept>
+#include <vector>
 
+const int benchmarkingIters = 1;// TODO пока тестируетесь удобно выставить единицу
+const unsigned int M = 256;
+const unsigned int K = 256;
+const unsigned int N = 256;
+const double gflops = 2e-9 * M * K * N;// умножить на два, т.к. операция сложения и умножения
 
-int main(int argc, char **argv)
-{
+gpu::gpu_mem_32f as_gpu, bs_gpu, cs_gpu;
+
+void run_kernel(const char *run_name, const char *kernel_name, const gpu::WorkSize &ws, std::string defines) {
+    ocl::Kernel kernel(matrix_multiplication, matrix_multiplication_length, kernel_name, std::move(defines));
+    kernel.compile();
+
+    timer t;
+    for (int iter = 0; iter < benchmarkingIters; ++iter) {
+        kernel.exec(ws, as_gpu, bs_gpu, cs_gpu, M, K, N);
+        t.nextLap();
+    }
+    t.stop();
+
+    double avgTime = t.lapAvg();
+    std::cout << run_name << ": " << avgTime << "+-" << t.lapStd() << " s" << std::endl;
+    std::cout << run_name << ": " << gflops / avgTime << " GFlops" << std::endl;
+}
+
+int main(int argc, char **argv) {
     gpu::Device device = gpu::chooseGPUDevice(argc, argv);
 
     gpu::Context context;
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 1; // TODO пока тестируетесь удобно выставить единицу
-    unsigned int M = 256;
-    unsigned int K = 256;
-    unsigned int N = 256;
-    const double gflops = 2e-9 * M * K * N; // умножить на два, т.к. операция сложения и умножения
+    std::vector<float> as(M * K, 0);
+    std::vector<float> bs(K * N, 0);
+    std::vector<float> cs(M * N, 0);
 
-    std::vector<float> as(M*K, 0);
-    std::vector<float> bs(K*N, 0);
-    std::vector<float> cs(M*N, 0);
-
-    FastRandom r(M+K+N);
+    FastRandom r(M + K + N);
     for (unsigned int i = 0; i < as.size(); ++i) {
         as[i] = r.nextf();
     }
@@ -58,45 +74,25 @@ int main(int argc, char **argv)
 
     const std::vector<float> cs_cpu_reference = cs;
 
-    gpu::gpu_mem_32f as_gpu, bs_gpu, cs_gpu;
-    as_gpu.resizeN(M*K);
-    bs_gpu.resizeN(K*N);
-    cs_gpu.resizeN(M*N);
+    as_gpu.resizeN(M * K);
+    bs_gpu.resizeN(K * N);
+    cs_gpu.resizeN(M * N);
 
-    as_gpu.writeN(as.data(), M*K);
-    bs_gpu.writeN(bs.data(), K*N);
+    as_gpu.writeN(as.data(), M * K);
+    bs_gpu.writeN(bs.data(), K * N);
 
+    const size_t TILE_SIZE = 16;
+    std::string defines;
     {
-        ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, "matrix_multiplication_0_naive");
-        matrix_multiplication_kernel.compile();
-
-        timer t;
-        for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            gpu::WorkSize ws(16, 16, M, N);
-            matrix_multiplication_kernel.exec(ws, as_gpu, bs_gpu, cs_gpu, M, K, N);
-
-            t.nextLap();
-        }
-        std::cout << "GPU Naive: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "GPU Naive: " << gflops / t.lapAvg() << " GFlops" << std::endl;
+        std::ostringstream oss;
+        oss << "-DTILE_SIZE=" << TILE_SIZE;
+        defines = oss.str();
     }
+    run_kernel("GPU Naive", "matrix_multiplication_1", gpu::WorkSize(TILE_SIZE, TILE_SIZE, M, N), defines);
+    run_kernel("GPU Local", "matrix_multiplication_2", gpu::WorkSize(TILE_SIZE, TILE_SIZE, M, N), defines);
+    run_kernel("GPU Heavy", "matrix_multiplication_3", gpu::WorkSize(TILE_SIZE, TILE_SIZE, M, N), defines);
 
-    {
-        ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, "matrix_multiplication_1_local");
-        matrix_multiplication_kernel.compile();
-
-        timer t;
-        for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            gpu::WorkSize ws(16, 16, M, N);
-            matrix_multiplication_kernel.exec(ws, as_gpu, bs_gpu, cs_gpu, M, K, N);
-
-            t.nextLap();
-        }
-        std::cout << "GPU Local: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "GPU Local: " << gflops / t.lapAvg() << " GFlops" << std::endl;
-    }
-
-    cs_gpu.readN(cs.data(), M*N);
+    cs_gpu.readN(cs.data(), M * N);
     // */
 
     // Проверяем корректность результатов
