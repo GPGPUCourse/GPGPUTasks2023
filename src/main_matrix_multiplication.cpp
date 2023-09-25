@@ -10,7 +10,7 @@
 #include <stdexcept>
 #include <vector>
 
-const int benchmarkingIters = 1;// TODO пока тестируетесь удобно выставить единицу
+const int benchmarkingIters = 10;// TODO пока тестируетесь удобно выставить единицу
 const unsigned int M = 1024;
 const unsigned int K = 1024;
 const unsigned int N = 1024;
@@ -82,7 +82,7 @@ int main(int argc, char **argv) {
     bs_gpu.writeN(bs.data(), K * N);
 
     const size_t TILE_SIZE = 16;
-    const size_t WORK_PER_THREAD = 4;
+    const size_t WORK_PER_THREAD = 8;
     std::string defines;
     {
         std::ostringstream oss;
