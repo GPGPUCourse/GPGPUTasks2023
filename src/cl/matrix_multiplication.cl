@@ -55,10 +55,10 @@ __kernel void matrix_multiplication_2(__global const float *matr_a, __global con
     }
 }
 
-const size_t RTS = TILE_SIZE / WORK_PER_THREAD;
-
 __kernel void matrix_multiplication_3(__global const float *matr_a, __global const float *matr_b,
                                       __global float *matr_c, uint M, uint K, uint N) {
+    const size_t RTS = TILE_SIZE / WORK_PER_THREAD;
+
     size_t col_g = get_global_id(0);
     size_t col_l = get_local_id(0);
     size_t row_l = get_local_id(1);
