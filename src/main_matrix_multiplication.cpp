@@ -77,8 +77,23 @@ int main(int argc, char **argv)
 
             t.nextLap();
         }
-        std::cout << "Naive: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "Naive: " << gflops / t.lapAvg() << " GFlops" << std::endl;
+        std::cout << "GPU Naive: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU Naive: " << gflops / t.lapAvg() << " GFlops" << std::endl;
+    }
+
+    {
+        ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, "matrix_multiplication_1_local");
+        matrix_multiplication_kernel.compile();
+
+        timer t;
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
+            gpu::WorkSize ws(16, 16, M, N);
+            matrix_multiplication_kernel.exec(ws, as_gpu, bs_gpu, cs_gpu, M, K, N);
+
+            t.nextLap();
+        }
+        std::cout << "GPU Local: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU Local: " << gflops / t.lapAvg() << " GFlops" << std::endl;
     }
 
     cs_gpu.readN(cs.data(), M*N);
