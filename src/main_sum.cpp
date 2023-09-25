@@ -1,7 +1,9 @@
 #include <libutils/misc.h>
 #include <libutils/timer.h>
 #include <libutils/fast_random.h>
-
+#include "cl/sum_cl.h"
+#include <libgpu/context.h>
+#include <libgpu/shared_device_buffer.h>
 
 template<typename T>
 void raiseFail(const T &a, const T &b, std::string message, std::string filename, int line)
@@ -14,6 +16,60 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 
+void run_kernel(std::string kernel_name, gpu::Device device)
+{
+    int benchmarkingIters = 10;
+
+    unsigned int reference_sum = 0;
+    unsigned int n = 100*1000*1000;
+    std::vector<unsigned int> as(n, 0);
+    FastRandom r(42);
+    for (int i = 0; i < n; ++i) {
+        as[i] = (unsigned int) r.next(0, std::numeric_limits<unsigned int>::max() / n);
+        reference_sum += as[i];
+    }
+
+    {
+//         gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+
+        gpu::Context context;
+        context.init(device.device_id_opencl);
+        context.activate();
+
+        unsigned int workGroupSize = 64;
+        unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
+        gpu::WorkSize workSize = gpu::WorkSize(workGroupSize, global_work_size);
+
+        gpu::gpu_mem_32u as_gpu;
+        as_gpu.resizeN(n);
+        as_gpu.writeN(as.data(), n);
+        
+        gpu::gpu_mem_32u sum_gpu;
+        sum_gpu.resizeN(1);
+
+        {
+            ocl::Kernel kernel(sum_kernel, sum_kernel_length, kernel_name);
+            bool printLog = false;
+            kernel.compile(printLog);
+
+            timer t;
+            for (int iter = 0; iter < benchmarkingIters; ++iter) {
+                unsigned int sum = 0;
+                sum_gpu.writeN(&sum, 1);
+                kernel.exec(workSize, as_gpu, sum_gpu, n);
+                
+                sum_gpu.readN(&sum, 1);
+                
+                EXPECT_THE_SAME(reference_sum, sum, "GPU result should be consistent!");
+                t.nextLap();
+            }
+           
+            std::cout << kernel_name << ":" << std::endl;
+            std::cout << "\tGPU:     " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+            std::cout << "\tGPU:     " << (n/1000.0/1000.0) / t.lapAvg() << " millions/s" << std::endl;
+        }
+    }
+}
 
 int main(int argc, char **argv)
 {
@@ -57,8 +113,14 @@ int main(int argc, char **argv)
         std::cout << "CPU OMP: " << (n/1000.0/1000.0) / t.lapAvg() << " millions/s" << std::endl;
     }
 
+    
     {
-        // TODO: implement on OpenCL
-        // gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+        gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+        run_kernel("sum_gpu_baseline", device);
+        run_kernel("sum_gpu_cicle", device);
+        run_kernel("sum_gpu_cicle_coalesced", device);
+        run_kernel("sum_gpu_local", device);
+        run_kernel("sum_gpu_tree", device);
     }
 }
+
