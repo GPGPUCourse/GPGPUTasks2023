@@ -75,5 +75,6 @@ void atomic_add(...);
 // 64 for AMD, 32 for NVidia, 8 for intel GPUs, 1 for CPU
 #define WARP_SIZE 64
 #define TILE_SIZE 16
+#define WORK_PER_THREAD 16
 
 #endif // pragma once

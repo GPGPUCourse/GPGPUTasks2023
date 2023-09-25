@@ -11,9 +11,9 @@
 #include <vector>
 
 const int benchmarkingIters = 1;// TODO пока тестируетесь удобно выставить единицу
-const unsigned int M = 256;
-const unsigned int K = 256;
-const unsigned int N = 256;
+const unsigned int M = 1024;
+const unsigned int K = 1024;
+const unsigned int N = 1024;
 const double gflops = 2e-9 * M * K * N;// умножить на два, т.к. операция сложения и умножения
 
 gpu::gpu_mem_32f as_gpu, bs_gpu, cs_gpu;
@@ -82,15 +82,19 @@ int main(int argc, char **argv) {
     bs_gpu.writeN(bs.data(), K * N);
 
     const size_t TILE_SIZE = 16;
+    const size_t WORK_PER_THREAD = 4;
     std::string defines;
     {
         std::ostringstream oss;
-        oss << "-DTILE_SIZE=" << TILE_SIZE;
+        oss << "-DTILE_SIZE=" << TILE_SIZE << " -DWORK_PER_THREAD=" << WORK_PER_THREAD;
         defines = oss.str();
     }
-    run_kernel("GPU Naive", "matrix_multiplication_1", gpu::WorkSize(TILE_SIZE, TILE_SIZE, M, N), defines);
-    run_kernel("GPU Local", "matrix_multiplication_2", gpu::WorkSize(TILE_SIZE, TILE_SIZE, M, N), defines);
-    run_kernel("GPU Heavy", "matrix_multiplication_3", gpu::WorkSize(TILE_SIZE, TILE_SIZE, M, N), defines);
+
+    gpu::WorkSize ws1(TILE_SIZE, TILE_SIZE, M, N);
+    gpu::WorkSize ws3(TILE_SIZE, TILE_SIZE / WORK_PER_THREAD, M, (N + WORK_PER_THREAD - 1) / WORK_PER_THREAD);
+    run_kernel("GPU Naive", "matrix_multiplication_1", ws1, defines);
+    run_kernel("GPU Local", "matrix_multiplication_2", ws1, defines);
+    run_kernel("GPU Heavy", "matrix_multiplication_3", ws3, defines);
 
     cs_gpu.readN(cs.data(), M * N);
     // */
