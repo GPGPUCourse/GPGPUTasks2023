@@ -246,7 +246,7 @@ int main() {
             t.nextLap();
         }
         std::cout << "Result data transfer time: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "VRAM -> RAM bandwidth: " << sizeOfBuffer / 1024 / 1024 / 1024 / t.lapAvg() << " GB/s" << std::endl;
+        std::cout << "VRAM -> RAM bandwidth: " << double(sizeOfBuffer) / 1024 / 1024 / 1024 / t.lapAvg() << " GB/s" << std::endl;
     }
 
     // TODO 16 Сверьте результаты вычислений со сложением чисел на процессоре (и убедитесь, что если в кернеле сделать намеренную ошибку, то эта проверка поймает ошибку)
