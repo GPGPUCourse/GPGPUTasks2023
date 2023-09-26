@@ -29,19 +29,16 @@ __kernel void matrix_multiplication_tile(__global const float *a, __global const
     _uint lid1 = get_local_id(1);
 
     float sum = 0.F;
-    for (_uint tile_number = 0; tile_number * TILE_SIZE < K; tile_number++) {
-        if (gid0 < N && gid1 < M) {
-            tileA[lid1][lid0] = a[gid1 * K + tile_number * TILE_SIZE + lid0];
-            tileB[lid1][lid0] = b[tile_number * TILE_SIZE * N + lid1 * N + gid0];
-        } else {
-            tileA[lid1][lid0] = 0.;
-            tileB[lid1][lid0] = 0.;
-        }
+    for (_uint number = 0; number < K; number += TILE_SIZE) {
+        tileA[lid1][lid0] = (gid0 < N && gid1 < M) ? a[gid1 * K + number + lid0] : 0;
+        tileB[lid1][lid0] = (gid0 < N && gid1 < M) ? b[number * N + lid1 * N + gid0] : 0;
+
         barrier(CLK_LOCAL_MEM_FENCE);
 
         for (_uint k = 0; k < TILE_SIZE; k++) {
             sum += tileA[lid1][k] * tileB[k][lid0];
         }
+        barrier(CLK_LOCAL_MEM_FENCE);
     }
 
     if (gid0 < N && gid1 < M) {
