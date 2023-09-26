@@ -36,15 +36,13 @@ __kernel void matrix_multiplication_1(__global const float *input_1,
 	const unsigned int gid_x = get_global_id(0);
 	const unsigned int gid_y = get_global_id(1);
 
-	int sum = 0;
+	float sum = 0;
 	for (int i = 0; i < K; ++i) {
 		sum += input_1[gid_y * K + i] * input_2[i * N + gid_x];
 	}
 
 	output[gid_y * M + gid_x] = sum;
 }
-
-
 
 __kernel void matrix_multiplication_2(__global const float *input_1,
 									  __global const float *input_2,
@@ -61,7 +59,7 @@ __kernel void matrix_multiplication_2(__global const float *input_1,
 	__local float tileA[WORKGROUP_SIZE][WORKGROUP_SIZE];
 	__local float tileB[WORKGROUP_SIZE][WORKGROUP_SIZE];
 
-	int sum = 0;
+	float sum = 0;
 	for (int workgroup_offset = 0; workgroup_offset < K; workgroup_offset += WORKGROUP_SIZE) {
 		tileA[lid_y][lid_x] = input_1[gid_y * K + (workgroup_offset + lid_x)];
 		tileB[lid_y][(lid_x + lid_y) % WORKGROUP_SIZE] = input_2[(workgroup_offset + lid_y) * N + gid_x];
