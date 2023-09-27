@@ -19,11 +19,9 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 
 template <typename KERNEL_NAME_TYPE, typename KERNEL_LENGTH_TYPE, typename ARRAY_TYPE>
-void runSumKernel(KERNEL_NAME_TYPE kernelName, KERNEL_LENGTH_TYPE kernelLength, const std::string& kernel_func_name,  const ARRAY_TYPE& arr, unsigned int n, int benchmarkingIters = 20) {
+void runSumKernel(KERNEL_NAME_TYPE kernelName, KERNEL_LENGTH_TYPE kernelLength, const std::string& kernel_func_name,  const ARRAY_TYPE& arr, unsigned int n, int work_size, int global_work_size, int benchmarkingIters = 20) {
     ocl::Kernel sumKernel(kernelName, kernelLength , kernel_func_name);
     sumKernel.compile();
-    unsigned int workGroupSize = 128;
-    unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
     gpu::gpu_mem_32u res;
     res.resizeN(1);
 
@@ -32,7 +30,7 @@ void runSumKernel(KERNEL_NAME_TYPE kernelName, KERNEL_LENGTH_TYPE kernelLength, 
     for (int iter = 0; iter < benchmarkingIters; ++iter) {
         sum = 0;
         res.writeN(&sum, 1);
-        sumKernel.exec(gpu::WorkSize(workGroupSize, global_work_size), arr, res, n);
+        sumKernel.exec(gpu::WorkSize(work_size, global_work_size), arr, res, n);
         t.nextLap();
     }
     res.readN(&sum, 1);
@@ -99,10 +97,20 @@ int main(int argc, char **argv)
         arrBuff.resizeN(n);
         arrBuff.writeN(as.data(), n);
 
-        runSumKernel(sum_kernel, sum_kernel_length, "sum_gpu_1", arrBuff, n);
-        runSumKernel(sum_kernel, sum_kernel_length, "sum_gpu_2", arrBuff, n);
-        runSumKernel(sum_kernel, sum_kernel_length, "sum_gpu_3", arrBuff, n);
-        runSumKernel(sum_kernel, sum_kernel_length, "sum_gpu_4", arrBuff, n);
-        runSumKernel(sum_kernel, sum_kernel_length, "sum_gpu_5", arrBuff, n);
+        auto get_global_size = [](unsigned int n, int workSize) {
+            return (n + workSize - 1) / workSize * workSize;
+        };
+        int workSize = 256, globalWorkSize = get_global_size(n, workSize);
+        runSumKernel(sum_kernel, sum_kernel_length, "sum_gpu_1", arrBuff, n, workSize, globalWorkSize);
+        workSize = 256;
+        globalWorkSize = (n + workSize - 1) / workSize;
+        runSumKernel(sum_kernel, sum_kernel_length, "sum_gpu_2", arrBuff, n, workSize, globalWorkSize);
+        runSumKernel(sum_kernel, sum_kernel_length, "sum_gpu_3", arrBuff, n, workSize, globalWorkSize);
+        workSize = 128;
+        globalWorkSize = get_global_size(n, workSize);
+        runSumKernel(sum_kernel, sum_kernel_length, "sum_gpu_4", arrBuff, n, workSize, globalWorkSize);
+        workSize = 64;
+        globalWorkSize = get_global_size(n, workSize);
+        runSumKernel(sum_kernel, sum_kernel_length, "sum_gpu_5", arrBuff, n, workSize, globalWorkSize);
     }
 }

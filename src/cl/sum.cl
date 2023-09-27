@@ -13,8 +13,7 @@ __kernel void sum_gpu_1(__global const unsigned int *arr,
     atomic_add(sum, arr[gid]);
 }
 
-#define VALUES_PER_WORKITEM 32
-#define GROUP_SIZE 128
+#define VALUES_PER_WORKITEM 256
 
 __kernel void sum_gpu_2(__global const unsigned int* arr,
                         __global unsigned int* sum,
@@ -50,6 +49,7 @@ __kernel void sum_gpu_3(__global const unsigned int *arr,
     atomic_add(sum, res);
 }
 
+#define GROUP_SIZE 128
 __kernel void sum_gpu_4(__global const unsigned int *arr,
                         __global unsigned int *sum,
                         unsigned int n) {
@@ -70,7 +70,9 @@ __kernel void sum_gpu_4(__global const unsigned int *arr,
         atomic_add(sum, group_res);
     }
 }
+#undef GROUP_SIZE
 
+#define GROUP_SIZE 64
 __kernel void sum_gpu_5(__global const unsigned int *arr,
                         __global unsigned int *sum,
                         unsigned int n) {
@@ -95,3 +97,4 @@ __kernel void sum_gpu_5(__global const unsigned int *arr,
     if (lid == 0)
         atomic_add(sum, buf[0]);
 }
+#undef GROUP_SIZE
