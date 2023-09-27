@@ -72,6 +72,7 @@ int main(int argc, char **argv) {
         as_gpu.writeN(as.data(), n);
         unsigned int workGroupSize = 128;
         unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
+        unsigned int warpSize = 32;
         {
             ocl::Kernel kernel(sum_kernel, sum_kernel_length, "sum");
             kernel.compile();
@@ -94,7 +95,7 @@ int main(int argc, char **argv) {
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
                 unsigned int sum = 0;
                 cs_gpu.writeN(&sum, 1);
-                kernel.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, cs_gpu, n);
+                kernel.exec(gpu::WorkSize(workGroupSize, global_work_size/warpSize), as_gpu, cs_gpu, n);
                 cs_gpu.readN(&sum, 1);
                 EXPECT_THE_SAME(reference_sum, sum, "GPU result should be consistent!");
                 t.nextLap();
@@ -109,7 +110,7 @@ int main(int argc, char **argv) {
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
                 unsigned int sum = 0;
                 cs_gpu.writeN(&sum, 1);
-                kernel.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, cs_gpu, n);
+                kernel.exec(gpu::WorkSize(workGroupSize, global_work_size/warpSize), as_gpu, cs_gpu, n);
                 cs_gpu.readN(&sum, 1);
                 EXPECT_THE_SAME(reference_sum, sum, "GPU result should be consistent!");
                 t.nextLap();
@@ -154,12 +155,13 @@ int main(int argc, char **argv) {
             kernel.compile();
             timer t;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
-                unsigned int res = 0;
+                as_gpu.writeN(as.data(), n);
                 for (int nValues = n; nValues > 1; nValues = (nValues + workGroupSize - 1) / workGroupSize) {
-                    kernel.exec(gpu::WorkSize(workGroupSize, global_work_size),
+                    kernel.exec(gpu::WorkSize(workGroupSize, nValues),
                             as_gpu, bs_gpu, nValues);
-                    bs_gpu.copyToN(as_gpu, nValues);
+                    std::swap(as_gpu, bs_gpu);
                 }
+                unsigned int res = 0;
                 as_gpu.readN(&res, 1);
                 EXPECT_THE_SAME(reference_sum, res, "GPU(sum_tree) result should be constistent!");
                 t.nextLap();
