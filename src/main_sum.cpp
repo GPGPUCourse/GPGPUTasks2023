@@ -6,6 +6,8 @@
 
 #include "cl/sum_cl.h"
 
+#define VALUES_PER_ITEM 32
+
 template<typename T>
 void raiseFail(const T &a, const T &b, std::string message, std::string filename, int line)
 {
@@ -104,7 +106,7 @@ int main(int argc, char **argv)
             unsigned int initialValue = 0, sum = 0;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
                 res_gpu.writeN(&initialValue, 1);
-                sum_loop.exec(gpu::WorkSize(workGroupSize, global_work_size),
+                sum_loop.exec(gpu::WorkSize(workGroupSize, global_work_size / VALUES_PER_ITEM),
                             as_gpu, res_gpu, n);
                 t.nextLap();
             }
@@ -122,7 +124,7 @@ int main(int argc, char **argv)
             unsigned int initialValue = 0, sum = 0;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
                 res_gpu.writeN(&initialValue, 1);
-                sum_loop_coalesced.exec(gpu::WorkSize(workGroupSize, global_work_size),
+                sum_loop_coalesced.exec(gpu::WorkSize(workGroupSize, global_work_size / VALUES_PER_ITEM),
                             as_gpu, res_gpu, n);
                 t.nextLap();
             }
@@ -171,35 +173,24 @@ int main(int argc, char **argv)
         {
             gpu::gpu_mem_32u bs_gpu;
             bs_gpu.resizeN(n);
-            res_gpu.resizeN(n_work_groups);
+            res_gpu.resizeN(n);
 
             ocl::Kernel sum_tree2(sum_kernel, sum_kernel_length, "sumTree2");
             sum_tree2.compile();
 
             timer t;
             unsigned int initialValue = 0, sum = 0;
-            bool bs_to_res;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
-                as_gpu.copyToN(bs_gpu, n);
-                bs_to_res = true;
+                as_gpu.copyToN(res_gpu, n);
                 for (int current_n = n; current_n > 1; current_n = (current_n + workGroupSize - 1) / workGroupSize) {
-                    global_work_size = global_work_size = (current_n + workGroupSize - 1) / workGroupSize * workGroupSize;
-                    if (bs_to_res) {
-                        sum_tree2.exec(gpu::WorkSize(workGroupSize, global_work_size),
-                                    bs_gpu, res_gpu, current_n);
-                    } else {
-                        sum_tree2.exec(gpu::WorkSize(workGroupSize, global_work_size),
-                                    res_gpu, bs_gpu, current_n);
-                    }
-                    bs_to_res = !bs_to_res;
+                    global_work_size = (current_n + workGroupSize - 1) / workGroupSize * workGroupSize;
+                    res_gpu.swap(bs_gpu);                                
+                    sum_tree2.exec(gpu::WorkSize(workGroupSize, global_work_size),
+                                bs_gpu, res_gpu, current_n);
                 }
                 t.nextLap();
             }
-            if (!bs_to_res) {
-                res_gpu.readN(&sum, 1);
-            } else {
-                bs_gpu.readN(&sum, 1);
-            }
+            res_gpu.readN(&sum, 1);
             EXPECT_THE_SAME(reference_sum, sum, "GPU result should be consistent!");
             std::cout << "GPU (tree_v2): " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
             std::cout << "GPU (tree_v2): " << (n/1000.0/1000.0) / t.lapAvg() << " millions/s" << std::endl;
