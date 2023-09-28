@@ -51,8 +51,8 @@ public:
 
                 t.nextLap();
             }
-            std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-            std::cout << "GPU: " << gflops / t.lapAvg() << " GFlops" << std::endl;
+            std::cout << "    GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+            std::cout << "    GPU: " << gflops / t.lapAvg() << " GFlops" << std::endl;
         }
 
         cs_gpu.readN(cs.data(), M * N);
@@ -69,7 +69,7 @@ public:
         }
 
         double diff_avg = diff_sum / (M * N);
-        std::cout << "Average difference: " << diff_avg * 100.0 << "%" << std::endl;
+        std::cout << "    Average difference: " << diff_avg * 100.0 << "%" << std::endl;
         if (diff_avg > 0.01) {
             std::cerr << "Too big difference!" << std::endl;
             return false;
@@ -135,8 +135,8 @@ int main(int argc, char **argv) {
             }
             t.nextLap();
         }
-        std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "CPU: " << gflops / t.lapAvg() << " GFlops" << std::endl;
+        std::cout << "    CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "    CPU: " << gflops / t.lapAvg() << " GFlops" << std::endl;
     }
 
     constexpr size_t TILE_SIZE = 16;
