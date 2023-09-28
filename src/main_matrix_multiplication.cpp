@@ -123,7 +123,7 @@ int main(int argc, char **argv) {
 
     {
         timer t;
-        for (int iter = 0; iter < 1; ++iter) {
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
             for (int j = 0; j < M; ++j) {
                 for (int i = 0; i < N; ++i) {
                     float sum = 0.0f;
