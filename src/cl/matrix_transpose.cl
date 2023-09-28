@@ -1,4 +1,1 @@
-__kernel void matrix_transpose(...)
-{
-    // TODO
-}
+#define TILE_SIZE 16__kernel void matrix_transpose(__global float* mtx, __global float* res, unsigned int width, unsigned int height){	int g_c = get_global_id(0);	int g_r = get_global_id(1);	int l_c = get_local_id(0);	int l_r = get_local_id(1);	__local float tile[TILE_SIZE][TILE_SIZE];	if (g_c < width && g_r < height)		tile[l_r][l_c] = mtx[g_r * width + g_c];    barrier(CLK_LOCAL_MEM_FENCE);    int res_g_c = g_r - l_r + l_c;    int res_g_r = g_c - l_c + l_r;	if (res_g_c < height && res_g_r < width)		res[res_g_r * height + res_g_c] = tile[l_c][l_r];}
