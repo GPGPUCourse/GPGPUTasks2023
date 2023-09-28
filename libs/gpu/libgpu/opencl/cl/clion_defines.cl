@@ -7,6 +7,8 @@
 #define STATIC_KEYWORD static
 #endif
 
+#include <cstddef>
+
 #define __kernel
 #define __global
 #define __local
@@ -14,6 +16,7 @@
 #define __private
 
 #define half float
+#define uint unsigned int
 
 struct float2 { float x;          };
 struct float3 { float x, y, z;    };
@@ -68,6 +71,9 @@ uint	get_work_dim		();
 // Defined in libs/gpu/libgpu/opencl/engine.cpp:584
 // 64 for AMD, 32 for NVidia, 8 for intel GPUs, 1 for CPU
 #define WARP_SIZE 64
+
+#define TILE_SIZE 16
+#define WORK_PER_THREAD 2
 
 #endif
 
