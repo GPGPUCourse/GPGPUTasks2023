@@ -1,10 +1,11 @@
+#include "libgpu/utils.h"
 #include <libutils/misc.h>
 #include <libutils/timer.h>
 #include <libutils/fast_random.h>
 
 #include <libgpu/context.h>
 #include <libgpu/shared_device_buffer.h>
-#define VALUES_PER_WORKITEM 32
+#define VALUES_PER_WORKITEM 128
 #define WORKGROUP_SIZE 128
 #include "cl/sum_cl.h"
 
@@ -64,14 +65,13 @@ int main(int argc, char **argv)
     }
 
     {
-        // TODO: implement on OpenCL
         gpu::Device device = gpu::chooseGPUDevice(argc, argv);
         gpu::Context context;
         context.init(device.device_id_opencl);
         context.activate();
         gpu::gpu_mem_32u as_gpu, bs_gpu, res_gpu;
 
-        unsigned int global_work_size = (n + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE * WORKGROUP_SIZE;
+        unsigned int global_work_size = gpu::divup(n, WORKGROUP_SIZE) * WORKGROUP_SIZE;
 
         as_gpu.resizeN(n);
         bs_gpu.resizeN(n);
@@ -79,7 +79,8 @@ int main(int argc, char **argv)
         as_gpu.writeN(as.data(), n);
 
         {
-            ocl::Kernel sum(sum_kernel, sum_kernel_length, "sum_gpu_global_atomic");
+            ocl::Kernel sum(sum_kernel, sum_kernel_length, "sum_gpu_global_atomic", "-DVALUES_PER_WORKITEM=" + std::to_string(VALUES_PER_WORKITEM) +
+            " -DWORKGROUP_SIZE=" + std::to_string(WORKGROUP_SIZE));
             sum.compile();
 
             timer t;
@@ -98,14 +99,16 @@ int main(int argc, char **argv)
         }
 
         {
-            ocl::Kernel sum(sum_kernel, sum_kernel_length, "sum_gpu_cycle");
+            ocl::Kernel sum(sum_kernel, sum_kernel_length, "sum_gpu_cycle", "-DVALUES_PER_WORKITEM=" + std::to_string(VALUES_PER_WORKITEM) +
+            " -DWORKGROUP_SIZE=" + std::to_string(WORKGROUP_SIZE));
             sum.compile();
 
+            unsigned int work_size = gpu::divup(n, VALUES_PER_WORKITEM);
             timer t;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
                 unsigned int res = 0;
                 res_gpu.writeN(&zero, 1);
-                sum.exec(gpu::WorkSize(WORKGROUP_SIZE, global_work_size),
+                sum.exec(gpu::WorkSize(WORKGROUP_SIZE, work_size),
                         as_gpu, res_gpu, n);
                 res_gpu.readN(&res, 1);
                 EXPECT_THE_SAME(reference_sum, res, "GPU(sum_cycle) result should be constistent!");
@@ -116,14 +119,16 @@ int main(int argc, char **argv)
         }
 
         {
-            ocl::Kernel sum(sum_kernel, sum_kernel_length, "sum_gpu_cycle_coalesced");
+            ocl::Kernel sum(sum_kernel, sum_kernel_length, "sum_gpu_cycle_coalesced", "-DVALUES_PER_WORKITEM=" + std::to_string(VALUES_PER_WORKITEM) +
+            " -DWORKGROUP_SIZE=" + std::to_string(WORKGROUP_SIZE));
             sum.compile();
 
+            unsigned int work_size = gpu::divup(n, VALUES_PER_WORKITEM);
             timer t;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
                 unsigned int res = 0;
                 res_gpu.writeN(&zero, 1);
-                sum.exec(gpu::WorkSize(WORKGROUP_SIZE, global_work_size),
+                sum.exec(gpu::WorkSize(WORKGROUP_SIZE, work_size),
                         as_gpu, res_gpu, n);
                 res_gpu.readN(&res, 1);
                 EXPECT_THE_SAME(reference_sum, res, "GPU(sum_cycle_coalesced) result should be constistent!");
@@ -134,7 +139,8 @@ int main(int argc, char **argv)
         }
 
         {
-            ocl::Kernel sum(sum_kernel, sum_kernel_length, "sum_gpu_local_memory");
+            ocl::Kernel sum(sum_kernel, sum_kernel_length, "sum_gpu_local_memory", "-DVALUES_PER_WORKITEM=" + std::to_string(VALUES_PER_WORKITEM) +
+            " -DWORKGROUP_SIZE=" + std::to_string(WORKGROUP_SIZE));
             sum.compile();
 
             timer t;
@@ -152,7 +158,8 @@ int main(int argc, char **argv)
         }
 
        {
-            ocl::Kernel sum(sum_kernel, sum_kernel_length, "sum_gpu_atomic_tree");
+            ocl::Kernel sum(sum_kernel, sum_kernel_length, "sum_gpu_atomic_tree", "-DVALUES_PER_WORKITEM=" + std::to_string(VALUES_PER_WORKITEM) +
+            " -DWORKGROUP_SIZE=" + std::to_string(WORKGROUP_SIZE));
             sum.compile();
 
             timer t;
@@ -171,7 +178,8 @@ int main(int argc, char **argv)
 
 
        {
-            ocl::Kernel sum(sum_kernel, sum_kernel_length, "sum_gpu_tree");
+            ocl::Kernel sum(sum_kernel, sum_kernel_length, "sum_gpu_tree", "-DVALUES_PER_WORKITEM=" + std::to_string(VALUES_PER_WORKITEM) +
+            " -DWORKGROUP_SIZE=" + std::to_string(WORKGROUP_SIZE));
             sum.compile();
 
             timer t;
