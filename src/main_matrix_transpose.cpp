@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             // TODO
             unsigned int work_group_size_x = 16;
-            unsigned int work_group_size_y = 8;
+            unsigned int work_group_size_y = 16;
             unsigned int global_work_size_x = M;
             unsigned int global_work_size_y = K;
             // Для этой задачи естественнее использовать двухмерный NDRange. Чтобы это сформулировать
