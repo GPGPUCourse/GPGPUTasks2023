@@ -64,7 +64,7 @@ int main(int argc, char **argv)
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 10; // TODO пока тестируетесь удобно выставить единицу
+    int benchmarkingIters = 10;
     unsigned int M = 1024;
     unsigned int K = 1024;
     unsigned int N = 1024;
@@ -110,7 +110,7 @@ int main(int argc, char **argv)
     as_gpu.writeN(as.data(), M*K);
     bs_gpu.writeN(bs.data(), K*N);
 
-    unsigned int groupSize = 16;
+    const unsigned int groupSize = 16;
 
     unsigned int workSizeX = (N + groupSize - 1) / groupSize * groupSize;
     unsigned int workSizeY = (M + groupSize - 1) / groupSize * groupSize;
@@ -126,10 +126,33 @@ int main(int argc, char **argv)
 
     // 4.2.1 Реализуйте умножение матриц через локальную память. (на лекции это вплоть до "Умножение матриц 2: локальная память")
     if (int ret = checkMultiplication(as_gpu, bs_gpu, N, K, M,
-                                  cs_cpu_reference,
-                                  "matrix_multiplication_local",
-                                  gpu::WorkSize(groupSize, groupSize, workSizeX, workSizeY),
-                                  benchmarkingIters)) {
+                                      cs_cpu_reference,
+                                      "matrix_multiplication_local",
+                                      gpu::WorkSize(groupSize, groupSize, workSizeX, workSizeY),
+                                      benchmarkingIters)) {
+        return ret;
+    }
+
+    // 4.2.2 Реализуйте умножение матриц через локальную память с большим количеством работы
+    // на один воркайтем (на лекции на странице "Умножение матриц 3: more work per thread".
+    // На странице с дожиманиями перемножения матриц это кернел №3).
+    // Обратите внимание на то чтобы после перехода на эту версию не потерять существенную
+    // часть коалесд-доступа к глобальной памяти. Этого удобно добиться пойдя от обратного,
+    // начав с того, какие клеточки хочется чтобы варп записал соседними потоками,
+    // и выбрав индексацию так, чтобы выбранному порядку соответствовать.
+
+    const unsigned int threadWorkGroupSize = 16;
+    const unsigned int threadWork = 4;
+
+    unsigned int workSizeThreadWorkX = (N + threadWorkGroupSize - 1) / threadWorkGroupSize * threadWorkGroupSize;
+    unsigned int workSizeThreadWorkY = (M + threadWorkGroupSize * threadWork - 1) / threadWorkGroupSize / threadWork * threadWorkGroupSize;
+
+    if (int ret = checkMultiplication(as_gpu, bs_gpu, N, K, M,
+                                      cs_cpu_reference,
+                                      "matrix_multiplication_more_work_per_thread",
+                                      gpu::WorkSize(threadWorkGroupSize, threadWorkGroupSize / threadWork,
+                                                    workSizeThreadWorkX, workSizeThreadWorkY),
+                                      benchmarkingIters)) {
         return ret;
     }
 
