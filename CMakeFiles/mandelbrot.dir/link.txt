@@ -1,0 +1,1 @@
+/usr/bin/c++  -fopenmp -rdynamic CMakeFiles/mandelbrot.dir/src/main_mandelbrot.cpp.o -o mandelbrot  libs/clew/liblibclew.a libs/gpu/liblibgpu.a libs/images/liblibimages.a libs/utils/liblibutils.a libs/gpu/liblibgpu.a libs/utils/liblibutils.a libs/clew/liblibclew.a -ldl -lSM -lICE -lX11 -lXext 

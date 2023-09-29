@@ -1,0 +1,1 @@
+/usr/bin/c++  -fopenmp -rdynamic CMakeFiles/sum.dir/src/main_sum.cpp.o -o sum  libs/clew/liblibclew.a libs/gpu/liblibgpu.a libs/utils/liblibutils.a libs/gpu/liblibgpu.a libs/utils/liblibutils.a libs/clew/liblibclew.a -ldl 
