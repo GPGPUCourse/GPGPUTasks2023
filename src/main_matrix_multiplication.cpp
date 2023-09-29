@@ -20,7 +20,7 @@ int main(int argc, char **argv)
     context.activate();
 
     int benchmarkingIters = 10; // TODO пока тестируетесь удобно выставить единицу
-    bool skipCPUBenchmarking = true;
+    bool skipCPUBenchmarking = false;
     unsigned int M = 1024;
     unsigned int K = 1025;
     unsigned int N = 1023;
