@@ -20,7 +20,7 @@ int main(int argc, char **argv)
     context.activate();
 
     int benchmarkingIters = 10; // TODO пока тестируетесь удобно выставить единицу
-    bool skipCPUBenchmarking = false;
+    bool skipCPUBenchmarking = true;
     unsigned int M = 1024;
     unsigned int K = 1025;
     unsigned int N = 1023;
@@ -75,7 +75,10 @@ int main(int argc, char **argv)
                 "matrix_multiplication_naive",
                 "matrix_multiplication_local_mem_not_coalesced",
                 "matrix_multiplication_local_mem_coalesced",
-                "matrix_multiplication_more_work_per_thread"
+                "matrix_multiplication_more_work_per_thread",
+                "matrix_multiplication_local_mem_coalesced2",
+                "matrix_multiplication_more_work_per_thread2",
+                "matrix_multiplication_more_work_per_thread3"
         };
         std::string kernel_name = kernels[kernel_name_id];
         ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length,
@@ -90,9 +93,9 @@ int main(int argc, char **argv)
                 unsigned int global_work_sizeX = (M + work_group_size - 1) / work_group_size * work_group_size;
                 unsigned int global_work_sizeY = (N + work_group_size - 1) / work_group_size * work_group_size;
 
-                if (kernel_name == kernels[3])
+                if (kernel_name_id >= 3)
                     std::swap(global_work_sizeX, global_work_sizeY);
-                if (kernel_name == kernels[4])
+                if (kernel_name_id == 4 || kernel_name_id == 6 || kernel_name_id == 7)
                     global_work_sizeX = (N + work_per_thread * work_group_size - 1) / (work_per_thread * work_group_size) * work_group_size;
 
                 matrix_multiplication_kernel.exec(
@@ -133,6 +136,9 @@ int main(int argc, char **argv)
     benchmarkKernel(2);
     benchmarkKernel(3);
     benchmarkKernel(4);
+    benchmarkKernel(5);
+    benchmarkKernel(6);
+    benchmarkKernel(7);
 
     return 0;
 }
