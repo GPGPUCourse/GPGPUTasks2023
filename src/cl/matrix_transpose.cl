@@ -1,5 +1,6 @@
 #define TILE_SIZE 32
-__kernel void matrix_transpose(__global float *a, __global float *at, unsigned int m, unsigned int k) {
+__kernel void matrix_transpose(const __global float *a, __global float *at, const unsigned int m,
+                               const unsigned int k) {
     // TODO
     __local float tile[TILE_SIZE][TILE_SIZE + 1];
 
