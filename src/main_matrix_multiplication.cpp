@@ -126,7 +126,7 @@ int main(int argc, char **argv) {
     }
 
     {
-        auto func = [&](ocl::Kernel &k) { k.exec(gpu::WorkSize(16, 8, N, M / 2), as_gpu, bs_gpu, cs_gpu, M, K, N); };
+        auto func = [&](ocl::Kernel &k) { k.exec(gpu::WorkSize(16, 4, N, M / 4), as_gpu, bs_gpu, cs_gpu, M, K, N); };
         executor("matrix_multiplication_more_thread_work", "more work per thread: ", func, benchmarkingIters, gflops);
         cs_gpu.readN(cs.data(), M * N);
     }

@@ -46,7 +46,7 @@ __kernel void matrix_multiplication_tile(__global const float *a, __global const
     }
 }
 
-#define THREAD_WORK 2
+#define THREAD_WORK 4
 __kernel void matrix_multiplication_more_thread_work(__global const float *a, __global const float *b,
                                                      __global float *c, const _uint M, const _uint K, const _uint N) {
     _uint lid0 = get_local_id(0);
@@ -83,9 +83,9 @@ __kernel void matrix_multiplication_more_thread_work(__global const float *a, __
     }
 
     for (_uint i = 0; i < THREAD_WORK; i++) {
-        gid1 = gid1 + i * STEP;
-        if (gid0 < N && gid1 < M) {
-            c[gid1 * N + gid0] = sum[i];
+        _uint gid1n = gid1 + i * STEP;
+        if (gid0 < N && gid1n < M) {
+            c[gid1n * N + gid0] = sum[i];
         }
     }
 }
