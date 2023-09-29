@@ -31,21 +31,21 @@ int check_correct(const std::vector<float> &cs_cpu, const std::vector<float> &cs
 }
 
 template<typename F>
-void helper(ocl::Kernel &kernel, const F &f, const unsigned int benchmarkingIters, const unsigned int gflops) {
+void helper(ocl::Kernel &kernel, const F &f, const std::string& prefix, const unsigned int benchmarkingIters, const unsigned int gflops) {
     timer t;
     for (int iter = 0; iter < benchmarkingIters; ++iter) {
         f(kernel);
         t.nextLap();
     }
-    std::cout << "\nGPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-    std::cout << "GPU: " << gflops / t.lapAvg() << " GFlops" << std::endl;
+    std::cout << std::endl << prefix << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+    std::cout << prefix << gflops / t.lapAvg() << " GFlops" << std::endl;
 }
 
 template<typename F>
-void executor(const std::string &func, const F &f, const unsigned int benchmarkingIters, const unsigned int gflops) {
+void executor(const std::string &func, const std::string &prefix, const F &f, const unsigned int benchmarkingIters, const unsigned int gflops) {
     ocl::Kernel kernel(matrix_multiplication, matrix_multiplication_length, func);
     kernel.compile();
-    helper(kernel, f, benchmarkingIters, gflops);
+    helper(kernel, f, prefix, benchmarkingIters, gflops);
 }
 
 int main(int argc, char **argv) {
@@ -103,9 +103,11 @@ int main(int argc, char **argv) {
     as_gpu.writeN(as.data(), M * K);
     bs_gpu.writeN(bs.data(), K * N);
 
+    std::cout << std::endl << "selected device: " << device.name << std::endl;
+
     {
         auto func = [&](ocl::Kernel &k) { k.exec(gpu::WorkSize(16, 16, N, M), as_gpu, bs_gpu, cs_gpu, M, K, N); };
-        executor("matrix_multiplication_simple", func, benchmarkingIters, gflops);
+        executor("matrix_multiplication_simple", "simple: ", func, benchmarkingIters, gflops);
         cs_gpu.readN(cs.data(), M * N);
     }
     int ret_code = check_correct(cs_cpu_reference, cs, N, M);
@@ -115,7 +117,7 @@ int main(int argc, char **argv) {
 
     {
         auto func = [&](ocl::Kernel &k) { k.exec(gpu::WorkSize(16, 16, N, M), as_gpu, bs_gpu, cs_gpu, M, K, N); };
-        executor("matrix_multiplication_tile", func, benchmarkingIters, gflops);
+        executor("matrix_multiplication_tile", "local memory: ", func, benchmarkingIters, gflops);
         cs_gpu.readN(cs.data(), M * N);
     }
     ret_code = check_correct(cs_cpu_reference, cs, N, M);
@@ -125,7 +127,7 @@ int main(int argc, char **argv) {
 
     {
         auto func = [&](ocl::Kernel &k) { k.exec(gpu::WorkSize(16, 8, N, M / 2), as_gpu, bs_gpu, cs_gpu, M, K, N); };
-        executor("matrix_multiplication_more_thread_work", func, benchmarkingIters, gflops);
+        executor("matrix_multiplication_more_thread_work", "more work per thread: ", func, benchmarkingIters, gflops);
         cs_gpu.readN(cs.data(), M * N);
     }
     ret_code = check_correct(cs_cpu_reference, cs, N, M);
