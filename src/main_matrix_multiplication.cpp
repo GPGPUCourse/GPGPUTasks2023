@@ -111,9 +111,9 @@ int main(int argc, char **argv)
 
 
     {
-        unsigned int work_group_size0 = 4*4;
-        unsigned int work_group_size1 = 4*2;
-        unsigned int divisor_of_K = 4; // любой делитель K <= min(WG0,WG1)
+        unsigned int work_group_size0 = 4*8;
+        unsigned int work_group_size1 = 4*4;
+        unsigned int divisor_of_K = 4*2; // любой делитель K <= min(WG0,WG1)
         ocl::Kernel matrix_multiplication_kernel(
             matrix_multiplication, 
             matrix_multiplication_length, 
@@ -158,7 +158,7 @@ int main(int argc, char **argv)
     }
     
     {
-        unsigned int work_group_size = 8*2;
+        unsigned int work_group_size = 8*8;
         unsigned int work_per_workitem = 8; // любое <= work_group_size!
         ocl::Kernel matrix_multiplication_kernel(
             matrix_multiplication, 
