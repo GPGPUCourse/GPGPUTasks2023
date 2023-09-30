@@ -100,15 +100,24 @@ __kernel void mandelbrot_naive(__global float *out, const unsigned int width, co
     float y = y0;
 
     int iter = 0;
+    float it = iterationsLimit;
     for (; iter < iterationsLimit; ++iter) {
         float xPrev = x;
         x = x * x - y * y + x0;
         y = 2.0f * xPrev * y + y0;
         if ((x * x + y * y) > threshold) {
-            break;
+            it += iter;
+            // hack to avoid creating instructions to change exec mask
+            x = 0;
+            y = 0;
+            x0 = 0;
+            y0 = 0;
         }
     }
-    float result = iter;
+    if(it - iterationsLimit > 1e-6) {
+        it = it - iterationsLimit;
+    }
+    float result = it;
     if (smoothing && iter != iterationsLimit) {
         result = result - log(log(sqrt(x * x + y * y)) / log(threshold)) / log(2.0f);
     }
