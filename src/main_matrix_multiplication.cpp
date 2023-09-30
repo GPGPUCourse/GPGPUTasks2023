@@ -14,13 +14,21 @@
 
 constexpr int benchmarkingIters = 10; // TODO пока тестируетесь удобно выставить единицу
 constexpr unsigned int M = 1024;
-constexpr unsigned int K = 500;
+constexpr unsigned int K = 1024;
 constexpr unsigned int N = 1024;
 constexpr size_t gflops =
         ((size_t) M * K * N * 2) / (1000 * 1000 * 1000); // умножить на два, т.к. операция сложения и умножения
 
-void test_kernel(gpu::gpu_mem_32f &as_gpu, gpu::gpu_mem_32f &bs_gpu, gpu::gpu_mem_32f &cs_gpu, const std::string kernel_name,
-                 const float *expected) {
+void test_kernel(std::vector<float> &as, std::vector<float> &bs, const std::string kernel_name, const float *expected,
+                 int x_scale = 1, int y_scale = 1) {
+
+    gpu::gpu_mem_32f as_gpu, bs_gpu, cs_gpu;
+    as_gpu.resizeN(M * K);
+    bs_gpu.resizeN(K * N);
+    cs_gpu.resizeN(M * N);
+
+    as_gpu.writeN(as.data(), M * K);
+    bs_gpu.writeN(bs.data(), K * N);
     ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length,
                                              kernel_name);
     matrix_multiplication_kernel.compile();
@@ -30,8 +38,10 @@ void test_kernel(gpu::gpu_mem_32f &as_gpu, gpu::gpu_mem_32f &bs_gpu, gpu::gpu_me
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             // TODO
             unsigned int work_group_size = 16;
-            unsigned int global_work_size_width = (N + work_group_size - 1) / work_group_size * work_group_size;
-            unsigned int global_work_size_height = (M + work_group_size - 1) / work_group_size * work_group_size;
+            unsigned int global_work_size_width =
+                    (((N + x_scale - 1) / x_scale) + work_group_size - 1) / work_group_size * work_group_size;
+            unsigned int global_work_size_height =
+                    (((M + y_scale - 1) / y_scale) + work_group_size - 1) / work_group_size * work_group_size;
             matrix_multiplication_kernel.exec(
                     gpu::WorkSize(work_group_size, work_group_size, global_work_size_width, global_work_size_height),
                     as_gpu, bs_gpu, cs_gpu, M, K, N);
@@ -105,16 +115,10 @@ int main(int argc, char **argv) {
 
     const std::vector<float> cs_cpu_reference = cs;
 
-
-    gpu::gpu_mem_32f as_gpu, bs_gpu, cs_gpu;
-    as_gpu.resizeN(M * K);
-    bs_gpu.resizeN(K * N);
-    cs_gpu.resizeN(M * N);
-
-    as_gpu.writeN(as.data(), M * K);
-    bs_gpu.writeN(bs.data(), K * N);
-
-    test_kernel(as_gpu, bs_gpu, cs_gpu, "matrix_multiplication_naive", cs_cpu_reference.data());
+    test_kernel(as, bs, "matrix_multiplication_naive", cs_cpu_reference.data());
+    test_kernel(as, bs, "matrix_multiplication_local_memes", cs_cpu_reference.data());
+    test_kernel(as, bs, "matrix_multiplication_task3_rows", cs_cpu_reference.data(), 16);
+    test_kernel(as, bs, "matrix_multiplication_task3_columns", cs_cpu_reference.data(), 1, 16);
 
     return 0;
 }

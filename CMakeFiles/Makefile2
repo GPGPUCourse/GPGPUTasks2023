@@ -168,9 +168,9 @@ libs/utils/clean: libs/utils/CMakeFiles/libutils.dir/clean
 # Target rules for target CMakeFiles/matrix_transpose.dir
 
 # All Build rule for target.
-CMakeFiles/matrix_transpose.dir/all: libs/clew/CMakeFiles/libclew.dir/all
 CMakeFiles/matrix_transpose.dir/all: libs/gpu/CMakeFiles/libgpu.dir/all
 CMakeFiles/matrix_transpose.dir/all: libs/gpu/CMakeFiles/hexdumparray.dir/all
+CMakeFiles/matrix_transpose.dir/all: libs/clew/CMakeFiles/libclew.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_transpose.dir/build.make CMakeFiles/matrix_transpose.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_transpose.dir/build.make CMakeFiles/matrix_transpose.dir/build
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/ilia/GPGPUTasks2023/CMakeFiles --progress-num=25,26,27 "Built target matrix_transpose"
@@ -196,9 +196,9 @@ CMakeFiles/matrix_transpose.dir/clean:
 # Target rules for target CMakeFiles/matrix_multiplication.dir
 
 # All Build rule for target.
-CMakeFiles/matrix_multiplication.dir/all: libs/clew/CMakeFiles/libclew.dir/all
 CMakeFiles/matrix_multiplication.dir/all: libs/gpu/CMakeFiles/libgpu.dir/all
 CMakeFiles/matrix_multiplication.dir/all: libs/gpu/CMakeFiles/hexdumparray.dir/all
+CMakeFiles/matrix_multiplication.dir/all: libs/clew/CMakeFiles/libclew.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_multiplication.dir/build.make CMakeFiles/matrix_multiplication.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_multiplication.dir/build.make CMakeFiles/matrix_multiplication.dir/build
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/ilia/GPGPUTasks2023/CMakeFiles --progress-num=22,23,24 "Built target matrix_multiplication"
