@@ -12,9 +12,10 @@
 #include <iostream>
 #include <stdexcept>
 
-#define THREAD_WORK 16
+#define THREAD_WORK 32
+#define TILE_SIZE 32
 
-const int benchmarkingIters = 10; // TODO пока тестируетесь удобно выставить единицу
+const int benchmarkingIters = 1; // TODO пока тестируетесь удобно выставить единицу
 const unsigned int M = 1024;
 const unsigned int K = 1024;
 const unsigned int N = 1024;
@@ -117,8 +118,8 @@ int main(int argc, char **argv)
     }
     const std::vector<float> cs_cpu_reference = cs;
 
-    run_kernel(as, bs, cs, cs_cpu_reference, "matrix_multiplication_1", 32, 32, M, N);
-    run_kernel(as, bs, cs, cs_cpu_reference, "matrix_multiplication_2", 32, 32, M, N);
-    run_kernel(as, bs, cs, cs_cpu_reference, "matrix_multiplication_3", 32, 32 / THREAD_WORK, M, N / THREAD_WORK);
+    run_kernel(as, bs, cs, cs_cpu_reference, "matrix_multiplication_1", TILE_SIZE, TILE_SIZE, M, N);
+    run_kernel(as, bs, cs, cs_cpu_reference, "matrix_multiplication_2", TILE_SIZE, TILE_SIZE, M, N);
+    run_kernel(as, bs, cs, cs_cpu_reference, "matrix_multiplication_3", TILE_SIZE, TILE_SIZE / THREAD_WORK, M, N / THREAD_WORK);
     return 0;
 }

@@ -61,6 +61,9 @@ __kernel void matrix_multiplication_3(__global const float *a,
     int local_y = get_local_id(0);
     int local_x = get_local_id(1);
 
+    int y = group_y * TILE_SIZE + local_y;
+    int x = group_x * TILE_SIZE + local_x;
+
     __local float tileA[TILE_SIZE][TILE_SIZE];
     __local float tileB[TILE_SIZE][TILE_SIZE];
 
@@ -68,10 +71,10 @@ __kernel void matrix_multiplication_3(__global const float *a,
     for (int t = 0; t < THREAD_WORK; ++t) {
         sum[t] = 0.0f;
     }
-    for (int tile = 0; tile * TILE_SIZE < M; ++tile) {
-        for (int t = 0; t < THREAD_WORK; ++t) {
-            tileA[local_x + t * GROUP_WORK][local_y] = a[(group_x * TILE_SIZE + local_x + t * GROUP_WORK) * M + tile * TILE_SIZE + local_y];
-            tileB[local_x + t * GROUP_WORK][local_y] = b[(tile * TILE_SIZE + local_x + t * GROUP_WORK) * K + group_y * TILE_SIZE + local_y];
+    for (int tile = 0; tile < M; tile += TILE_SIZE) {
+        for (int t = 0; t < TILE_SIZE; t += GROUP_WORK) {
+            tileA[local_x + t][local_y] = a[(x + t) * M + tile + local_y];
+            tileB[local_x + t][local_y] = b[(tile + local_x + t) * K + y];
         }
 
         barrier(CLK_LOCAL_MEM_FENCE);
@@ -87,6 +90,6 @@ __kernel void matrix_multiplication_3(__global const float *a,
     }
 
     for (int t = 0; t < THREAD_WORK; ++t) {
-        c[(group_x * TILE_SIZE + local_x + t * GROUP_WORK) * K + group_y * TILE_SIZE + local_y] = sum[t];
+        c[(x + t * GROUP_WORK) * K + y] = sum[t];
     }
 }
