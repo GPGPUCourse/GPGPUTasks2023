@@ -78,8 +78,8 @@ __kernel void matrix_multiplication_more_work_per_thread(__global const float *a
             int a_index = (j + w) * K + col;
             int b_index = i + N * row;
 
-            tileA[wj][local_i] = col < K && j + w < M ? as[a_index] : 0.0;
-            tileB[wj][local_i] = i < N && row < K ? bs[b_index] : 0.0;
+            tileA[wj][local_i] = a_index < K * M ? as[a_index] : 0.0;
+            tileB[wj][local_i] = b_index < N * K ? bs[b_index] : 0.0;
         }
 
         barrier(CLK_LOCAL_MEM_FENCE);
