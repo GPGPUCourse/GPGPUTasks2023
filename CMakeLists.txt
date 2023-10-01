@@ -25,5 +25,7 @@ add_executable(matrix_transpose src/main_matrix_transpose.cpp src/cl/matrix_tran
 target_link_libraries(matrix_transpose libclew libgpu libutils)
 
 convertIntoHeader(src/cl/matrix_multiplication.cl src/cl/matrix_multiplication_cl.h matrix_multiplication)
-add_executable(matrix_multiplication src/main_matrix_multiplication.cpp src/cl/matrix_multiplication_cl.h)
+add_executable(matrix_multiplication src/main_matrix_multiplication.cpp src/cl/matrix_multiplication_cl.h
+        src/cl/matrix_transpose.cl
+        src/cl/matrix_multiplication.cl)
 target_link_libraries(matrix_multiplication libclew libgpu libutils)
