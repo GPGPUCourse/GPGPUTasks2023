@@ -24,7 +24,7 @@ __kernel void matrix_transpose(__global float* as,
         return;
     }
 
-    __local float tile[TILE_SIZE][TILE_SIZE];
+    __local float tile[TILE_SIZE][TILE_SIZE + 1];
     tile[local_j][local_i] = as[global_j * k + global_i];
 
     barrier(CLK_LOCAL_MEM_FENCE);
