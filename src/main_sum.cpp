@@ -193,7 +193,7 @@ int main(int argc, char **argv)
                     throw std::runtime_error("No actions made");
                 }
                 unsigned int sum = 0;
-                std::vector<unsigned int> sumv(n, 0);
+                std::vector<unsigned int> sumv(n1, 0);
                 tmp_gpu.readN(sumv.data(), n1);
                 for (unsigned int i = 0; i < n1; ++i) {
                     sum += sumv[i];
