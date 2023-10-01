@@ -1,4 +1,4 @@
-#define VALUES_PER_WORKITEM 32
+#define VALUES_PER_WORKITEM 128
 #define WORKGROUP_SIZE 128
 
 __kernel void sum_gpu_global_atomic(__global const unsigned int *arr,

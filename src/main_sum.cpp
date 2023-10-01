@@ -4,7 +4,7 @@
 #include <libgpu/context.h>
 #include <libgpu/shared_device_buffer.h>
 
-#define VALUES_PER_WORKITEM 32
+#define VALUES_PER_WORKITEM 128
 #define WORKGROUP_SIZE 128
 
 #include "cl/sum_cl.h"
@@ -104,7 +104,7 @@ int main(int argc, char **argv)
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
                 unsigned int res = 0;
                 res_gpu.writeN(&res, 1);
-                kernel.exec(gpu::WorkSize(128, global_work_size), as_gpu, res_gpu, n);
+                kernel.exec(gpu::WorkSize(128, global_work_size / VALUES_PER_WORKITEM), as_gpu, res_gpu, n);
                 res_gpu.readN(&res, 1);
                 EXPECT_THE_SAME(reference_sum, res, "GPU result should be consistent!");
                 t.nextLap();
@@ -120,7 +120,7 @@ int main(int argc, char **argv)
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
                 unsigned int sum = 0;
                 res_gpu.writeN(&sum, 1);
-                kernel.exec(gpu::WorkSize(128, global_work_size), as_gpu, res_gpu, n);
+                kernel.exec(gpu::WorkSize(128, global_work_size / VALUES_PER_WORKITEM), as_gpu, res_gpu, n);
                 res_gpu.readN(&sum, 1);
                 EXPECT_THE_SAME(reference_sum, sum, "GPU result should be consistent!");
                 t.nextLap();
