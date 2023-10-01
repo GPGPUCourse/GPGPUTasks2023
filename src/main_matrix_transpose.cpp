@@ -45,7 +45,6 @@ int main(int argc, char **argv)
     {
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            // TODO
             unsigned int work_group_size_x = 16;
             unsigned int work_group_size_y = 16;
             unsigned int global_work_size_x = gpu::divup(M, work_group_size_x) * work_group_size_x;

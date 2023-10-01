@@ -36,20 +36,36 @@ __kernel void block_matrix_multiplication(__global float* a, __global float* b, 
     c[j * n + i] = sum;
 }
 
-#define THREAD_WORK 8
+#define THREAD_WORK 16
 
 __kernel void threadwork_matrix_multiplication(__global float* a, __global float* b, __global float* c, unsigned int m, unsigned int k, unsigned int n)
 {
     int i = get_global_id(0);
     int j = get_global_id(1);
 
+    int local_i = get_local_id(0);
+    int local_j = get_local_id(1);
+
+    __local float tile_a[TILE_SIZE][THREAD_WORK];
+    __local float tile_b[TILE_SIZE][THREAD_WORK];
+
     float sum[THREAD_WORK];
     for (int w = 0; w < THREAD_WORK; w++)
         sum[w] = 0;
-    for (int t = 0; t < k; t++) {
-        for (int w = 0; w < THREAD_WORK; w++)
-            sum[w] += a[j * k + t] * b[t * n + i * THREAD_WORK + w];
+    for (int tile_k = 0; tile_k < k; tile_k += TILE_SIZE) {
+        for (int w = 0; w < THREAD_WORK; w++) {
+            tile_a[local_j][w] = a[j * k + tile_k + w];
+            tile_b[local_j][w] = b[(local_j + tile_k) * n + i * THREAD_WORK + w];
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+        for (int t = 0; t < TILE_SIZE; t++) {
+            for (int w = 0; w < THREAD_WORK; w++)
+                sum[w] += tile_a[local_j][t] * tile_b[t][w];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
     }
+
     for (int w = 0; w < THREAD_WORK; w++)
         c[j * n + i * THREAD_WORK + w] = sum[w];
 }

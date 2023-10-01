@@ -19,7 +19,7 @@ int main(int argc, char **argv)
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 1; // TODO пока тестируетесь удобно выставить единицу
+    int benchmarkingIters = 10;
     unsigned int M = 1024;
     unsigned int K = 1024;
     unsigned int N = 1024;
@@ -99,7 +99,6 @@ int main(int argc, char **argv)
     auto run_kernel = [&](const std::string& name, ocl::Kernel& kernel){
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            // TODO
             unsigned int work_group_size_x = 16;
             unsigned int work_group_size_y = 16;
             unsigned int global_work_size_x = gpu::divup(M, work_group_size_x) * work_group_size_x;
@@ -123,10 +122,9 @@ int main(int argc, char **argv)
     {
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            // TODO
-            unsigned int work_group_size_x = 16;
+            unsigned int work_group_size_x = 1;
             unsigned int work_group_size_y = 16;
-            unsigned int global_work_size_x = gpu::divup(gpu::divup(M, work_group_size_x) * work_group_size_x, 8);
+            unsigned int global_work_size_x = gpu::divup(gpu::divup(M, 16), work_group_size_x) * work_group_size_x;
             unsigned int global_work_size_y = gpu::divup(N, work_group_size_y) * work_group_size_y;
             threadwork_kernel.exec(gpu::WorkSize(work_group_size_x, work_group_size_y, global_work_size_x, global_work_size_y), as_gpu, bs_gpu, cs_gpu, M, K, N);
 
