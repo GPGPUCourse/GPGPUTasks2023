@@ -59,8 +59,6 @@ __kernel void matrix_multiplication2(__global float* as,
     cs[global_j * N + global_i] = sum;
 }
 
-#define GET(matrix, row, col, row_size, col_size) \
-        (row < col_size && col < row_size) ? matrix[row * row_size + col] : 0.0f;
 
 __kernel void matrix_multiplication3(__global float* as,
                                      __global float* bs,
