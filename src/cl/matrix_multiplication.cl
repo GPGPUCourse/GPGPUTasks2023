@@ -45,30 +45,76 @@ __kernel void matrix_multiplication_1(__global const float *input_1,
 }
 
 __kernel void matrix_multiplication_2(__global const float *input_1,
-									  __global const float *input_2,
-									  __global float *output,
-									  const int M,
-									  const int K,
-									  const int N)
+                                      __global const float *input_2,
+                                      __global float *output,
+                                      const int M,
+                                      const int K,
+                                      const int N)
 {
-	const unsigned int gid_x = get_global_id(0);
-	const unsigned int gid_y = get_global_id(1);
-	const unsigned int lid_x = get_local_id(0);
-	const unsigned int lid_y = get_local_id(1);
+    const unsigned int gid_x = get_global_id(0);
+    const unsigned int gid_y = get_global_id(1);
+    const unsigned int lid_x = get_local_id(0);
+    const unsigned int lid_y = get_local_id(1);
 
-	__local float tileA[WORKGROUP_SIZE][WORKGROUP_SIZE];
-	__local float tileB[WORKGROUP_SIZE][WORKGROUP_SIZE];
+    __local float tileA[WORKGROUP_SIZE][WORKGROUP_SIZE];
+    __local float tileB[WORKGROUP_SIZE][WORKGROUP_SIZE];
 
-	float sum = 0;
-	for (int workgroup_offset = 0; workgroup_offset < K; workgroup_offset += WORKGROUP_SIZE) {
-		tileA[lid_y][lid_x] = input_1[gid_y * K + (workgroup_offset + lid_x)];
-		tileB[lid_y][(lid_x + lid_y) % WORKGROUP_SIZE] = input_2[(workgroup_offset + lid_y) * N + gid_x];
-		barrier(CLK_LOCAL_MEM_FENCE);
-		for (int k = 0; k < WORKGROUP_SIZE; ++k){
-			sum += tileA[lid_y][k] * tileB[k][(lid_x + k) % WORKGROUP_SIZE];
-		}
-		barrier(CLK_LOCAL_MEM_FENCE);
-	}
+    float sum = 0;
+    for (int workgroup_offset = 0; workgroup_offset < K; workgroup_offset += WORKGROUP_SIZE) {
+        tileA[lid_y][lid_x] = input_1[gid_y * K + (workgroup_offset + lid_x)];
+        tileB[lid_y][(lid_x + lid_y) % WORKGROUP_SIZE] = input_2[(workgroup_offset + lid_y) * N + gid_x];
+        barrier(CLK_LOCAL_MEM_FENCE);
+        for (int k = 0; k < WORKGROUP_SIZE; ++k){
+            sum += tileA[lid_y][k] * tileB[k][(lid_x + k) % WORKGROUP_SIZE];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
 
-	output[gid_y * N + gid_x] = sum;
+    output[gid_y * N + gid_x] = sum;
+}
+
+#define WORK_PER_THREAD 8
+
+__kernel void matrix_multiplication_3(__global const float *input_1,
+                                      __global const float *input_2,
+                                      __global float *output,
+                                      const int M,
+                                      const int K,
+                                      const int N)
+{
+    const unsigned int RTS = WORKGROUP_SIZE / WORK_PER_THREAD;
+
+    const unsigned int lid_x = get_local_id(0);
+    const unsigned int lid_y = get_local_id(1);
+    const unsigned int gid_x = get_global_id(0);
+    const unsigned int gid_y = get_group_id(1) * WORKGROUP_SIZE + lid_y;
+
+    __local float tileA[WORKGROUP_SIZE][WORKGROUP_SIZE];
+    __local float tileB[WORKGROUP_SIZE][WORKGROUP_SIZE + 1];
+
+    float sum[WORK_PER_THREAD];
+    for (int w = 0; w < WORK_PER_THREAD; ++w)
+        sum[w] = 0.f;
+
+    for (int workgroup_offset = 0; workgroup_offset < K; workgroup_offset += WORKGROUP_SIZE) {
+
+        for (int w = 0; w < WORK_PER_THREAD; ++w) {
+            tileA[lid_y + w * RTS][lid_x] = input_1[(gid_y + w * RTS) * K + (workgroup_offset + lid_x)];
+            tileB[lid_y + w * RTS][lid_x] = input_2[(workgroup_offset + lid_y + w * RTS) * N + gid_x];
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        for (int k = 0; k < WORKGROUP_SIZE; ++k) {
+            float b = tileB[k][lid_x];
+            for (int w = 0; w < WORK_PER_THREAD; ++w) {
+                sum[w] += tileA[lid_y + w * RTS][k] * b;
+            }
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+
+    for (int w = 0; w < WORK_PER_THREAD; ++w) {
+        output[(gid_y + w * RTS) * N + gid_x] = sum[w];
+    }
 }
