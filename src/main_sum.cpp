@@ -6,6 +6,8 @@
 
 #include "cl/sum_cl.h"
 
+#define VALUES_PER_WORK_ITEM 32
+
 template<typename T>
 void raiseFail(const T &a, const T &b, std::string message, std::string filename, int line)
 {
@@ -103,11 +105,14 @@ int main(int argc, char **argv)
             ocl::Kernel kernel(sum_kernel, sum_kernel_length, "loopSum");
             kernel.compile();
 
+            unsigned int currentWorkGroupSize = 128;
+            unsigned int current_global_work_size = (((n + VALUES_PER_WORK_ITEM - 1) / VALUES_PER_WORK_ITEM) + workGroupSize - 1) / workGroupSize * workGroupSize;
+
             timer t;
             unsigned int sum = 0;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
                 sum_buffer.writeN(&init, 1);
-                kernel.exec(gpu::WorkSize(workGroupSize, global_work_size),
+                kernel.exec(gpu::WorkSize(currentWorkGroupSize, current_global_work_size),
                             as_buffer, n, sum_buffer);
                 t.nextLap();
             }
@@ -121,11 +126,15 @@ int main(int argc, char **argv)
             ocl::Kernel kernel(sum_kernel, sum_kernel_length, "loopCoalescedSum");
             kernel.compile();
 
+
+            unsigned int currentWorkGroupSize = 128;
+            unsigned int current_global_work_size = (((n + VALUES_PER_WORK_ITEM - 1) / VALUES_PER_WORK_ITEM) + workGroupSize - 1) / workGroupSize * workGroupSize;
+
             timer t;
             unsigned int sum = 0;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
                 sum_buffer.writeN(&init, 1);
-                kernel.exec(gpu::WorkSize(workGroupSize, global_work_size),
+                kernel.exec(gpu::WorkSize(currentWorkGroupSize, current_global_work_size),
                             as_buffer, n, sum_buffer);
                 t.nextLap();
             }
