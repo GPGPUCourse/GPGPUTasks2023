@@ -9,6 +9,26 @@
 #include <vector>
 #include <iostream>
 #include <stdexcept>
+#include <string>
+
+template<typename EXECUTOR_TYPE>
+void runner(const std::string& kernel_name, EXECUTOR_TYPE executor, int benchmarkingIters, int gflops) {
+    std::cout << kernel_name << std::endl;
+    ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, kernel_name);
+    matrix_multiplication_kernel.compile();
+
+    {
+        timer t;
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
+            unsigned int work_group_size = 16;
+            executor(matrix_multiplication_kernel);
+
+            t.nextLap();
+        }
+        std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU: " << gflops / t.lapAvg() << " GFlops" << std::endl;
+    }
+}
 
 
 int main(int argc, char **argv)
@@ -19,7 +39,7 @@ int main(int argc, char **argv)
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 10; // TODO пока тестируетесь удобно выставить единицу
+    int benchmarkingIters = 20; // TODO пока тестируетесь удобно выставить единицу
     unsigned int M = 1024;
     unsigned int K = 1024;
     unsigned int N = 1024;
@@ -58,7 +78,6 @@ int main(int argc, char **argv)
 
     const std::vector<float> cs_cpu_reference = cs;
 
-    /*
     gpu::gpu_mem_32f as_gpu, bs_gpu, cs_gpu;
     as_gpu.resizeN(M*K);
     bs_gpu.resizeN(K*N);
@@ -67,42 +86,51 @@ int main(int argc, char **argv)
     as_gpu.writeN(as.data(), M*K);
     bs_gpu.writeN(bs.data(), K*N);
 
-    ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, "matrix_multiplication");
-    matrix_multiplication_kernel.compile();
+    auto checker = [&] () {
+        // Проверяем корректность результатов
+        double diff_sum = 0;
+        for (int i = 0; i < M * N; ++i) {
+            double a = cs[i];
+            double b = cs_cpu_reference[i];
+            if (a != 0.0 || b != 0.0) {
+                double diff = fabs(a - b) / std::max(fabs(a), fabs(b));
+                diff_sum += diff;
+            }
+        }
+
+        double diff_avg = diff_sum / (M * N);
+        std::cout << "Average difference: " << diff_avg * 100.0 << "%" << std::endl;
+        if (diff_avg > 0.01) {
+            std::cerr << "Too big difference!" << std::endl;
+            return 1;
+        }
+        return 0;
+    };
 
     {
-        timer t;
-        for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            // TODO
-            unsigned int work_group_size = 128;
-            unsigned int global_work_size = ...;
-            matrix_multiplication_kernel.exec(gpu::WorkSize(work_group_size, global_work_size), as_gpu, bs_gpu, cs_gpu, M, K, N);
-
-            t.nextLap();
-        }
-        std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "GPU: " << gflops / t.lapAvg() << " GFlops" << std::endl;
+        auto executor = [&](ocl::Kernel kernel) {
+            kernel.exec(gpu::WorkSize(16, 16, N, M), as_gpu, bs_gpu, cs_gpu, M, K, N);
+        };
+        runner("matrix_multiplication_naive", executor, benchmarkingIters, gflops);
+        cs_gpu.readN(cs.data(), M * N);
+        checker();
+    }
+    {
+        auto executor = [&](ocl::Kernel kernel) {
+            kernel.exec(gpu::WorkSize(16, 16, N, M), as_gpu, bs_gpu, cs_gpu, M, K, N);
+        };
+        runner("matrix_multiplication_local", executor, benchmarkingIters, gflops);
+        cs_gpu.readN(cs.data(), M * N);
+        checker();
     }
 
-    cs_gpu.readN(cs.data(), M*N);
-    */
-
-    // Проверяем корректность результатов
-    double diff_sum = 0;
-    for (int i = 0; i < M * N; ++i) {
-        double a = cs[i];
-        double b = cs_cpu_reference[i];
-        if (a != 0.0 || b != 0.0) {
-            double diff = fabs(a - b) / std::max(fabs(a), fabs(b));
-            diff_sum += diff;
-        }
-    }
-
-    double diff_avg = diff_sum / (M * N);
-    std::cout << "Average difference: " << diff_avg * 100.0 << "%" << std::endl;
-    if (diff_avg > 0.01) {
-        std::cerr << "Too big difference!" << std::endl;
-        return 1;
+    {
+        auto executor = [&](ocl::Kernel kernel) {
+            kernel.exec(gpu::WorkSize(16, 4, N, M / 4), as_gpu, bs_gpu, cs_gpu, M, K, N);
+        };
+        runner("matrix_multiplication", executor, benchmarkingIters, gflops);
+        cs_gpu.readN(cs.data(), M * N);
+        checker();
     }
 
     return 0;
