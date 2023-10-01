@@ -23,13 +23,15 @@ matrix_multiplication(__global float *a, __global float *b, __global float *c, u
     }
     for (int tile_k = 0; tile_k * TS < K; ++tile_k) {
         for (int w = 0; w < WPT; ++w) {
-            tileA[ly + w * RTS][lx] = gx < N && (gy + w * RTS) < M ? a[(gy + w * RTS) * K + tile_k * TS + lx] : 0;
-            tileB[ly + w * RTS][lx] = gx < N && (gy + w * RTS) < M ? b[(ly + tile_k * TS + w * RTS) * N + gx] : 0;
+            int gy_offset = gy + w * RTS;
+            tileA[ly + w * RTS][lx] = gx < N && gy_offset < M ? a[gy_offset * K + tile_k * TS + lx] : 0;
+            tileB[ly + w * RTS][lx] = gx < N && gy_offset < M ? b[(ly + tile_k * TS + w * RTS) * N + gx] : 0;
         }
         barrier(CLK_LOCAL_MEM_FENCE);
         for (int k = 0; k < TS; ++k) {
+            float tmpB = tileB[k][lx];
             for (int w = 0; w < WPT; ++w) {
-                sum[w] += tileA[ly + w * RTS][k] * tileB[k][lx];
+                sum[w] += tileA[ly + w * RTS][k] * tmpB;
             }
         }
 
