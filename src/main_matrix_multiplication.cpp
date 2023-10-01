@@ -10,40 +10,36 @@
 #include <iostream>
 #include <stdexcept>
 
-// Keep value synced with same define inside main_matrix_multiplication.cpp
-#define WGS 16u
+// Keep values synced with same define inside matrix_multiplication.cl
+#define TS 32u
+#define WS 8u
 
 template<typename T>
 constexpr T roundup(T a, T b) {
     return (a + b - 1) / b * b;
 }
 
-// FIXME
-/* int benchmarkingIters = 10; */
-int benchmarkingIters = 1;
+int benchmarkingIters = 10;
 
-/* unsigned int M = 2; */
-/* unsigned int K = 3; */
-/* unsigned int N = 1; */
 unsigned int M = 1024;
 unsigned int K = 1024;
 unsigned int N = 1024;
+
 const size_t gflops = ((size_t) M * K * N * 2) / (1000 * 1000 * 1000); // умножить на два, т.к. операция сложения и умножения
 gpu::gpu_mem_32f as_gpu, bs_gpu, cs_gpu;
 
-void run_gpu_kernel(const char* kernel_name) 
+void run_gpu_kernel(const char* kernel_name, gpu::WorkSize ws) 
 {
     ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, kernel_name);
     matrix_multiplication_kernel.compile();
-
     {
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            matrix_multiplication_kernel.exec(gpu::WorkSize(WGS, WGS, roundup(M, WGS), roundup(N, WGS)), as_gpu, bs_gpu, cs_gpu, M, K, N);
+            matrix_multiplication_kernel.exec(ws, as_gpu, bs_gpu, cs_gpu, M, K, N);
             t.nextLap();
         }
-        std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "GPU: " << gflops / t.lapAvg() << " GFlops" << std::endl;
+        std::cout << "GPU(" << kernel_name << "): " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU(" << kernel_name << "): " << gflops / t.lapAvg() << " GFlops" << std::endl;
     }
 
 }
@@ -119,11 +115,13 @@ int main(int argc, char **argv)
     as_gpu.writeN(as.data(), M*K);
     bs_gpu.writeN(bs.data(), K*N);
 
-    run_gpu_kernel("matrix_multiplication_trivial");
+    run_gpu_kernel("matrix_multiplication_trivial", gpu::WorkSize(TS, TS, roundup(M, TS), roundup(N, TS)));
     check_result(cs_cpu_reference);
 
-    run_gpu_kernel("matrix_multiplication_local_mem");
+    run_gpu_kernel("matrix_multiplication_local_mem", gpu::WorkSize(TS, TS, roundup(M, TS), roundup(N, TS)));
     check_result(cs_cpu_reference);
-
+    
+    run_gpu_kernel("matrix_multiplication_heavy_threads", gpu::WorkSize(TS, TS / WS, roundup(M, TS), roundup(N / WS, TS)));
+    check_result(cs_cpu_reference);
     return 0;
 }
