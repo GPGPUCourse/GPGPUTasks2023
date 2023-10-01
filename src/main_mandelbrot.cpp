@@ -105,8 +105,6 @@ int main(int argc, char **argv)
         image.savePNG("mandelbrot_cpu.png");
     }
 
-    // Раскомментируйте это:
-
     gpu::Context context;
     context.init(device.device_id_opencl);
     context.activate();
