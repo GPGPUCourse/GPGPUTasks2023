@@ -6,7 +6,7 @@
 
 #line 6
 
-#define VALUES_PER_WORKITEM 32
+#define VALUES_PER_WORK_ITEM 32
 #define WORKGROUP_SIZE 128
 
 __kernel void sum_1(
@@ -28,9 +28,9 @@ __kernel void sum_2(
 	const unsigned int gid = get_global_id(0);
 	unsigned int local_sum = 0;
 
-	for (int i = 0; i < VALUES_PER_WORKITEM; ++i)
+	for (int i = 0; i < VALUES_PER_WORK_ITEM; ++i)
 	{
-		int local_index = gid * VALUES_PER_WORKITEM + i;
+		int local_index = gid * VALUES_PER_WORK_ITEM + i;
 		if (local_index >= n)
 			break;
 		local_sum += numbers[local_index];
@@ -48,9 +48,9 @@ __kernel void sum_3(
 	const unsigned int grs = get_local_size(0);
 	unsigned int local_sum = 0;
 
-	for (int i = 0; i < VALUES_PER_WORKITEM; ++i)
+	for (int i = 0; i < VALUES_PER_WORK_ITEM; ++i)
 	{
-		int local_index = wid * grs * VALUES_PER_WORKITEM + i * grs + lid;
+		int local_index = wid * grs * VALUES_PER_WORK_ITEM + i * grs + lid;
 		if (local_index >= n)
 			break;
 		local_sum += numbers[local_index];
