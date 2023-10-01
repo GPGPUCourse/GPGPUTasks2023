@@ -1,11 +1,15 @@
 #ifdef __CLION_IDE__
+
 #include <libgpu/opencl/cl/clion_defines.cl>
+
 #endif
 
 
 #define TS 16
 #define WPT 4
-__kernel void matrix_multiplication(__global float* a, __global float* b, __global float* c, unsigned int M, unsigned int K, unsigned N) {
+__kernel void
+matrix_multiplication(__global float *a, __global float *b, __global float *c, unsigned int M, unsigned int K,
+                      unsigned N) {
     int lx = get_local_id(0);
     int ly = get_local_id(1);
     int gx = get_global_id(0);
@@ -20,7 +24,7 @@ __kernel void matrix_multiplication(__global float* a, __global float* b, __glob
     for (int tile_k = 0; tile_k * TS < K; ++tile_k) {
         for (int w = 0; w < WPT; ++w) {
             tileA[ly + w * RTS][lx] = gx < N && (gy + w * RTS) < M ? a[(gy + w * RTS) * K + tile_k * TS + lx] : 0;
-            tileB[ly + w * RTS][lx] = gx < N && (gy + w * RTS) < M ? b[(ly +  tile_k * TS + w * RTS) * N + gx] : 0;
+            tileB[ly + w * RTS][lx] = gx < N && (gy + w * RTS) < M ? b[(ly + tile_k * TS + w * RTS) * N + gx] : 0;
         }
         barrier(CLK_LOCAL_MEM_FENCE);
         for (int k = 0; k < TS; ++k) {
@@ -36,7 +40,9 @@ __kernel void matrix_multiplication(__global float* a, __global float* b, __glob
     }
 }
 
-__kernel void matrix_multiplication_local(__global float* a, __global float* b, __global float* c, unsigned int M, unsigned int K, unsigned N) {
+__kernel void
+matrix_multiplication_local(__global float *a, __global float *b, __global float *c, unsigned int M, unsigned int K,
+                            unsigned N) {
     int gx = get_global_id(0);
     int gy = get_global_id(1);
     int lx = get_local_id(0);
@@ -62,7 +68,9 @@ __kernel void matrix_multiplication_local(__global float* a, __global float* b, 
 }
 
 
-__kernel void matrix_multiplication_naive(__global float* a, __global float* b, __global float* c, unsigned int M, unsigned int K, unsigned N) {
+__kernel void
+matrix_multiplication_naive(__global float *a, __global float *b, __global float *c, unsigned int M, unsigned int K,
+                            unsigned N) {
     int i = get_global_id(0);
     int j = get_global_id(1);
 

@@ -1,10 +1,11 @@
 #ifdef __CLION_IDE__
+
 #include <libgpu/opencl/cl/clion_defines.cl>
+
 #endif
 
 #define TS 16
-__kernel void matrix_transpose(__global float* a, __global float* at, unsigned int M, unsigned int K)
-{
+__kernel void matrix_transpose(__global float *a, __global float *at, unsigned int M, unsigned int K) {
     unsigned int gx = get_global_id(0);
     unsigned int gy = get_global_id(1);
     unsigned int lx = get_local_id(0);

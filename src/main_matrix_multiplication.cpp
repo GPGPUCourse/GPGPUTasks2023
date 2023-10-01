@@ -12,7 +12,7 @@
 #include <string>
 
 template<typename EXECUTOR_TYPE>
-void runner(const std::string& kernel_name, EXECUTOR_TYPE executor, int benchmarkingIters, int gflops) {
+void runner(const std::string &kernel_name, EXECUTOR_TYPE executor, int benchmarkingIters, int gflops) {
     std::cout << kernel_name << std::endl;
     ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, kernel_name);
     matrix_multiplication_kernel.compile();
@@ -31,8 +31,7 @@ void runner(const std::string& kernel_name, EXECUTOR_TYPE executor, int benchmar
 }
 
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     gpu::Device device = gpu::chooseGPUDevice(argc, argv);
 
     gpu::Context context;
@@ -43,13 +42,14 @@ int main(int argc, char **argv)
     unsigned int M = 1024;
     unsigned int K = 1024;
     unsigned int N = 1024;
-    const size_t gflops = ((size_t) M * K * N * 2) / (1000 * 1000 * 1000); // умножить на два, т.к. операция сложения и умножения
+    const size_t gflops =
+            ((size_t) M * K * N * 2) / (1000 * 1000 * 1000); // умножить на два, т.к. операция сложения и умножения
 
-    std::vector<float> as(M*K, 0);
-    std::vector<float> bs(K*N, 0);
-    std::vector<float> cs(M*N, 0);
+    std::vector<float> as(M * K, 0);
+    std::vector<float> bs(K * N, 0);
+    std::vector<float> cs(M * N, 0);
 
-    FastRandom r(M+K+N);
+    FastRandom r(M + K + N);
     for (unsigned int i = 0; i < as.size(); ++i) {
         as[i] = r.nextf();
     }
@@ -79,14 +79,14 @@ int main(int argc, char **argv)
     const std::vector<float> cs_cpu_reference = cs;
 
     gpu::gpu_mem_32f as_gpu, bs_gpu, cs_gpu;
-    as_gpu.resizeN(M*K);
-    bs_gpu.resizeN(K*N);
-    cs_gpu.resizeN(M*N);
+    as_gpu.resizeN(M * K);
+    bs_gpu.resizeN(K * N);
+    cs_gpu.resizeN(M * N);
 
-    as_gpu.writeN(as.data(), M*K);
-    bs_gpu.writeN(bs.data(), K*N);
+    as_gpu.writeN(as.data(), M * K);
+    bs_gpu.writeN(bs.data(), K * N);
 
-    auto checker = [&] () {
+    auto checker = [&]() {
         // Проверяем корректность результатов
         double diff_sum = 0;
         for (int i = 0; i < M * N; ++i) {
