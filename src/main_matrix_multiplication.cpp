@@ -50,7 +50,7 @@ void test(ocl::Kernel kernel, std::string name, std::vector<float> cs_cpu_refere
     std::cout << name << " Average difference: " << diff_avg * 100.0 << "%" << std::endl;
     if (diff_avg > 0.01) {
         std::cerr << "Too big difference!" << std::endl;
-        return 1;
+        exit(1);
     }
 }
 
