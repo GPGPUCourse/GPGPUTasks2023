@@ -9,7 +9,7 @@ __kernel void matrix_transpose(__global const float *src, __global float *dst, u
     size_t src_row_l = get_local_id(1);
     size_t src_flat_id = src_row_g * src_size_x + src_col_g;
 
-    __local float tile[TILE_SIZE][TILE_SIZE];
+    __local float tile[TILE_SIZE][TILE_SIZE + 1];
     if (src_col_g < src_size_x && src_row_g < src_size_y) {
         tile[src_row_l][src_col_l] = src[src_flat_id];
     }
