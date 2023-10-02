@@ -16,7 +16,7 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 
-void run_kernel(std::string kernel_name, gpu::Device device)
+void run_kernel(std::string kernel_name, gpu::Device device, unsigned int k)
 {
     int benchmarkingIters = 10;
 
@@ -30,14 +30,12 @@ void run_kernel(std::string kernel_name, gpu::Device device)
     }
 
     {
-//         gpu::Device device = gpu::chooseGPUDevice(argc, argv);
-
         gpu::Context context;
         context.init(device.device_id_opencl);
         context.activate();
 
         unsigned int workGroupSize = 64;
-        unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
+        unsigned int global_work_size = (n / k + workGroupSize - 1) / workGroupSize * workGroupSize;
         gpu::WorkSize workSize = gpu::WorkSize(workGroupSize, global_work_size);
 
         gpu::gpu_mem_32u as_gpu;
@@ -116,11 +114,11 @@ int main(int argc, char **argv)
     
     {
         gpu::Device device = gpu::chooseGPUDevice(argc, argv);
-        run_kernel("sum_gpu_baseline", device);
-        run_kernel("sum_gpu_cicle", device);
-        run_kernel("sum_gpu_cicle_coalesced", device);
-        run_kernel("sum_gpu_local", device);
-        run_kernel("sum_gpu_tree", device);
+        run_kernel("sum_gpu_baseline", device, 1);
+        run_kernel("sum_gpu_cicle", device, 32);
+        run_kernel("sum_gpu_cicle_coalesced", device, 32);
+        run_kernel("sum_gpu_local", device, 1);
+        run_kernel("sum_gpu_tree", device, 1);
     }
 }
 
