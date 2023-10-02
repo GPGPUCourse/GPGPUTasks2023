@@ -19,9 +19,11 @@ int main(int argc, char **argv)
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 10;
-    unsigned int M = 1024;
-    unsigned int K = 1024;
+    const int benchmarkingIters = 10;
+    const unsigned int M = 1024;
+    const unsigned int K = 1024;
+    // const unsigned int M = 128;
+    // const unsigned int K = 128;
 
     std::vector<float> as(M*K, 0);
     std::vector<float> as_t(M*K, 0);
@@ -31,6 +33,14 @@ int main(int argc, char **argv)
         as[i] = r.nextf();
     }
     std::cout << "Data generated for M=" << M << ", K=" << K << std::endl;
+
+    // for (int i = 0; i < K; ++i) {
+    //     for (int j = 0; j < M; ++j) {
+    //         std::cout << as[i * M + j] << ' ';
+    //     }
+
+    //     std::cout << '\n';
+    // }
 
     gpu::gpu_mem_32f as_gpu, as_t_gpu;
     as_gpu.resizeN(M*K);
@@ -44,9 +54,8 @@ int main(int argc, char **argv)
     {
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            // TODO
-            const unsigned int xGroupSize = 8;
-            const unsigned int yGroupSize = 8;
+            const unsigned int xGroupSize = 16;
+            const unsigned int yGroupSize = 16;
             const unsigned int xWorkSize = (M + xGroupSize - 1) / xGroupSize * xGroupSize;
             const unsigned int yWorkSize = (K + yGroupSize - 1) / yGroupSize * yGroupSize;
 
@@ -71,6 +80,14 @@ int main(int argc, char **argv)
     }
 
     as_t_gpu.readN(as_t.data(), M*K);
+
+    // for (int i = 0; i < M; ++i) {
+    //     for (int j = 0; j < K; ++j) {
+    //         std::cout << as_t[i * K + j] << ' ';
+    //     }
+
+    //     std::cout << '\n';
+    // }
 
     // Проверяем корректность результатов
     for (int j = 0; j < M; ++j) {
