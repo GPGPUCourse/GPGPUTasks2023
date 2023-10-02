@@ -19,7 +19,7 @@ int main(int argc, char **argv)
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 1; // TODO пока тестируетесь удобно выставить единицу
+    int benchmarkingIters = 10; // TODO пока тестируетесь удобно выставить единицу
     unsigned int M = 1024;
     unsigned int K = 1024;
     unsigned int N = 1024;
@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 
     unsigned int tile_size = 16;
 
-
+    
     std::cout << "Naive approach:\n";
     {
         ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, "naive_multiplication", "-DTILE_SIZE=" + std::to_string(tile_size));
@@ -110,7 +110,7 @@ int main(int argc, char **argv)
             return 1;
         }
     }
-    std::cout << "Local memory:\n";
+    std::cout << "Local memory 1:\n";
     {
         ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, "local_memory_multiplication_1", "-DTILE_SIZE=" + std::to_string(tile_size));
         matrix_multiplication_kernel.compile();
@@ -119,6 +119,43 @@ int main(int argc, char **argv)
             timer t;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
                 matrix_multiplication_kernel.exec(gpu::WorkSize(tile_size, tile_size, N, M), as_gpu, bs_gpu, cs_gpu, M, K, N);
+
+                t.nextLap();
+            }
+            std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+            std::cout << "GPU: " << gflops / t.lapAvg() << " GFlops" << std::endl;
+        }
+    
+        cs_gpu.readN(cs.data(), M*N);
+
+        // Проверяем корректность результатов
+        double diff_sum = 0;
+        for (int i = 0; i < M * N; ++i) {
+            double a = cs[i];
+            double b = cs_cpu_reference[i];
+            if (a != 0.0 || b != 0.0) {
+                double diff = fabs(a - b) / std::max(fabs(a), fabs(b));
+                diff_sum += diff;
+            }
+        }
+
+
+        double diff_avg = diff_sum / (M * N);
+        std::cout << "Average difference: " << diff_avg * 100.0 << "%" << std::endl;
+        if (diff_avg > 0.01) {
+            std::cerr << "Too big difference!" << std::endl;
+            return 1;
+        }
+    }
+    std::cout << "Local memory 2:\n";
+    {
+        ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, "local_memory_multiplication_2", "-DTILE_SIZE=" + std::to_string(tile_size));
+        matrix_multiplication_kernel.compile();
+
+        {
+            timer t;
+            for (int iter = 0; iter < benchmarkingIters; ++iter) {
+                matrix_multiplication_kernel.exec(gpu::WorkSize(tile_size, 1, N, M), as_gpu, bs_gpu, cs_gpu, M, K, N);
 
                 t.nextLap();
             }
