@@ -17,8 +17,16 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 
+#define VALUES_PER_WORKITEM 64
+#define WORKGROUP_SIZE 128
+
 void run(gpu::WorkSize &ws, std::string &kernel_name, int benchmarkingIters, gpu::gpu_mem_32u &as_gpu, gpu::gpu_mem_32u &sum_gpu, unsigned int n, unsigned int reference_sum) {
-    ocl::Kernel kernel(sum_kernel, sum_kernel_length, kernel_name);
+    ocl::Kernel kernel(
+        sum_kernel, 
+        sum_kernel_length, 
+        kernel_name, 
+        "-DVALUES_PER_WORKITEM=" + std::to_string(VALUES_PER_WORKITEM) + " -DWORKGROUP_SIZE=" + std::to_string(WORKGROUP_SIZE)
+    );
     bool printLog = false;
     kernel.compile(printLog);
 

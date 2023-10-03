@@ -4,9 +4,6 @@
 
 #line 6
 
-#define VALUES_PER_WORKITEM 64
-#define WORKGROUP_SIZE 128
-
 __kernel void baseline(__global unsigned int *sum, __global const unsigned int *as, const unsigned int n) {
     const unsigned id = get_global_id(0);
     if (id >= n) {
@@ -36,7 +33,7 @@ __kernel void coalesced_with_cycle(__global unsigned int *sum, __global const un
     
     unsigned int meg_sum = 0;
     for (int i = 0; i < VALUES_PER_WORKITEM; ++i) {
-        int idx = gid * sz * VALUES_PER_WORKITEM + lid * VALUES_PER_WORKITEM + i;
+        int idx = gid * sz * VALUES_PER_WORKITEM + i * sz + lid;
         if (idx < n) {
             meg_sum += as[idx];
         }
