@@ -22,41 +22,29 @@ unsigned bin_search_eq(const float x, unsigned left, unsigned right, __global co
     return left;
 }
 
-
 __kernel void merge(__global const float *src, __global float *res, const unsigned size, const unsigned n) {
     unsigned global_id = get_global_id(0);
-    if (global_id > n) {
+    if (global_id >= n) {
         return;
     }
-    unsigned local_size = get_local_size(0);
+    unsigned local_size = get_local_size(0), left, mid, right;
     if (local_size >= size) {
         unsigned local_id = get_local_id(0);
-        unsigned inner_id = local_id / size;
         unsigned group_id = get_group_id(0);
-        unsigned left = group_id * local_size + inner_id * size;
-        unsigned right = left + size;
-        unsigned mid = (left + right) / 2;
-        float element = src[global_id];
-
-        if (global_id < mid) {
-            unsigned offset = bin_search_ne(element, mid, right, src) - mid;
-            res[left + local_id % size + offset] = src[global_id];
-        } else {
-            unsigned offset = bin_search_eq(element, left, mid, src) - left;
-            res[left + local_id % size - size / 2 + offset] = src[global_id];
-        }
+        left = group_id * local_size + (local_id / size) * size;
+        right = left + size;
+        mid = (left + right) / 2;
     } else {
-        unsigned group_id = global_id / size;
-        unsigned left = group_id * size;
-        unsigned right = left + size;
-        unsigned mid = (left + right) / 2;
-        float element = src[global_id];
-        if (global_id < mid) {
-            unsigned offset = bin_search_ne(element, mid, right, src) - mid;
-            res[left + global_id % size + offset] = src[global_id];
-        } else {
-            unsigned offset = bin_search_eq(element, left, mid, src) - left;
-            res[mid + global_id % size + offset] = src[global_id];
-        }
+        left = (global_id / size) * size;
+        right = left + size;
+        mid = (left + right) / 2;
+    }
+    float element = src[global_id];
+    if (global_id < mid) {
+        unsigned offset = bin_search_ne(element, mid, right, src) - mid;
+        res[left + global_id % size + offset] = element;
+    } else {
+        unsigned offset = bin_search_eq(element, left, mid, src) - left;
+        res[left + global_id % size - size / 2 + offset] = element;
     }
 }
