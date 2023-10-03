@@ -182,7 +182,7 @@ int main() {
     const auto as_buf = make_holder(
         clCreateBuffer(
             *ctx,
-            CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+            CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
             sizeof(cl_float) * n,
             as.data(),
             &result
@@ -195,7 +195,7 @@ int main() {
     const auto bs_buf = make_holder(
         clCreateBuffer(
             *ctx,
-            CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+            CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
             sizeof(cl_float) * n,
             bs.data(),
             &result
@@ -208,9 +208,9 @@ int main() {
     const auto cs_buf = make_holder(
         clCreateBuffer(
             *ctx,
-            CL_MEM_WRITE_ONLY,
+            CL_MEM_WRITE_ONLY | CL_MEM_USE_HOST_PTR,
             sizeof(cl_float) * n,
-            nullptr,
+            cs.data(),
             &result
         ),
         clReleaseMemObject
