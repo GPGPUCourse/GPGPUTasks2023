@@ -129,7 +129,7 @@ int main() {
                 // Размер памяти перевожу из байт в Мб
                 size_t memorySizeSize = 0;
                 OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_SIZE, 0, nullptr, &memorySizeSize));
-                cl_ulong memorySize;
+                cl_ulong memorySize = 0;
                 OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_GLOBAL_MEM_SIZE, memorySizeSize, &memorySize, 0));
                 std::cout << "        Memory Size (MB): " << memorySize / 1024 / 1024 << std::endl;
 
@@ -137,7 +137,7 @@ int main() {
                 // Как я понимаю это количество ядер на процессоре или количество work group на видеокарте
                 size_t maxComputeUnitsSize = 0;
                 OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_MAX_COMPUTE_UNITS, 0, nullptr, &maxComputeUnitsSize));
-                cl_ulong maxCopmuteUnits;
+                cl_ulong maxCopmuteUnits = 0;
                 OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_MAX_COMPUTE_UNITS, maxComputeUnitsSize, &maxCopmuteUnits, 0));
                 std::cout << "        Max compute units: " << maxCopmuteUnits << std::endl;
 
@@ -145,7 +145,7 @@ int main() {
                 // Максимальное количество work-item'ов в одной work-group'е
                 size_t maxGroupSizeSize = 0;
                 OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, 0, nullptr, &maxGroupSizeSize));
-                size_t maxGroupSize;
+                size_t maxGroupSize = 0;
                 OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_MAX_WORK_GROUP_SIZE, maxGroupSizeSize, &maxGroupSize, 0));
                 std::cout << "        Max group size: " << maxGroupSize << std::endl;
             }
