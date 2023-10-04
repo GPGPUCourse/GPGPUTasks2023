@@ -27,16 +27,17 @@ __kernel void matrix_multiplication_local_memory(__global const float *lmat, __g
     const int fcol = get_global_id(0);
     const int frow = get_global_id(1);
 
-    int local_row = get_local_id(0);
     int local_col = get_local_id(0);
+    int local_row = get_local_id(1);
 
     __local float ltile[TILE_SIZE][TILE_SIZE];
     __local float rtile[TILE_SIZE][TILE_SIZE];
 
     float sum = 0.0f;
     for (int tileK = 0; tileK * TILE_SIZE < ncommon; tileK++) {
-        ltile[local_row][local_col] = lmat[(frow * ncommon) + ((tileK * TILE_SIZE) + local_col)];
-        rtile[local_row][local_col] = rmat[(((tileK * TILE_SIZE) + local_row) * rncol) + fcol];
+        int kstart = tileK * TILE_SIZE;
+        ltile[local_row][local_col] = lmat[(frow * ncommon) + (kstart + local_col)];
+        rtile[local_row][local_col] = rmat[((kstart + local_row) * rncol) + fcol];
 
         barrier(CLK_LOCAL_MEM_FENCE);
 
