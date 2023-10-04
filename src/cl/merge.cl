@@ -5,110 +5,73 @@
 #line 6
 
 #define WORKGROUP_SIZE 128
-#define MAX_WORK_SINGLE 256
+#define MAX_WORK_SINGLE 128
 
+// Small blocks sorting
+// Sorts as[l..r) in local memory
+// 0 <= r - l <= MAX_WORK_SINGLE should hold
 __kernel void merge_not_parallel(__global float * as,
                                  const unsigned int l,
                                  const unsigned int r)
 {
     float merge_mem1[MAX_WORK_SINGLE], merge_mem2[MAX_WORK_SINGLE];
+    float *from = merge_mem1, *to = merge_mem2;
     const unsigned int tot_len = r - l;
     for (int i = 0; i < tot_len; i++)
     {
         merge_mem1[i] = as[i + l];
     }
-    int direction = 0;
-    for (int len = 1; len < tot_len; len <<= 1, direction ^= 1)
+    for (int len = 1; len < tot_len; len <<= 1)
     {
-        if (direction == 0)
+        int offset = 0;
+        for (; offset + len < tot_len; offset += 2 * len)
         {
-            int offset = 0;
-            for (; offset + len < tot_len; offset += 2 * len)
+            int pnt1 = 0;
+            int pnt2 = 0;
+            while (pnt1 < len && pnt2 < len && offset + len + pnt2 < tot_len)
             {
-                int pnt1 = 0;
-                int pnt2 = 0;
-                while (pnt1 < len && pnt2 < len && offset + len + pnt2 < tot_len)
+                if (from[offset + pnt1] < from[offset + len + pnt2])
                 {
-                    if (merge_mem1[offset + pnt1] < merge_mem1[offset + len + pnt2])
-                    {
-                        merge_mem2[offset + pnt1 + pnt2] = merge_mem1[offset + pnt1];
-                        pnt1++;
-                    }
-                    else
-                    {
-                        merge_mem2[offset + pnt1 + pnt2] = merge_mem1[offset + len + pnt2];
-                        pnt2++;
-                    }
-                }
-                while (pnt1 < len)
-                {
-                    merge_mem2[offset + pnt1 + pnt2] = merge_mem1[offset + pnt1];
+                    to[offset + pnt1 + pnt2] = from[offset + pnt1];
                     pnt1++;
                 }
-                while (pnt2 < len && offset + len + pnt2 < tot_len)
+                else
                 {
-                    merge_mem2[offset + pnt1 + pnt2] = merge_mem1[offset + len + pnt2];
+                    to[offset + pnt1 + pnt2] = from[offset + len + pnt2];
                     pnt2++;
                 }
             }
-
-            while (offset < tot_len)
+            while (pnt1 < len)
             {
-                merge_mem2[offset] = merge_mem1[offset];
-                offset++;
+                to[offset + pnt1 + pnt2] = from[offset + pnt1];
+                pnt1++;
+            }
+            while (pnt2 < len && offset + len + pnt2 < tot_len)
+            {
+                to[offset + pnt1 + pnt2] = from[offset + len + pnt2];
+                pnt2++;
             }
         }
-        else
+
+        while (offset < tot_len)
         {
-            int offset = 0;
-            for (; offset + len < tot_len; offset += 2 * len)
-            {
-                int pnt1 = 0;
-                int pnt2 = 0;
-                while (pnt1 < len && pnt2 < len && offset + len + pnt2 < tot_len)
-                {
-                    if (merge_mem2[offset + pnt1] < merge_mem2[offset + len + pnt2])
-                    {
-                        merge_mem1[offset + pnt1 + pnt2] = merge_mem2[offset + pnt1];
-                        pnt1++;
-                    }
-                    else
-                    {
-                        merge_mem1[offset + pnt1 + pnt2] = merge_mem2[offset + len + pnt2];
-                        pnt2++;
-                    }
-                }
-                while (pnt1 < len)
-                {
-                    merge_mem1[offset + pnt1 + pnt2] = merge_mem2[offset + pnt1];
-                    pnt1++;
-                }
-                while (pnt2 < len && offset + len + pnt2 < tot_len)
-                {
-                    merge_mem1[offset + pnt1 + pnt2] = merge_mem2[offset + len + pnt2];
-                    pnt2++;
-                }
-            }
-
-            while (offset < tot_len)
-            {
-                merge_mem1[offset] = merge_mem2[offset];
-                offset++;
-            }
+            to[offset] = from[offset];
+            offset++;
         }
+
+        float *tmp = to;
+        to = from;
+        from = tmp;
     }
     for (int i = 0; i < tot_len; i++)
     {
-        if (direction == 1)
-            as[i + l] = merge_mem2[i];
-        else
-            as[i + l] = merge_mem1[i];
+        as[i + l] = from[i];
     }
 }
 
-__kernel void merge(__global float * as,
-                    __global float * bs,
-                    const unsigned int n)
+__kernel void merge_one_workgroup(__global float * as,
+                                  __global float * bs,
+                                  const unsigned int n)
 {
     unsigned int id = get_local_id(0);
 
@@ -178,14 +141,6 @@ __kernel void merge(__global float * as,
                     bs[offset + pre + pnt1 + pnt2] = as[rs[id] + pnt2];
                     pnt2++;
                 }
-
-                barrier(CLK_GLOBAL_MEM_FENCE);
-
-                for (int j = 0; j < itemsPerWorkflow; j++)
-                {
-                    as[offset + pre + j] = bs[offset + pre + j];
-                }
-
                 barrier(CLK_GLOBAL_MEM_FENCE);
             }
 
@@ -249,14 +204,6 @@ __kernel void merge(__global float * as,
                     as[offset + pre + pnt1 + pnt2] = bs[rs[id] + pnt2];
                     pnt2++;
                 }
-
-                barrier(CLK_GLOBAL_MEM_FENCE);
-
-                for (int j = 0; j < itemsPerWorkflow; j++)
-                {
-                    bs[offset + pre + j] = as[offset + pre + j];
-                }
-
                 barrier(CLK_GLOBAL_MEM_FENCE);
             }
 
@@ -273,7 +220,7 @@ __kernel void merge(__global float * as,
         }
     }
 
-    if (direction == 0)
+    if (direction == 1)
     {
         for (int i = 0; i < n; i += WORKGROUP_SIZE)
         {
