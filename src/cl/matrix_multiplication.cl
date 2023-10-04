@@ -40,7 +40,7 @@ __kernel void matrix_multiplication_local_memory(__global const float *lmat, __g
 
         barrier(CLK_LOCAL_MEM_FENCE);
 
-        for (int k = 0; k < TILE_SIZE;)
+        for (int k = 0; k < TILE_SIZE; k++)
             sum += ltile[local_row][k] * rtile[k][local_col];
         
         barrier(CLK_LOCAL_MEM_FENCE);
