@@ -113,11 +113,12 @@ int main(int argc, char **argv) {
                 {
                     for (int offset = 0; offset + len < n; offset += 2 * len)
                     {
-                        while (2 * len < global_work_size)
+                        unsigned int global_work_size1 = global_work_size;
+                        while (2 * len < global_work_size1)
                         {
-                            global_work_size /= 2;
+                            global_work_size1 /= 2;
                         }
-                        merge_merge.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, bs_gpu, offset, len, n);
+                        merge_merge.exec(gpu::WorkSize(workGroupSize, global_work_size1), as_gpu, bs_gpu, offset, len, n);
                     }
                     std::swap(as_gpu, bs_gpu);
                 }

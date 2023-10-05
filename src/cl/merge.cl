@@ -216,8 +216,7 @@ __kernel void merge(__global float * as,
     unsigned int gid = get_group_id(0);
 
     unsigned int itemsPerWorkflow = 2 * len / WORKGROUP_SIZE;
-    unsigned int offset = 0;
-    for (; offset + 2 * gr * len <= n; offset += 2 * gr * len)
+    for (unsigned int offset = 0; offset < n; offset += 2 * gr * len)
     {
         unsigned int offset2 = offset + gid * 2 * len;
         unsigned int r = binary_search(as, offset2, len, offset2 + len, len, itemsPerWorkflow * lid);
