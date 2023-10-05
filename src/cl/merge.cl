@@ -94,8 +94,6 @@ __kernel void merge_one_workgroup(__global float * as,
         unsigned int itemsPerWorkflow = 2 * len / WORKGROUP_SIZE;
         unsigned int offset = 0;
 
-        barrier(CLK_GLOBAL_MEM_FENCE);
-
         for (; offset + len < n; offset += 2 * len)
         {
             unsigned int pre = id * itemsPerWorkflow;
@@ -152,7 +150,8 @@ __kernel void merge_one_workgroup(__global float * as,
                 bs[offset + pre + pnt1 + pnt2] = as[rs[id] + pnt2];
                 pnt2++;
             }
-            barrier(CLK_GLOBAL_MEM_FENCE);
+
+            barrier(CLK_LOCAL_MEM_FENCE);
         }
 
         if (id == 0)
@@ -164,13 +163,9 @@ __kernel void merge_one_workgroup(__global float * as,
             }
         }
 
-        barrier(CLK_GLOBAL_MEM_FENCE);
-
-        {
-            __global float *tmp = bs;
-            bs = as;
-            as = tmp;
-        }
+        __global float *tmp = bs;
+        bs = as;
+        as = tmp;
 
         barrier(CLK_GLOBAL_MEM_FENCE);
     }
