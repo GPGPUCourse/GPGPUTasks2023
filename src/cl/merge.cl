@@ -27,7 +27,7 @@ __kernel void merge(__global const float *in, __global float *out, unsigned int 
     unsigned int other_block = my_block ^ 1;
     bool is_me_second = my_block % 2;
 
-    const float *other_start = in + other_block * sorted_len;
+    __global const float *other_start = in + other_block * sorted_len;
 
     unsigned int my_pos = is_me_second ? i - sorted_len : i;
     my_pos += bin_search(sorted_len, other_start, in[i], is_me_second);
