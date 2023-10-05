@@ -32,8 +32,8 @@ int main(int argc, char **argv) {
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 1;
-    unsigned int n = 1 << 25;
+    int benchmarkingIters = 10;
+    unsigned int n = 32 * 1024 * 1024;
     std::vector<float> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -53,7 +53,6 @@ int main(int argc, char **argv) {
         std::cout << "CPU  : " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
 
-    if (0)
     {
         gpu::gpu_mem_32f as_gpu, bs_gpu;
         as_gpu.resizeN(n);
@@ -114,7 +113,7 @@ int main(int argc, char **argv) {
                 {
                     for (int offset = 0; offset + len < n; offset += 2 * len)
                     {
-                        while (2 * len / global_work_size <= 0)
+                        while (2 * len < global_work_size)
                         {
                             global_work_size /= 2;
                         }
