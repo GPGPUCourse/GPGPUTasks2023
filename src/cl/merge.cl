@@ -215,37 +215,16 @@ __kernel void merge(__global float * as,
     unsigned int lid = get_local_id(0);
     unsigned int gid = get_group_id(0);
 
+    unsigned int itemsPerWorkflow = 2 * len / WORKGROUP_SIZE;
     unsigned int offset = 0;
     for (; offset + 2 * gr * len <= n; offset += 2 * gr * len)
     {
-        if (lid != 0)
-            continue;
-
-        unsigned int le = offset + gid * 2 * len;
-        unsigned int pnt1 = 0, pnt2 = 0;
-        while (pnt1 < len && pnt2 < len)
-        {
-            if (as[le + pnt1] < as[le + len + pnt2])
-            {
-                bs[le + pnt1 + pnt2] = as[le + pnt1];
-                pnt1++;
-            }
-            else
-            {
-                bs[le + pnt1 + pnt2] = as[le + len + pnt2];
-                pnt2++;
-            }
-        }
-        while (pnt1 < len)
-        {
-            bs[le + pnt1 + pnt2] = as[le + pnt1];
-            pnt1++;
-        }
-        while (pnt2 < len)
-        {
-            bs[le + pnt1 + pnt2] = as[le + len + pnt2];
-            pnt2++;
-        }
+        unsigned int offset2 = offset + gid * 2 * len;
+        unsigned int r = binary_search(as, offset2, len, offset2 + len, len, itemsPerWorkflow * lid);
+        unsigned int l1 = offset2 + r, r1 = offset2 + len + itemsPerWorkflow * lid - r;
+        r = binary_search(as, offset2, len, offset2 + len, len, itemsPerWorkflow * (lid + 1));
+        unsigned int l2 = offset2 + r, r2 = offset2 + len + itemsPerWorkflow * (lid + 1) - r;
+        merge_simple(as, bs, l1, l2, r1, r2, offset2 + itemsPerWorkflow * lid);
     }
 }
 
@@ -261,13 +240,13 @@ __kernel void merge_merge(__global float * as,
 
     unsigned int itemsPerWorkGroup = 2 * len / gr;
 
-    __local int l1, r1;
+    __local unsigned int l1, r1;
     if (lid == 0)
     {
         int r = binary_search(as, offset, len, offset + len, len,itemsPerWorkGroup * gid);
         l1 = offset + r, r1 = offset + len + itemsPerWorkGroup * gid - r;
     }
-    __local int l2, r2;
+    __local unsigned int l2, r2;
     if (lid == 1)
     {
         int r = binary_search(as, offset, len, offset + len, len,itemsPerWorkGroup * (gid + 1));
@@ -278,8 +257,8 @@ __kernel void merge_merge(__global float * as,
 
     unsigned int itemsPerWorkflow = itemsPerWorkGroup / WORKGROUP_SIZE;
 
-    int l3, r3, l4, r4;
-    int r = binary_search(as, l1, l2 - l1, r1, r2 - r1, itemsPerWorkflow * lid);
+    unsigned int l3, r3, l4, r4;
+    unsigned int r = binary_search(as, l1, l2 - l1, r1, r2 - r1, itemsPerWorkflow * lid);
     l3 = l1 + r, r3 = r1 + itemsPerWorkflow * lid - r;
     r = binary_search(as, l1, l2 - l1, r1, r2 - r1, itemsPerWorkflow * (lid + 1));
     l4 = l1 + r, r4 = r1 + itemsPerWorkflow * (lid + 1) - r;
