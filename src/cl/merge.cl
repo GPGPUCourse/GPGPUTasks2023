@@ -5,7 +5,7 @@
 #line 6
 
 #define WORKGROUP_SIZE 128
-#define MAX_WORK_SINGLE 128
+#define MAX_WORK_SINGLE 256
 
 // Small blocks sorting
 // Sorts as[l..r) in local memory
@@ -75,7 +75,7 @@ __kernel void merge_one_workgroup(__global float * as,
 {
     unsigned int id = get_local_id(0);
 
-    for (int offset = 0; offset < n; offset += MAX_WORK_SINGLE * WORKGROUP_SIZE)
+    for (unsigned int offset = 0; offset < n; offset += MAX_WORK_SINGLE * WORKGROUP_SIZE)
     {
         unsigned int l = offset + id * MAX_WORK_SINGLE;
         unsigned int r = offset + (id + 1) * MAX_WORK_SINGLE;
@@ -89,17 +89,23 @@ __kernel void merge_one_workgroup(__global float * as,
     barrier(CLK_GLOBAL_MEM_FENCE);
 
     __local unsigned int ls[WORKGROUP_SIZE + 1], rs[WORKGROUP_SIZE + 1];
-    int direction = 0;
-    for (int len = MAX_WORK_SINGLE; len < n; len <<= 1, direction ^= 1)
+    for (unsigned int len = MAX_WORK_SINGLE; len < n; len <<= 1)
     {
-        if (direction == 0)
+        unsigned int itemsPerWorkflow = 2 * len / WORKGROUP_SIZE;
+        unsigned int offset = 0;
+
+        barrier(CLK_GLOBAL_MEM_FENCE);
+
+        for (; offset + len < n; offset += 2 * len)
         {
-            int itemsPerWorkflow = 2 * len / WORKGROUP_SIZE;
-            int offset = 0;
-            for (; offset + len < n; offset += 2 * len)
+            unsigned int pre = id * itemsPerWorkflow;
+            if (offset + pre < n)
             {
-                int pre = id * itemsPerWorkflow;
-                int l = max(0, pre - len) - 1, r = min(pre, len);
+                int l = pre > len ? pre - len : 0;
+                if (l + (n - offset - len) < pre) l = pre - (n - offset - len);
+                l--;
+
+                int r = min(pre, len);
                 while (l + 1 < r)
                 {
                     int m = (l + r) / 2;
@@ -108,126 +114,72 @@ __kernel void merge_one_workgroup(__global float * as,
                     else
                         r = m;
                 }
-
                 ls[id] = offset + r, rs[id] = offset + len + pre - r;
-                if (id == 0)
-                {
-                    ls[WORKGROUP_SIZE] = offset + len, rs[WORKGROUP_SIZE] = offset + 2 * len;
-                }
+            }
+            else
+            {
+                ls[id] = offset + len, rs[id] = n;
+            }
 
-                barrier(CLK_LOCAL_MEM_FENCE);
+            if (id == 0)
+            {
+                ls[WORKGROUP_SIZE] = offset + len, rs[WORKGROUP_SIZE] = min(offset + 2 * len, n);
+            }
 
-                int pnt1 = 0, pnt2 = 0;
-                while (ls[id] + pnt1 < ls[id + 1] && rs[id] + pnt2 < rs[id + 1])
-                {
-                    if (as[ls[id] + pnt1] < as[rs[id] + pnt2])
-                    {
-                        bs[offset + pre + pnt1 + pnt2] = as[ls[id] + pnt1];
-                        pnt1++;
-                    }
-                    else
-                    {
-                        bs[offset + pre + pnt1 + pnt2] = as[rs[id] + pnt2];
-                        pnt2++;
-                    }
-                }
-                while (ls[id] + pnt1 < ls[id + 1])
+            barrier(CLK_LOCAL_MEM_FENCE);
+
+            int pnt1 = 0, pnt2 = 0;
+            while (ls[id] + pnt1 < ls[id + 1] && rs[id] + pnt2 < rs[id + 1])
+            {
+                if (as[ls[id] + pnt1] < as[rs[id] + pnt2])
                 {
                     bs[offset + pre + pnt1 + pnt2] = as[ls[id] + pnt1];
                     pnt1++;
                 }
-                while (rs[id] + pnt2 < rs[id + 1])
+                else
                 {
                     bs[offset + pre + pnt1 + pnt2] = as[rs[id] + pnt2];
                     pnt2++;
                 }
-                barrier(CLK_GLOBAL_MEM_FENCE);
             }
-
-            if (id == 0)
+            while (ls[id] + pnt1 < ls[id + 1])
             {
-                while (offset < n)
-                {
-                    bs[offset] = as[offset];
-                    offset++;
-                }
+                bs[offset + pre + pnt1 + pnt2] = as[ls[id] + pnt1];
+                pnt1++;
             }
-
+            while (rs[id] + pnt2 < rs[id + 1])
+            {
+                bs[offset + pre + pnt1 + pnt2] = as[rs[id] + pnt2];
+                pnt2++;
+            }
             barrier(CLK_GLOBAL_MEM_FENCE);
         }
-        else
+
+        if (id == 0)
         {
-            int itemsPerWorkflow = 2 * len / WORKGROUP_SIZE;
-            int offset = 0;
-            for (; offset + len < n; offset += 2 * len)
+            while (offset < n)
             {
-                int pre = id * itemsPerWorkflow;
-                int l = max(0, pre - len) - 1, r = min(pre, len);
-                while (l + 1 < r)
-                {
-                    int m = (l + r) / 2;
-                    if (bs[offset + m] < bs[offset + len + pre - 1 - m])
-                        l = m;
-                    else
-                        r = m;
-                }
-
-                ls[id] = offset + r, rs[id] = offset + len + pre - r;
-                if (id == 0)
-                {
-                    ls[WORKGROUP_SIZE] = offset + len, rs[WORKGROUP_SIZE] = offset + 2 * len;
-                }
-
-                barrier(CLK_LOCAL_MEM_FENCE);
-
-                int pnt1 = 0, pnt2 = 0;
-                while (ls[id] + pnt1 < ls[id + 1] && rs[id] + pnt2 < rs[id + 1])
-                {
-                    if (bs[ls[id] + pnt1] < bs[rs[id] + pnt2])
-                    {
-                        as[offset + pre + pnt1 + pnt2] = bs[ls[id] + pnt1];
-                        pnt1++;
-                    }
-                    else
-                    {
-                        as[offset + pre + pnt1 + pnt2] = bs[rs[id] + pnt2];
-                        pnt2++;
-                    }
-                }
-                while (ls[id] + pnt1 < ls[id + 1])
-                {
-                    as[offset + pre + pnt1 + pnt2] = bs[ls[id] + pnt1];
-                    pnt1++;
-                }
-                while (rs[id] + pnt2 < rs[id + 1])
-                {
-                    as[offset + pre + pnt1 + pnt2] = bs[rs[id] + pnt2];
-                    pnt2++;
-                }
-                barrier(CLK_GLOBAL_MEM_FENCE);
+                bs[offset] = as[offset];
+                offset++;
             }
-
-            if (id == 0)
-            {
-                while (offset < n)
-                {
-                    as[offset] = bs[offset];
-                    offset++;
-                }
-            }
-
-            barrier(CLK_GLOBAL_MEM_FENCE);
         }
+
+        barrier(CLK_GLOBAL_MEM_FENCE);
+
+        {
+            __global float *tmp = bs;
+            bs = as;
+            as = tmp;
+        }
+
+        barrier(CLK_GLOBAL_MEM_FENCE);
     }
 
-    if (direction == 1)
+    for (int i = 0; i < n; i += WORKGROUP_SIZE)
     {
-        for (int i = 0; i < n; i += WORKGROUP_SIZE)
+        if (i + id < n)
         {
-            if (i + id < n)
-            {
-                as[i + id] = bs[i + id];
-            }
+            bs[i + id] = as[i + id];
         }
     }
 }
