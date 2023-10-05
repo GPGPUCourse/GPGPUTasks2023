@@ -2,7 +2,7 @@ inline bool comp(float a, float b, bool also_equal) {
     return also_equal ? a <= b : a < b;
 }
 
-inline unsigned int bin_search(unsigned int sorted_len, const float *data, float value, bool also_equal) {
+inline unsigned int bin_search(unsigned int sorted_len, __global const float *data, float value, bool also_equal) {
     unsigned int search_start = 0;
     unsigned int search_end = sorted_len;
     while (search_start < search_end) {
