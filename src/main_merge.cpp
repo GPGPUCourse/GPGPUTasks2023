@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 10;
+    int benchmarkingIters = 1;
     unsigned int n = 32 * 1024 * 1024;
     std::vector<float> as(n, 0);
     FastRandom r(n);
@@ -127,6 +127,47 @@ int main(int argc, char **argv) {
             }
             std::cout << "GPU 1: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
             std::cout << "GPU 1: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+            as_gpu.readN(gpu_sorted.data(), n);
+        }
+
+        // Проверяем корректность результатов
+        for (int i = 0; i < n; ++i) {
+            EXPECT_THE_SAME(gpu_sorted[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
+        }
+    }
+
+    {
+        gpu::gpu_mem_32f as_gpu, bs_gpu;
+        as_gpu.resizeN(n);
+        bs_gpu.resizeN(n);
+        std::vector<float> gpu_sorted(n);
+        {
+            ocl::Kernel sort_small_blocks(merge_kernel, merge_kernel_length, "sort_small_blocks");
+            sort_small_blocks.compile();
+            ocl::Kernel merge3(merge_kernel, merge_kernel_length, "merge3");
+            merge3.compile();
+            timer t;
+            for (int iter = 0; iter < benchmarkingIters; ++iter) {
+                as_gpu.writeN(as.data(), n);
+                t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфера данных
+                unsigned int workGroupSize = WORKGROUP_SIZE;
+                unsigned int global_work_size = ((n + MAX_WORK_SINGLE - 1) / MAX_WORK_SINGLE + WORKGROUP_SIZE - 1) /
+                                                WORKGROUP_SIZE * WORKGROUP_SIZE;
+                sort_small_blocks.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, n);
+                // At this point all blocks of size MAX_WORK_SINGLE = 1 << 8 are sorted
+
+                global_work_size = (n + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE * WORKGROUP_SIZE;
+                for (int len = MAX_WORK_SINGLE; len < n; len <<= 1)
+                {
+                    merge3.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, bs_gpu, len, n);
+                    std::swap(as_gpu, bs_gpu);
+                }
+
+                t.nextLap();
+            }
+
+            std::cout << "GPU 2: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+            std::cout << "GPU 2: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
             as_gpu.readN(gpu_sorted.data(), n);
         }
 

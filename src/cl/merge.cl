@@ -264,3 +264,38 @@ __kernel void merge_merge(__global float * as,
 
     merge_simple(as, bs, l3, l4, r3, r4, offset + itemsPerWorkGroup * gid + itemsPerWorkflow * lid);
 }
+
+__kernel void merge3(__global float * as,
+                     __global float * bs,
+                     const unsigned int len,
+                     const unsigned int n)
+{
+    unsigned int gr = get_num_groups(0);
+    unsigned int lid = get_local_id(0);
+    unsigned int gid = get_group_id(0);
+
+    unsigned int groupsPerMerge = gr / (n / (2 * len));
+    unsigned int mergeId = gid / groupsPerMerge;
+
+    __local unsigned int l1, r1, l2, r2;
+    if (lid == 0)
+    {
+        unsigned int r = binary_search(as, 2 * len * mergeId, len, 2 * len * mergeId + len, len, WORKGROUP_SIZE * (gid % groupsPerMerge));
+        l1 = 2 * len * mergeId + r, r1 = 2 * len * mergeId + len + WORKGROUP_SIZE * (gid % groupsPerMerge) - r;
+        r = binary_search(as, 2 * len * mergeId, len, 2 * len * mergeId + len, len, WORKGROUP_SIZE * (gid % groupsPerMerge) + WORKGROUP_SIZE);
+        l2 = 2 * len * mergeId + r, r2 = 2 * len * mergeId + len + WORKGROUP_SIZE * (gid % groupsPerMerge) + WORKGROUP_SIZE - r;
+    }
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    unsigned int x = binary_search(as, l1, l2 - l1, r1, r2 - r1, lid);
+
+    if (lid - x == r2 - r1 || (x < l2 - l1 && as[l1 + x] < as[r1 + lid - x]))
+    {
+        bs[gid * WORKGROUP_SIZE + lid] = as[l1 + x];
+    }
+    else
+    {
+        bs[gid * WORKGROUP_SIZE + lid] = as[r1 + lid - x];
+    }
+}
