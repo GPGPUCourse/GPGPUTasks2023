@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
     context.activate();
 
     int benchmarkingIters = 10;
-    unsigned int n = 32 * 1024 * 1024;
+    unsigned int n = 32 * 1024;
     std::vector<float> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
         std::cout << "DEBUG 1" << std::endl;
         ocl::Kernel merge(merge_kernel, merge_kernel_length, "merge");
         std::cout << "DEBUG 2" << std::endl;
-        merge.compile();
+        merge.compile(true);
         std::cout << "DEBUG 3" << std::endl;
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
