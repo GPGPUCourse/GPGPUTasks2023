@@ -23,8 +23,5 @@ __kernel void merge(const __global float *as_gpu, __global float *bs_gpu, const 
             left = mid + 1;
         }
     }
-    int final_i = (left - start_left) + i % merge_block_size + i / (2 * merge_block_size) * 2 * merge_block_size;
-    if (final_i < n) {
-        bs_gpu[final_i] = as_gpu[i];
-    }
+    bs_gpu[(left - start_left) + i % merge_block_size + i / (2 * merge_block_size) * 2 * merge_block_size] = as_gpu[i];
 }
