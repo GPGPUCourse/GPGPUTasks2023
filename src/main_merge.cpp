@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
     context.activate();
 
     int benchmarkingIters = 10;
-    unsigned int n = 32 * 1024 * 1024;
+    unsigned int n = 500;
     std::vector<float> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -66,7 +66,7 @@ int main(int argc, char **argv) {
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфера данных
             unsigned int workGroupSize = 128;
             unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
-            for (unsigned int merge_block_size = 1; merge_block_size <= n / 2 + 1; merge_block_size *= 2) {
+            for (unsigned int merge_block_size = 1; merge_block_size < n; merge_block_size *= 2) {
                 merge.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, bs_gpu, n, merge_block_size);
                 as_gpu.swap(bs_gpu);
                 as_gpu.readN(as.data(), n);
