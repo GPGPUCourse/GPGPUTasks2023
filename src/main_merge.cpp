@@ -4,7 +4,6 @@
 #include <libutils/misc.h>
 #include <libutils/timer.h>
 
-#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
@@ -21,7 +20,7 @@ void raiseFail(const T &a, const T &b, const char *message, const char *filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 
-std::string read_kernel(const std::filesystem::path &path) {
+std::string read_kernel(const std::string &path) {
     std::ifstream fin(path);
     std::ostringstream oss;
     oss << fin.rdbuf();
@@ -48,19 +47,20 @@ int main(int argc, char **argv) {
     std::vector<float> cpu_sorted;
     {
         timer t;
-        //for (int iter = 0; iter < benchmarkingIters; ++iter) {
-        cpu_sorted = as;
-        //for (int i = 0; i < n; i += workGroupSize) {
-        //    std::sort(cpu_sorted.begin() + i, cpu_sorted.begin() + i + workGroupSize);
-        //}
-        std::sort(cpu_sorted.begin(), cpu_sorted.end());
-        t.nextLap();
-        //}
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
+            cpu_sorted = as;
+            //for (int i = 0; i < n; i += workGroupSize) {
+            //    std::sort(cpu_sorted.begin() + i, cpu_sorted.begin() + i + workGroupSize);
+            //}
+            std::sort(cpu_sorted.begin(), cpu_sorted.end());
+            t.nextLap();
+        }
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "CPU: " << 1e-6 * n / t.lapAvg() << " millions/s" << std::endl;
     }
 
-    const auto base_path = std::filesystem::path(__FILE__).parent_path() / "cl";
+    std::string base_path = __FILE__;
+    base_path = base_path.substr(0, base_path.size() - 14);
 
     gpu::WorkSize ws(workGroupSize, n);
     std::ostringstream defines;
@@ -73,7 +73,7 @@ int main(int argc, char **argv) {
     dst_gpu.resizeN(n);
 
     {
-        std::string src = read_kernel(base_path / "merge_simple.cl");
+        std::string src = read_kernel(base_path + "merge_simple.cl");
         ocl::Kernel merge(src.c_str(), src.size(), "kmain", defines.str());
         merge.compile();
         timer t;
@@ -94,8 +94,8 @@ int main(int argc, char **argv) {
     }
 
     {
-        std::string src1 = read_kernel(base_path / "merge_simple_local.cl");
-        std::string src2 = read_kernel(base_path / "merge_simple.cl");
+        std::string src1 = read_kernel(base_path + "merge_simple_local.cl");
+        std::string src2 = read_kernel(base_path + "merge_simple.cl");
         ocl::Kernel phase1(src1.c_str(), src1.size(), "kmain", defines.str());
         ocl::Kernel phase2(src2.c_str(), src2.size(), "kmain", defines.str());
         phase1.compile();
