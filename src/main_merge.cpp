@@ -39,7 +39,6 @@ int main(int argc, char **argv) {
     }
     std::cout << "Data generated for n=" << n << "!" << std::endl;
 
-    std::cout << std::endl << "CPU" << std::endl;
     std::vector<float> cpu_sorted;
     {
         timer t;
@@ -52,7 +51,6 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
 
-    std::cout << std::endl << "GPU" << std::endl;
     gpu::gpu_mem_32f as_gpu;
     as_gpu.resizeN(n);
     gpu::gpu_mem_32f bs_gpu;
