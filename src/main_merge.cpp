@@ -56,11 +56,8 @@ int main(int argc, char **argv) {
     gpu::gpu_mem_32f bs_gpu;
     bs_gpu.resizeN(n);
     {
-        std::cout << "DEBUG 1" << std::endl;
         ocl::Kernel merge(merge_kernel, merge_kernel_length, "merge");
-        std::cout << "DEBUG 2" << std::endl;
-        merge.compile(true);
-        std::cout << "DEBUG 3" << std::endl;
+        merge.compile();
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
