@@ -4,9 +4,8 @@
 #include <libutils/misc.h>
 #include <libutils/timer.h>
 
-// Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
-#include "cl/merge_cl.h"
-
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -22,6 +21,12 @@ void raiseFail(const T &a, const T &b, const char *message, const char *filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 
+std::string read_kernel(const std::filesystem::path &path) {
+    std::ifstream fin(path);
+    std::ostringstream oss;
+    oss << fin.rdbuf();
+    return oss.str();
+}
 
 int main(int argc, char **argv) {
     gpu::Device device = gpu::chooseGPUDevice(argc, argv);
@@ -55,61 +60,67 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << 1e-6 * n / t.lapAvg() << " millions/s" << std::endl;
     }
 
+    const auto base_path = std::filesystem::path(__FILE__).parent_path() / "cl";
+
     gpu::WorkSize ws(workGroupSize, n);
     std::ostringstream defines;
     defines << "-DWORK_GROUP_SIZE=" << workGroupSize;
 
-    gpu::gpu_mem_32f as_gpu;
-    gpu::gpu_mem_32f bs_gpu;
-    as_gpu.resizeN(n);
-    bs_gpu.resizeN(n);
+    gpu::gpu_mem_32f src_gpu;
+    gpu::gpu_mem_32f dst_gpu;
+    gpu::gpu_mem_32u idx_gpu;
+    src_gpu.resizeN(n);
+    dst_gpu.resizeN(n);
 
     {
-        ocl::Kernel merge(merge_kernel, merge_kernel_length, "simple_merge_phase_global", defines.str());
+        std::string src = read_kernel(base_path / "merge_simple.cl");
+        ocl::Kernel merge(src.c_str(), src.size(), "kmain", defines.str());
         merge.compile();
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            as_gpu.writeN(as.data(), n);
+            src_gpu.writeN(as.data(), n);
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфера данных
 
             for (cl_uint sortedSize = 1; sortedSize < n; sortedSize *= 2) {
-                merge.exec(ws, as_gpu, bs_gpu, n, sortedSize);
-                std::swap(as_gpu, bs_gpu);
+                merge.exec(ws, src_gpu, dst_gpu, n, sortedSize);
+                std::swap(src_gpu, dst_gpu);
             }
 
             t.nextLap();
         }
         std::cout << "GPU one phase: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "GPU one phase: " << 1e-6 * n / t.lapAvg() << " millions/s" << std::endl;
-        as_gpu.readN(as.data(), n);
+        src_gpu.readN(as.data(), n);
     }
 
     {
-        ocl::Kernel phase1(merge_kernel, merge_kernel_length, "simple_merge_phase_local", defines.str());
-        ocl::Kernel phase2(merge_kernel, merge_kernel_length, "simple_merge_phase_global", defines.str());
+        std::string src1 = read_kernel(base_path / "merge_simple_local.cl");
+        std::string src2 = read_kernel(base_path / "merge_simple.cl");
+        ocl::Kernel phase1(src1.c_str(), src1.size(), "kmain", defines.str());
+        ocl::Kernel phase2(src2.c_str(), src2.size(), "kmain", defines.str());
         phase1.compile();
         phase2.compile();
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            as_gpu.writeN(as.data(), n);
+            src_gpu.writeN(as.data(), n);
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфера данных
 
             // Выделение фазы, когда сортируемый блок попадает в локальную память,
             // и можно использовать синхронизацию барьерами, увеличивает производительность
             // с 193 млн/с до 356 млн/с на GTX 1060, т.е. почти в два раза.
-            phase1.exec(ws, as_gpu, bs_gpu, n);
-            std::swap(as_gpu, bs_gpu);
+            phase1.exec(ws, src_gpu, dst_gpu, n);
+            std::swap(src_gpu, dst_gpu);
 
             for (cl_uint sortedSize = workGroupSize; sortedSize < n; sortedSize *= 2) {
-                phase2.exec(ws, as_gpu, bs_gpu, n, sortedSize);
-                std::swap(as_gpu, bs_gpu);
+                phase2.exec(ws, src_gpu, dst_gpu, n, sortedSize);
+                std::swap(src_gpu, dst_gpu);
             }
 
             t.nextLap();
         }
         std::cout << "GPU two phases: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "GPU two phases: " << 1e-6 * n / t.lapAvg() << " millions/s" << std::endl;
-        as_gpu.readN(as.data(), n);
+        src_gpu.readN(as.data(), n);
     }
 
     //for (int i = 0; i < n; ++i) {
