@@ -1,10 +1,11 @@
-__kernel void merge(__global const float *as_gpu, __global float *bs_gpu, const unsigned int n, const unsigned int merge_block_size) {
-    const unsigned int i = get_global_id(0);
+__kernel void merge(__global const float *as_gpu, __global float *bs_gpu, const int n,
+                    const int merge_block_size) {
+    const int i = get_global_id(0);
     if (i >= n) {
         return;
     }
-    unsigned int left = 0;
-    unsigned int right = 0;
+    int left = 0;
+    int right = 0;
     bool is_block_even = i % (merge_block_size * 2) < merge_block_size;
     if (is_block_even) {
         left = i / merge_block_size * merge_block_size + merge_block_size;
@@ -14,11 +15,11 @@ __kernel void merge(__global const float *as_gpu, __global float *bs_gpu, const 
     if (left >= n) {
         return;
     }
-    unsigned int start_left = left;
+    int start_left = left;
     right = min(left + merge_block_size, n);
 
     while (left < right) {
-        unsigned int mid = left + (right - left) / 2;
+        int mid = left + (right - left) / 2;
         if (as_gpu[mid] > as_gpu[i] || is_block_even && as_gpu[mid] >= as_gpu[i]) {
             right = mid;
         } else {
