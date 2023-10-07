@@ -50,19 +50,65 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
-    /*
     gpu::gpu_mem_32f as_gpu;
+    gpu::gpu_mem_32f out_gpu;
+    gpu::gpu_mem_32u ind_gpu;
     as_gpu.resizeN(n);
+    out_gpu.resizeN(n);
+    ind_gpu.resizeN(n);
     {
-        ocl::Kernel merge(merge_kernel, merge_kernel_length, "merge");
-        merge.compile();
+        ocl::Kernel merge_small(merge_kernel, merge_kernel_length, "merge_small");
+        merge_small.compile();
+        ocl::Kernel calculate_inds(merge_kernel, merge_kernel_length, "calculate_inds");
+        calculate_inds.compile();
+        ocl::Kernel merge_large(merge_kernel, merge_kernel_length, "merge_large");
+        merge_large.compile();
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфера данных
-            unsigned int workGroupSize = 128;
-            unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
-            merge.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, n);
+            unsigned int workGroupSize = 256;
+            unsigned int global_work_size = n;
+            unsigned int block_size = 1;
+            while (2 * block_size <= workGroupSize) {
+                merge_small.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, out_gpu, block_size);
+                std::swap(as_gpu, out_gpu);
+                block_size *= 2;
+            }
+            /*
+            as_gpu.readN(as.data(), n);
+            for (int i = 0; i < n; ++i) {
+                std::cout << as[i] << " ";
+            }
+            std::cout << std::endl;
+             */
+            while (block_size < n) {
+                unsigned int workGroupSize_ind = 128;
+                unsigned int global_work_size_ind = n / workGroupSize;
+                calculate_inds.exec(gpu::WorkSize(workGroupSize_ind, global_work_size_ind), as_gpu, ind_gpu,
+                                    block_size);
+                /*
+                std::vector<unsigned int> ind(n / workGroupSize, 0);
+                ind_gpu.readN(ind.data(), n / workGroupSize);
+                for (int i = 0; i < n / workGroupSize; ++i) {
+                    std::cout << ind[i] << " ";
+                }
+                std::cout << std::endl;
+                 */
+                merge_large.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, ind_gpu, out_gpu, block_size);
+                std::swap(as_gpu, out_gpu);
+                block_size *= 2;
+                /*
+                as_gpu.readN(as.data(), n);
+                for (int i = 0; i < n; ++i) {
+                    std::cout << as[i] << " ";
+                    if (i % block_size == block_size - 1) {
+                        std::cout << std::endl;
+                    }
+                }
+                std::cout << std::endl;
+                 */
+            }
             t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
@@ -73,6 +119,5 @@ int main(int argc, char **argv) {
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
-*/
     return 0;
 }
