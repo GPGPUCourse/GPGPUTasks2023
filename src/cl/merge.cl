@@ -7,7 +7,7 @@ __kernel void mergeSortStep(__global const float* source,
         return;
     unsigned int currentBlockIndex = index / blockSize;
     unsigned int pairedBlockIndex = currentBlockIndex ^ 1;
-    const float *pairedBlock = source + pairedBlockIndex * blockSize;
+    __global const float *pairedBlock = source + pairedBlockIndex * blockSize;
     float val = source[index];
     int l = -1;
     int r = blockSize;
