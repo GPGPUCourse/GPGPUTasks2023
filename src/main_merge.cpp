@@ -31,14 +31,15 @@ int main(int argc, char **argv) {
     context.activate();
 
     int benchmarkingIters = 10;
-    int n = 32 * 1024 * 1024;
+    unsigned int n = 32 * 1024;
     std::vector<float> as(n, 0);
     FastRandom r(n);
-    for (int i = 0; i < n; ++i) {
+    for (unsigned int i = 0; i < n; ++i) {
         as[i] = r.nextf();
     }
     std::cout << "Data generated for n=" << n << "!" << std::endl;
 
+    std::cout << std::endl << "CPU" << std::endl;
     std::vector<float> cpu_sorted;
     {
         timer t;
@@ -51,32 +52,25 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
 
-    // std::cout << "DEBUG 1" << std::endl;
+    std::cout << std::endl << "GPU" << std::endl;
     gpu::gpu_mem_32f as_gpu;
     as_gpu.resizeN(n);
     gpu::gpu_mem_32f bs_gpu;
     bs_gpu.resizeN(n);
     {
-        // std::cout << "DEBUG 2" << std::endl;
-        ocl::Kernel merge(merge_kernel, merge_kernel_length, "merge");
+        ocl::Kernel merge(merge_kernel, merge_kernel_length, "merge_naive");
         merge.compile();
-        // std::cout << "DEBUG 3" << std::endl;
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
-            // std::cout << "DEBUG 4" << std::endl;
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфера данных
-            int workGroupSize = 128;
-            int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
-            for (int merge_block_size = 1; merge_block_size < n; merge_block_size *= 2) {
+            unsigned int workGroupSize = 128;
+            unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
+            for (unsigned int merge_block_size = 1; merge_block_size <= n / 2 + 1; merge_block_size *= 2) {
                 merge.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, bs_gpu, n, merge_block_size);
-                // std::cout << "DEBUG 5" << std::endl;
                 as_gpu.swap(bs_gpu);
                 as_gpu.readN(as.data(), n);
-                // break;
             }
-            // std::cout << "DEBUG 6" << std::endl;
-            // break;
             t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
