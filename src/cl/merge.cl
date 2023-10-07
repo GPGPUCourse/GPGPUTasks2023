@@ -142,23 +142,48 @@ __kernel void merge_diag(
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
+    __local const float * const a1_local = buf;
+    __local const float * const a2_local = buf + len1;
+
     __local float res[2 * WORK_GROUP_SIZE];
 
-    if (lid == 0) {
-        for (unsigned int i = 0, j = 0; i < len1 || j < len2; ) {
-            if (i >= len1 || j < len2 && buf[len1 + j] < buf[i]) {
-                res[i + j] = buf[len1 + j];
-                ++j;
+    for (unsigned int i = 0; i < 2; ++i) {
+        const unsigned int idx = i * WORK_GROUP_SIZE + lid;
+
+        unsigned int less_count = idx < len1 ? idx : idx - len1;
+
+        __local const float * other = idx < len1 ? a2_local : a1_local;
+
+        // разные предикаты для устойчивости сортировки
+        const bool pred = idx < len1;
+
+        unsigned int l = 0, r = idx < len1 ? len2 : len1;
+
+        while (l + 1 < r) {
+            const unsigned int m = l + (r - l) / 2;
+
+            if (pred ? other[m] < buf[idx] : other[m] <= buf[idx]) {
+                l = m;
             } else {
-                res[i + j] = buf[i];
-                ++i;
+                r = m;
             }
         }
+
+        if (l == 0) {
+            if (pred ? other[0] >= buf[idx] : other[0] > buf[idx]) {
+                --r;
+            }
+        }
+
+        less_count += r;
+
+        res[less_count] = buf[idx];
     }
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    __global float * const b_res = b + base_idx + diag * WORK_GROUP_SIZE; // указатель на начало результата
+    // указатель на начало результата
+    __global float * const b_res = b + base_idx + diag * WORK_GROUP_SIZE;
     for (unsigned int i = 0; i < 2; ++i) {
         const unsigned int idx = i * WORK_GROUP_SIZE + lid;
 
