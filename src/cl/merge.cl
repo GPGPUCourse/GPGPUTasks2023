@@ -1,4 +1,4 @@
-__kernel void merge_naive(__global float *as_gpu, __global float *bs_gpu, unsigned int n,
+__kernel void merge(__global float *as_gpu, __global float *bs_gpu, unsigned int n,
                           unsigned int merge_block_size) {
     const unsigned int i = get_global_id(0);
     unsigned int left = 0;

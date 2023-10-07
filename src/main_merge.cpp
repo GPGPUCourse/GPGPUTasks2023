@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
     gpu::gpu_mem_32f bs_gpu;
     bs_gpu.resizeN(n);
     {
-        ocl::Kernel merge(merge_kernel, merge_kernel_length, "merge_naive");
+        ocl::Kernel merge(merge_kernel, merge_kernel_length, "merge");
         merge.compile();
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
