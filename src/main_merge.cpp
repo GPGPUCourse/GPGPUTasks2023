@@ -7,6 +7,7 @@
 // Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
 #include "cl/merge_cl.h"
 
+#include <cassert>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -30,13 +31,15 @@ int main(int argc, char **argv) {
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 10;
+    int benchmarkingIters = 1;
     unsigned int n = 32 * 1024 * 1024;
     std::vector<float> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
         as[i] = r.nextf();
+        // std::cout << as[i] << ' ';
     }
+    // std::cout << std::endl;
     std::cout << "Data generated for n=" << n << "!" << std::endl;
 
     std::vector<float> cpu_sorted;
@@ -48,31 +51,91 @@ int main(int argc, char **argv) {
             t.nextLap();
         }
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "CPU: " << (n / 1000.0 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
-    /*
+
     gpu::gpu_mem_32f as_gpu;
     as_gpu.resizeN(n);
-    {
-        ocl::Kernel merge(merge_kernel, merge_kernel_length, "merge");
-        merge.compile();
+    gpu::gpu_mem_32f aux_gpu;
+    aux_gpu.resizeN(n);
+
+    // Task 5.1
+    auto testGPU = [&](const char *phaseKernelName, gpu::WorkSize workSize) {
+        ocl::Kernel mergesortPhase(merge_kernel, merge_kernel_length, phaseKernelName);
+        mergesortPhase.compile();
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфера данных
-            unsigned int workGroupSize = 128;
-            unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
-            merge.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, n);
+            {
+                gpu::gpu_mem_32f *from = &as_gpu, *to = &aux_gpu;
+                for (int blockLength = 1; blockLength < n; blockLength *= 2) {
+                    mergesortPhase.exec(workSize, *from, *to, n, blockLength);
+                    std::swap(from, to);
+                }
+                if (from == &aux_gpu)
+                    aux_gpu.copyToN(as_gpu, n);
+            }
             t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "GPU: " << (n / 1000.0 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+        std::vector<float> result(n);
+        as_gpu.readN(result.data(), n);
+        // Проверяем корректность результатов
+        for (int i = 0; i < n; ++i) {
+            EXPECT_THE_SAME(result[i], cpu_sorted[i],
+                            "GPU " + std::string(phaseKernelName) + "results should be equal to CPU results!");
+        }
+    };
+    // number of work groups does not really matter
+    testGPU("mergesortPhase", gpu::WorkSize(8, n));
+
+    // Task 5.2
+    {
+        static constexpr int K = 64;
+        ocl::Kernel mergesortPhaseLocal(merge_kernel, merge_kernel_length, "mergesortPhaseLocal");
+        mergesortPhaseLocal.compile();
+        ocl::Kernel mergesortDiagonalPhase(merge_kernel, merge_kernel_length, "mergesortDiagonalPhase");
+        mergesortDiagonalPhase.compile();
+        timer t;
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
+            as_gpu.writeN(as.data(), n);
+            t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфера данных
+            {
+                gpu::gpu_mem_32f *from = &as_gpu, *to = &aux_gpu;
+                for (int blockLength = 1; blockLength < n; blockLength *= 2) {
+                    if (blockLength * 2 <= K) {
+                        mergesortPhaseLocal.exec(gpu::WorkSize(K, n), *from, *to, n, blockLength);
+                    } else {
+                        // number of work groups does not really matter
+                        mergesortDiagonalPhase.exec(gpu::WorkSize(1, n / K), *from, *to, n, blockLength);
+                    }
+                    std::swap(from, to);
+                    // {
+                    //     std::vector<float> current(n);
+                    //     from->readN(current.data(), n);
+                    //     std::cout << "after blockLength=" << blockLength << ":\n";
+                    //     for (float x : current)
+                    //         std::cout << x << ' ';
+                    //     std::cout << std::endl;
+                    // }
+                }
+                if (from == &aux_gpu)
+                    aux_gpu.copyToN(as_gpu, n);
+            }
+            t.nextLap();
+        }
+        std::cout << "GPU Diag: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU Diag: " << (n / 1000.0 / 1000) / t.lapAvg() << " millions/s" << std::endl;
         as_gpu.readN(as.data(), n);
+        // Проверяем корректность результатов
+        for (int i = 0; i < n; ++i) {
+            EXPECT_THE_SAME(as[i], cpu_sorted[i],
+                            "GPU Diag results should be equal to CPU results!");
+        }
     }
-    // Проверяем корректность результатов
-    for (int i = 0; i < n; ++i) {
-        EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
-    }
-*/
+
+
     return 0;
 }
