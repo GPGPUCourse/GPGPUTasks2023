@@ -1,3 +1,9 @@
+#ifdef __CLION_IDE__
+    #include <libgpu/opencl/cl/clion_defines.cl>
+#endif
+
+#line 6
+
 __kernel void merge(__global const float *as_gpu, __global float *bs_gpu, const int n,
                     const int merge_block_size) {
     const int i = get_global_id(0);
