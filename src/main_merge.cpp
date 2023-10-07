@@ -34,8 +34,8 @@ int main(int argc, char **argv) {
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 10;
-    constexpr cl_uint n = 32 * 1024 * 1024;
+    constexpr int benchmarkingIters = 10;
+    constexpr cl_uint n = 32 * 64 * 64;
     constexpr cl_uint workGroupSize = 64;
     std::vector<float> as(n, 0);
     FastRandom r(n);
@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
     }
 
     std::string base_path = __FILE__;
-    base_path = base_path.substr(0, base_path.size() - 14);
+    base_path = base_path.substr(0, base_path.size() - 14) + "cl/";
 
     gpu::WorkSize ws(workGroupSize, n);
     std::ostringstream defines;
