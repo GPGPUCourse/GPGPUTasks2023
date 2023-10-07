@@ -5,16 +5,8 @@ __kernel void merge(const __global float *as_gpu, __global float *bs_gpu, const 
         return;
     }
     unsigned int left = 0;
-    unsigned int right = 0;
+    unsigned int right = 1;
     bool is_block_even = i % (merge_block_size * 2) < merge_block_size;
-    if (is_block_even) {
-        left = i / merge_block_size * merge_block_size + merge_block_size;
-    } else {
-        left = i / merge_block_size * merge_block_size - merge_block_size;
-    }
-    if (left >= n) {
-        return;
-    }
     unsigned int start_left = left;
     right = left + merge_block_size < n ? left + merge_block_size : n;
 
