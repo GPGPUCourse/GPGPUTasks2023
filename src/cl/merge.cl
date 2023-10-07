@@ -27,24 +27,23 @@ __kernel void merge(__global const float *src, __global float *res, const unsign
     if (global_id >= n) {
         return;
     }
-    unsigned local_size = get_local_size(0), left, mid, right;
+    unsigned local_size = get_local_size(0), left, mid, right, start;
     if (local_size >= size) {
         unsigned local_id = get_local_id(0);
         unsigned group_id = get_group_id(0);
         left = group_id * local_size + (local_id / size) * size;
-        right = left + size;
-        mid = (left + right) / 2;
     } else {
         left = (global_id / size) * size;
-        right = left + size;
-        mid = (left + right) / 2;
     }
+    right = left + size;
+    mid = (left + right) / 2;
+    start = left + global_id % size;
     float element = src[global_id];
     if (global_id < mid) {
         unsigned offset = bin_search_ne(element, mid, right, src) - mid;
-        res[left + global_id % size + offset] = element;
+        res[start + offset] = element;
     } else {
         unsigned offset = bin_search_eq(element, left, mid, src) - left;
-        res[left + global_id % size - size / 2 + offset] = element;
+        res[start - size / 2 + offset] = element;
     }
 }
