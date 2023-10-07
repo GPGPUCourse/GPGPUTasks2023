@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
             // Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфера данных
             t.restart();
 
-            for (unsigned int k = 1; k <= good_n / 2; k <<= 1) {
+            for (unsigned int k = 1; k < good_n; k <<= 1) {
                 const unsigned int gws = good_n / 2 / k;
 
                 merge.exec(gpu::WorkSize(std::min(workGroupSize, gws), gws), as_gpu, bs_gpu, k);
@@ -94,6 +94,50 @@ int main(int argc, char **argv) {
 
         std::cout << "GPU naïve: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "GPU naïve: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+
+        std::vector<float> bs(n, 0);
+        as_gpu.readN(bs.data(), n);
+
+        // Проверяем корректность результатов
+        for (int i = 0; i < n; ++i) {
+            EXPECT_THE_SAME(bs[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
+        }
+    }
+
+    {
+        ocl::Kernel merge_naive(merge_kernel, merge_kernel_length, "merge_naive");
+        merge_naive.compile();
+
+        ocl::Kernel merge_diag(merge_kernel, merge_kernel_length, "merge_diag");
+        merge_diag.compile();
+
+        timer t;
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
+            as_gpu.writeN(as.data(), good_n);
+
+            const unsigned int workGroupSize = 128;
+
+            // Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфера данных
+            t.restart();
+
+            for (unsigned int k = 1; k < std::min(workGroupSize, good_n); k <<= 1) {
+                const unsigned int gws = good_n / 2 / k;
+
+                merge_naive.exec(gpu::WorkSize(std::min(workGroupSize, gws), gws), as_gpu, bs_gpu, k);
+
+                bs_gpu.copyToN(as_gpu, n);
+            }
+
+            for (unsigned int k = workGroupSize; k < good_n; k <<= 1) {
+                merge_diag.exec(gpu::WorkSize(workGroupSize, good_n / 2), as_gpu, bs_gpu, k);
+
+                bs_gpu.copyToN(as_gpu, n);
+            }
+
+            t.nextLap();
+        }
+        std::cout << "GPU diagonal: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU diagonal: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
         as_gpu.readN(as.data(), n);
 
         // Проверяем корректность результатов
@@ -101,33 +145,6 @@ int main(int argc, char **argv) {
             EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
         }
     }
-
-    // {
-    //     ocl::Kernel merge(merge_kernel, merge_kernel_length, "merge");
-    //     merge.compile();
-    //     timer t;
-    //     for (int iter = 0; iter < benchmarkingIters; ++iter) {
-    //         as_gpu.writeN(as.data(), n);
-
-    //         // Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфера данных
-    //         t.restart();
-
-    //         const unsigned int workGroupSize = 128;
-    //         const unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
-
-    //         merge.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, n);
-
-    //         t.nextLap();
-    //     }
-    //     std::cout << "GPU merge: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-    //     std::cout << "GPU merge: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
-    //     as_gpu.readN(as.data(), n);
-
-    //     // Проверяем корректность результатов
-    //     for (int i = 0; i < n; ++i) {
-    //         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
-    //     }
-    // }
 
     return 0;
 }
