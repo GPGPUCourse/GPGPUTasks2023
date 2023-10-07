@@ -72,4 +72,7 @@ void atomic_add(...);
 // 64 for AMD, 32 for NVidia, 8 for intel GPUs, 1 for CPU
 #define WARP_SIZE 64
 
+#define WORK_GROUP_SIZE 64
+using uint = unsigned int;
+
 #endif // pragma once
