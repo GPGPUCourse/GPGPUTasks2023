@@ -1,4 +1,4 @@
-__kernel void merge(__global float *as_gpu, __global float *bs_gpu, unsigned int n, unsigned int merge_block_size) {
+__kernel void merge(__global const float *as_gpu, __global float *bs_gpu, const unsigned int n, const unsigned int merge_block_size) {
     const unsigned int i = get_global_id(0);
     if (i >= n) {
         return;
