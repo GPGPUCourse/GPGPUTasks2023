@@ -83,7 +83,7 @@ __kernel void matrix_multiplication_local_mem2(
     const int gj = get_group_id(1);
 
     float sum[D];
-    for (int d = 0; d < n; ++d)
+    for (int d = 0; d < m; ++d)
         sum[d] = 0.0f;
 
     __local float suba[D][D]; 
