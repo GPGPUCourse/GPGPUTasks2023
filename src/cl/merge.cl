@@ -39,7 +39,7 @@ void binary_search(
         unsigned int* ra,
         unsigned int* rb) 
 {
-    int l = 0, r = (x+1)*WORK_PER_WORKITEM - 1, lst_zero = 0; 
+    int l = 0, r = (x+1)*WORK_PER_WORKITEM - 1, lst_zero = -1; 
 
     if(r>=len/2) {
         r = len - r - 2;
@@ -97,14 +97,7 @@ __kernel void merge_local(
     binary_search(as, l1, l2, len, x, &ssr1, &ssr2);
 
     __local float suba[WORK_PER_WORKITEM]; 
-    for(unsigned int i=0;i<WORK_PER_WORKITEM;++i) {
-        suba[i] = 0;
-    }
-
-    __local float subb[WORK_PER_WORKITEM]; 
-    for(unsigned int i=0;i<WORK_PER_WORKITEM;++i) {
-        subb[i] = 0;
-    }
+    __local float subb[WORK_PER_WORKITEM];
 
     for(unsigned int i=ssl1;i<ssr1;++i) {
         suba[i-ssl1] = as[l1+i];
@@ -128,11 +121,9 @@ __kernel void merge_local(
         else ++ssl2;
     }
     
-    while(ssl1<ssr1) {
+    while(ssl1<ssr1)
         ss[it++] = suba[ssl1++];
-    }
         
-    while(ssl2<ssr2) {
+    while(ssl2<ssr2)
         ss[it++] = subb[ssl2++];
-    }
 }

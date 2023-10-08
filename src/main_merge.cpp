@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфера данных
-            const unsigned int workGroupSize = 128;
+            const unsigned int workGroupSize = 64;
             const unsigned int warpsCount = 32; // сколько одновременно рабочих групп мы можем исполнять
             
             // пока есть возможность мерджить по два массива без простоя варпов - делаем так
