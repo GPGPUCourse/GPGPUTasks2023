@@ -1,31 +1,30 @@
 
-__kernel void merge(__global float *a, const unsigned int n) {
+__kernel void merge(__global const float *src, __global float *dest, const unsigned int cur_n) {
     const unsigned int gid = get_global_id(0);
 
     // we ain't even interested in local id
 
-    const unsigned int halfn = n >> 1; // let's assume that the length is a power of two. If data doesn't match - we'll make it by filling infs.
+    const unsigned int halfn = cur_n / 2; // let's assume that the length is a power of two. If data doesn't match - we'll make it by filling infs.
 
-    const bool from_right = gid >= halfn; // for example n = 4, halfn = 2; {0, 1} - from left, {2, 3} - from right
+    const unsigned int kgid = gid % cur_n;
 
-    const float val = a[gid];
-    const unsigned int base_ind = (!from_right) * halfn;
+    const unsigned int start_ind = (gid / cur_n) * cur_n;
 
-    unsigned int l = -1;
-    unsigned int r = halfn;
+    const bool from_right = kgid >= halfn; // for example n = 4, halfn = 2; {0, 1} - from left, {2, 3} - from right
 
-    unsigned int ind = -100; // This is so if something goes wrong - let it go terribly wrong :D
+    const float val = src[gid];
+    const unsigned int base_ind = start_ind + (!from_right) * halfn;
 
-    while (l < r - 1) {
-        ind = (l + r) >> 1;
-        const float mid_val = a[base_ind + ind];
+    int l = -1;
+    int r = halfn;
+
+    while (l < (r - 1)) {
+        const unsigned int ind = (l + r) / 2;
+        const float mid_val = src[base_ind + ind];
         const bool bigger = val > mid_val;
         l = bigger ? ind : l;
-        r = bigger ? r : ind;
+        r = !bigger ? ind : r;
     }
 
-    // wait for everyone to find their ind
-    barrier(CLK_GLOBAL_MEM_FENCE);
-
-    a[(gid % halfn) + r] = val;
+    dest[start_ind + (kgid % halfn) + r] = val;
 }
