@@ -57,6 +57,32 @@ int main(int argc, char **argv) {
     out_gpu.resizeN(n);
     ind_gpu.resizeN(n);
     {
+        ocl::Kernel merge_base(merge_kernel, merge_kernel_length, "merge_base");
+        merge_base.compile();
+        timer t;
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
+            as_gpu.writeN(as.data(), n);
+            t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфера данных
+            unsigned int workGroupSize = 256;
+            unsigned int global_work_size = n;
+            unsigned int block_size = 1;
+            while (block_size < n) {
+                merge_base.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, out_gpu, block_size);
+                std::swap(as_gpu, out_gpu);
+                block_size *= 2;
+            }
+            t.nextLap();
+        }
+        std::cout << "GPU baseline: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU baseline: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+        as_gpu.readN(as.data(), n);
+
+        // Проверяем корректность результатов
+        for (int i = 0; i < n; ++i) {
+            EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
+        }
+    }
+    {
         ocl::Kernel merge_small(merge_kernel, merge_kernel_length, "merge_small");
         merge_small.compile();
         ocl::Kernel calculate_inds(merge_kernel, merge_kernel_length, "calculate_inds");
@@ -111,13 +137,15 @@ int main(int argc, char **argv) {
             }
             t.nextLap();
         }
-        std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "GPU alternative: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU alternative: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
         as_gpu.readN(as.data(), n);
+
+        // Проверяем корректность результатов
+        for (int i = 0; i < n; ++i) {
+            EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
+        }
     }
-    // Проверяем корректность результатов
-    for (int i = 0; i < n; ++i) {
-        EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
-    }
+
     return 0;
 }

@@ -149,3 +149,44 @@ __kernel void merge_large(__global const float* in,
         out[gid] = a < b ? a : b;
     }
 }
+
+__kernel void merge_base(__global const float* in,
+                          __global float* out,
+                          unsigned int block_size)
+{
+    unsigned int gid = get_global_id(0);
+    float val = in[gid];
+    unsigned int block_pair_index = gid / (2 * block_size);
+    unsigned int block_pair_start = block_pair_index * 2 * block_size;
+    unsigned int llid = gid - block_pair_start;
+    unsigned int offset = llid < block_size ? 1 : 0; // важно: внутри варпа offset не меняется
+
+    int l = block_pair_start + offset - 1;
+    unsigned int r = block_size + l;
+    while (r - l > 1) {
+        unsigned int m = (l + r + 1 - offset) / 2;
+        float to_compare = in[offset * block_size + m];
+        if (to_compare > val) {
+            r = m;
+        } else if (to_compare < val) {
+            l = m;
+        } else {
+            if (offset) {
+                l = m;
+            } else {
+                r = m;
+            }
+        }
+    }
+    if (offset) {
+        if (in[block_size + l] > val) {
+            r = l;
+        }
+        out[llid + r] = val;
+    } else {
+        if (in[r] < val) {
+            l = r;
+        }
+        out[llid - block_size + l + 1] = val;
+    }
+}
