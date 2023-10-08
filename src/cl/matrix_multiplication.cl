@@ -4,7 +4,7 @@
 
 #line 6
 #define TILE_SIZE 16
-#define THREAD_WORK 16
+#define THREAD_WORK 4
 
 __kernel void matrix_multiplication(__global float* as,
                                     __global float* bs,
@@ -68,50 +68,34 @@ __kernel void matrix_multiplication3(__global float* as,
                                      unsigned int N)
 {
     int global_i = get_global_id(0);
-    int global_j = get_global_id(1);
+    int global_j = get_global_id(1) * THREAD_WORK;
     int local_i = get_local_id(0);
-    int local_j = get_local_id(1);
-    int group_j = get_group_id(1);
+    int local_j = get_local_id(1) * THREAD_WORK;
 
+    __local float sum[TILE_SIZE][TILE_SIZE];
+    __local float tile_a[TILE_SIZE][TILE_SIZE];
+    __local float tile_b[TILE_SIZE][TILE_SIZE];
 
-    __local float tile_a[TILE_SIZE * THREAD_WORK][TILE_SIZE + 1];
-    __local float tile_b[TILE_SIZE][TILE_SIZE + 1];
-
-    float sum[THREAD_WORK] = {0.0f};
-
-    for (int i = 0; i < THREAD_WORK; ++i) {
-        sum[i] = 0.0f;
+    for (int w = 0; w < THREAD_WORK; ++w) {
+        sum[local_j + w][local_i] = 0.0f;
     }
 
     for (int shift = 0; shift * TILE_SIZE < K; ++shift) {
-        tile_b[local_j][local_i] = bs[(TILE_SIZE * shift + local_j) * N + global_i];
-
-        for (int i = 0; i < TILE_SIZE; ++i) {
-            if ((TILE_SIZE * THREAD_WORK * group_j + local_j +
-                 i * THREAD_WORK) >= M) {
-                tile_a[local_j + i * THREAD_WORK][local_i] = 0.0f;
-            }else {
-                tile_a[local_j + i * THREAD_WORK][local_i] =
-                        as[(TILE_SIZE * THREAD_WORK * group_j + local_j + i * THREAD_WORK) * K +
-                           (shift * TILE_SIZE + local_i)];
-            }
-
-        }
-
-        barrier(CLK_LOCAL_MEM_FENCE);
-
-        for (int s = 0; s < TILE_SIZE; ++s) {
-            float tmp = tile_b[s][local_i];
-            for (int w = 0; w < THREAD_WORK; ++w) {
-                sum[w] += tmp * tile_a[local_j * THREAD_WORK + w][s];
+        if (!local_j) {
+            for (int i = 0; i < TILE_SIZE; ++i) {
+                tile_a[i][local_i] = as[(global_j + i) * K + shift * TILE_SIZE + local_i];
+                tile_b[i][local_i] = bs[(shift * TILE_SIZE + i) * N + global_i];
             }
         }
         barrier(CLK_LOCAL_MEM_FENCE);
+
+        for (int j = 0; j < TILE_SIZE; ++j) {
+            float tmp = tile_b[j][local_i];
+            for (int w = 0; w < THREAD_WORK; ++w)
+                sum[local_j + w][local_i] += tile_a[local_j + w][j] * tmp;
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
     }
-    if (global_j * THREAD_WORK>= N) {
-        return;
-    }
-    for (int w = 0; w < THREAD_WORK; ++w) {
-        cs[(global_j * THREAD_WORK + w) * N + global_i] = sum[w];
-    }
+    for (int w = 0; w < THREAD_WORK; ++w)
+        cs[(global_j + w) * N + global_i] = sum[local_j + w][local_i];
 }
