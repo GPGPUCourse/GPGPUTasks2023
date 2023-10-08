@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
 
     {
         std::string src = read_kernel(base_path + "merge_simple.cl");
-        ocl::Kernel merge(src.c_str(), src.size(), "kmain", defines.str());
+        ocl::Kernel merge(src.c_str(), src.size(), "merge", defines.str());
         merge.compile();
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
@@ -96,8 +96,8 @@ int main(int argc, char **argv) {
     {
         std::string src1 = read_kernel(base_path + "merge_simple_local.cl");
         std::string src2 = read_kernel(base_path + "merge_simple.cl");
-        ocl::Kernel phase1(src1.c_str(), src1.size(), "kmain", defines.str());
-        ocl::Kernel phase2(src2.c_str(), src2.size(), "kmain", defines.str());
+        ocl::Kernel phase1(src1.c_str(), src1.size(), "merge", defines.str());
+        ocl::Kernel phase2(src2.c_str(), src2.size(), "merge", defines.str());
         phase1.compile();
         phase2.compile();
         timer t;

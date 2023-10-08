@@ -36,7 +36,7 @@ uint binsearch_le(float x, __global const float *arr, uint len) {
     return r;
 }
 
-__kernel void kmain(__global const float *src, __global float *dst, uint len, uint sorted_block_len) {
+__kernel void merge(__global const float *src, __global float *dst, uint len, uint sorted_block_len) {
     uint src_id = get_global_id(0);
     if (src_id >= len) {
         return;

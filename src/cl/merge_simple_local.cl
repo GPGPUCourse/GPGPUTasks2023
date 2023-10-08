@@ -66,7 +66,7 @@ void merge_pass(__local const float *src, __local float *dst, uint len, uint sor
     dst[dst_id] = x;
 }
 
-__kernel void kmain(__global const float *src, __global float *dst, uint len) {
+__kernel void merge(__global const float *src, __global float *dst, uint len) {
     __local float buf1[WORK_GROUP_SIZE];
     __local float buf2[WORK_GROUP_SIZE];
 
