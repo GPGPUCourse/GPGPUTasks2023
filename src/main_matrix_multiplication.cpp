@@ -9,6 +9,7 @@
 #include <vector>
 #include <iostream>
 #include <stdexcept>
+#include <string.h>
 
 
 #define WORK_PER_THREAD 8
@@ -67,7 +68,7 @@ int main(int argc, char **argv)
     as_gpu.writeN(as.data(), M*K);
     bs_gpu.writeN(bs.data(), K*N);
 
-    ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, "matrix_multiplication_more_work_per_thread");
+    ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, argv[1]);
     matrix_multiplication_kernel.compile();
 
     {
@@ -76,7 +77,11 @@ int main(int argc, char **argv)
             // TODO
             unsigned int work_group_size = 128;
             unsigned int global_work_size = M * N;
-            matrix_multiplication_kernel.exec(gpu::WorkSize(16, 4, M, N / 4), as_gpu, bs_gpu, cs_gpu, M, K, N);
+            auto workSize = gpu::WorkSize(16, 16, M, N);
+            if (strcmp(argv[1], "matrix_multiplication_more_work_per_thread") == 0) {
+                workSize = gpu::WorkSize(16, 4, M, N / 4);
+            }
+            matrix_multiplication_kernel.exec(workSize, as_gpu, bs_gpu, cs_gpu, M, K, N);
 
             t.nextLap();
         }
