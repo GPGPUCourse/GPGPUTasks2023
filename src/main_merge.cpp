@@ -84,10 +84,10 @@ int main(int argc, char **argv) {
             // пока есть возможность мерджить по два массива без простоя варпов - делаем так
             // *(workGroupSize*warpsCount)
             int h;
-            for(h=1;(1<<h)<=n/(workGroupSize*warpsCount)*(workGroupSize*warpsCount);++h) {
+            for(h=1;(1<<h)<=n/(workGroupSize*warpsCount);++h) {
                 unsigned int len = (1<<h);
                 unsigned int global_work_size = n / len;
-                global_work_size = std::max(global_work_size, workGroupSize);
+                //global_work_size = std::max(global_work_size, workGroupSize);
                 merge1.exec(
                     gpu::WorkSize(workGroupSize, global_work_size), 
                     as_gpu, 
@@ -99,21 +99,21 @@ int main(int argc, char **argv) {
             }
 
             // теперь будем мерджить два (уже больших) массива всеми воркитемами (каждый посчитает свой подотрезок ответа)
-            // for(;(1<<h)<=n;++h) {
-            //     unsigned int len = (1<<h);
-            //     unsigned int global_work_size = len / work_per_workitem;
-            //     for(int j=0;j<n;j+=len) {
-            //         merge2.exec(
-            //             gpu::WorkSize(workGroupSize, global_work_size), 
-            //             as_gpu, 
-            //             ss_gpu, 
-            //             n,
-            //             len,
-            //             j
-            //         );
-            //     }
-            //     std::swap(as_gpu, ss_gpu);
-            // }
+            for(;(1<<h)<=n;++h) {
+                unsigned int len = (1<<h);
+                unsigned int global_work_size = len / work_per_workitem;
+                for(int j=0;j<n;j+=len) {
+                    merge2.exec(
+                        gpu::WorkSize(workGroupSize, global_work_size), 
+                        as_gpu, 
+                        ss_gpu, 
+                        n,
+                        len,
+                        j
+                    );
+                }
+                std::swap(as_gpu, ss_gpu);
+            }
             
             t.nextLap();
         }
