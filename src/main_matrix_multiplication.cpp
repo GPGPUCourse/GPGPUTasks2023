@@ -66,9 +66,8 @@ int main(int argc, char **argv)
 
     as_gpu.writeN(as.data(), M*K);
     bs_gpu.writeN(bs.data(), K*N);
-    std::string names[] = {"matrix_multiplication", "matrix_multiplication2", "matrix_multiplication3"};
-
-    for (auto name : names) {
+    std::tuple<std::string, int, int> names[] = {{"matrix_multiplication", 1, 1}, {"matrix_multiplication2", 16, 1}, {"matrix_multiplication3", 1, 16}};
+    for (auto& [name, x_scale, y_scale] : names) {
         ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, name);
         matrix_multiplication_kernel.compile();
 
@@ -78,7 +77,14 @@ int main(int argc, char **argv)
                 // TODO
                 unsigned int work_group_size = 16;
                 unsigned int global_work_size = 16;
-                auto workSize = gpu::WorkSize(work_group_size, global_work_size, K, M);
+                unsigned int global_work_size_width =
+                        (((N + x_scale - 1) / x_scale) + work_group_size - 1) / work_group_size * work_group_size;
+                unsigned int global_work_size_height =
+                        (((M + y_scale - 1) / y_scale) + work_group_size - 1) / work_group_size * work_group_size;
+                auto workSize = gpu::WorkSize(work_group_size,
+                                              global_work_size,
+                                              global_work_size_width,
+                                              global_work_size_height);
                 matrix_multiplication_kernel.exec(workSize, as_gpu, bs_gpu, cs_gpu, M, K, N);
 
                 t.nextLap();
