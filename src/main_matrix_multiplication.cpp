@@ -111,8 +111,8 @@ int main(int argc, char **argv) {
     test_kernel("local_mem", gpu::WorkSize(global_work_size_x, global_work_size_y, CEIL(N, global_work_size_x),
                                            CEIL(M, global_work_size_y)));
 
-    test_kernel("more_work_per_thread", gpu::WorkSize(global_work_size_x, global_work_size_y,
-                                                      CEIL(N, work_per_thread * global_work_size_x) / work_per_thread,
-                                                      CEIL(M, global_work_size_y)));
+    test_kernel("more_work_per_thread",
+                gpu::WorkSize(global_work_size_x, global_work_size_y / work_per_thread, CEIL(N, global_work_size_x),
+                              CEIL(M, work_per_thread * global_work_size_y) / work_per_thread));
     return 0;
 }

@@ -53,6 +53,7 @@ __kernel void local_mem(__global const float *as, __global const float *bs, __gl
 }
 
 #define THREAD_WORK 8
+#define TILE_SIZE_DIV_TW (TILE_SIZE / THREAD_WORK)
 __kernel void more_work_per_thread(__global const float *as, __global const float *bs, __global float *cs,
                                    const unsigned int M, const unsigned int K, const unsigned int N) {
     const unsigned int group_x = get_group_id(0);
@@ -61,7 +62,7 @@ __kernel void more_work_per_thread(__global const float *as, __global const floa
     const unsigned int local_y = get_local_id(1);
 
     __local float tileA[TILE_SIZE * TILE_SIZE];
-    __local float tileB[TILE_SIZE * TILE_SIZE * THREAD_WORK];
+    __local float tileB[TILE_SIZE * TILE_SIZE];
 
     float sum[THREAD_WORK];
     for (int t = 0; t < THREAD_WORK; t++)
@@ -69,23 +70,24 @@ __kernel void more_work_per_thread(__global const float *as, __global const floa
 
     unsigned int indexA_x = 0, indexB_x = 0, indexA_y = 0, indexB_y = 0;
     for (int tile = 0; tile < K; tile += TILE_SIZE) {
-        indexA_x = tile + local_x;
-        indexA_y = group_y * TILE_SIZE + local_y;
-        tileA[local_y * TILE_SIZE + local_x] = (indexA_x < K && indexA_y < M) ? as[indexA_y * K + indexA_x] : 0.0f;
+        for (int offset_y = 0; offset_y < TILE_SIZE; offset_y += TILE_SIZE_DIV_TW) {
+            indexA_x = tile + local_x;
+            indexA_y = group_y * TILE_SIZE + local_y + offset_y;
+            tileA[(local_y + offset_y) * TILE_SIZE + local_x] =
+                    (indexA_x < K && indexA_y < M) ? as[indexA_y * K + indexA_x] : 0.0f;
 
-        for (int worker = 0; worker < THREAD_WORK; worker++) {
-            indexB_x = group_x * TILE_SIZE * THREAD_WORK + local_x * THREAD_WORK + worker;
-            indexB_y = tile + local_y;
-            tileB[local_y * TILE_SIZE * THREAD_WORK + local_x * THREAD_WORK + worker] =
+            indexB_x = group_x * TILE_SIZE + local_x;
+            indexB_y = tile + local_y + offset_y;
+            tileB[(local_y + offset_y) * TILE_SIZE + local_x] =
                     (indexB_x < N && indexB_y < K) ? bs[indexB_y * N + indexB_x] : 0.0f;
         }
 
         barrier(CLK_LOCAL_MEM_FENCE);
 
-        for (int k = 0; k < TILE_SIZE; k++) {
-            float tmp = tileA[local_y * TILE_SIZE + k];
+        for (int k = 0; k < TILE_SIZE; ++k) {
+            float tmp = tileB[k * TILE_SIZE + local_x];
             for (int worker = 0; worker < THREAD_WORK; worker++) {
-                sum[worker] += tmp * tileB[k * TILE_SIZE * THREAD_WORK + local_x * THREAD_WORK + worker];
+                sum[worker] += tmp * tileA[(local_y + worker * TILE_SIZE_DIV_TW) * TILE_SIZE + k];
             }
         }
 
@@ -93,8 +95,8 @@ __kernel void more_work_per_thread(__global const float *as, __global const floa
     }
 
     for (int worker = 0; worker < THREAD_WORK; worker++) {
-        indexA_x = group_x * TILE_SIZE * THREAD_WORK + local_x * THREAD_WORK + worker;
-        indexA_y = group_y * TILE_SIZE + local_y;
+        indexA_x = group_x * TILE_SIZE + local_x;
+        indexA_y = group_y * TILE_SIZE + local_y + worker * TILE_SIZE_DIV_TW;
         if (indexA_x < N && indexA_y < M)
             cs[indexA_y * N + indexA_x] = sum[worker];
     }
