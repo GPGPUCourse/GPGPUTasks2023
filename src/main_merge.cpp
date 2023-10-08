@@ -7,6 +7,7 @@
 // Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
 #include "cl/merge_cl.h"
 
+#include <cassert>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -31,7 +32,7 @@ int main(int argc, char **argv) {
     context.activate();
 
     int benchmarkingIters = 10;
-    unsigned int n = 32 * 1024 * 1024;
+    unsigned int n = 1024 * 1024 * 32;
     std::vector<float> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -63,7 +64,7 @@ int main(int argc, char **argv) {
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфера данных
             unsigned int workGroupSize = 128;
             unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
-            for (unsigned int half_block_size = 1; half_block_size < n; half_block_size *= 2) {
+            for (int half_block_size = 1; half_block_size < n; half_block_size *= 2) {
                 merge.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, cs_gpu, half_block_size);
                 std::swap(as_gpu, cs_gpu);
             }
