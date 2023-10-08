@@ -65,7 +65,6 @@ matrix_multiplication_task3_rows(__global const float *a, __global const float *
                                  const unsigned int M,
                                  const unsigned int K,
                                  const unsigned int N) {
-    const int group_j = get_group_id(1);
     const int group_i = get_group_id(0);
     const int local_j = get_local_id(1);
     const int local_i = get_local_id(0);
@@ -109,7 +108,6 @@ matrix_multiplication_task3_columns(__global const float *a, __global const floa
                                     const unsigned int K,
                                     const unsigned int N) {
     const int group_j = get_group_id(1);
-    const int group_i = get_group_id(0);
     const int local_j = get_local_id(1);
     const int local_i = get_local_id(0);
     const int global_j = get_global_id(1);
@@ -145,3 +143,83 @@ matrix_multiplication_task3_columns(__global const float *a, __global const floa
     }
 }
 
+#define NEW_THREAD_WORK 16
+
+__kernel void
+matrix_multiplication_task3_columns_no_memes(__global const float *a, __global const float *b, __global float *result,
+                                             const unsigned int M,
+                                             const unsigned int K,
+                                             const unsigned int N) {
+    const int group_j = get_group_id(1);
+    const int local_j = get_local_id(1);
+    const int local_i = get_local_id(0);
+//    const int global_j = get_global_id(1);
+    const int global_i = get_global_id(0);
+
+
+    __local float tileA[TILE_SIZE][TILE_SIZE + 1];
+    __local float tileB[TILE_SIZE][TILE_SIZE + 1];
+
+    float sum[NEW_THREAD_WORK];
+    for (int i = 0; i < NEW_THREAD_WORK; ++i) {
+        sum[i] = 0.0f;
+    }
+
+    for (int k = 0; k * TILE_SIZE < K; ++k) {
+        tileB[local_j][local_i] = GET(b, (k * TILE_SIZE + local_j), global_i, N, K)
+        for (int work = 0; work < NEW_THREAD_WORK; ++work) {
+            tileA[local_j][local_i] = GET(a, (TILE_SIZE * NEW_THREAD_WORK * group_j + local_j +
+                                                                    work * TILE_SIZE), (k * TILE_SIZE + local_i), K, M)
+            barrier(CLK_LOCAL_MEM_FENCE);
+            for (int i = 0; i < TILE_SIZE; ++i) {
+                sum[work] += tileB[i][local_i] * tileA[local_j][i];
+            }
+            barrier(CLK_LOCAL_MEM_FENCE);
+
+        }
+    }
+
+    for (int i = 0; i < NEW_THREAD_WORK; ++i) {
+        result[(TILE_SIZE * NEW_THREAD_WORK * group_j + local_j + TILE_SIZE * i) * N + global_i] = sum[i];
+    }
+}
+
+__kernel void
+matrix_multiplication_task3_rows_no_memes(__global const float *a, __global const float *b, __global float *result,
+                                 const unsigned int M,
+                                 const unsigned int K,
+                                 const unsigned int N) {
+    const int group_i = get_group_id(0);
+    const int local_j = get_local_id(1);
+    const int local_i = get_local_id(0);
+    const int global_j = get_global_id(1);
+    const int global_i = get_global_id(0);
+
+
+    __local float tileA[TILE_SIZE][TILE_SIZE + 1];
+    __local float tileB[TILE_SIZE][TILE_SIZE + 1];
+
+    float sum[NEW_THREAD_WORK];
+    for (int i = 0; i < NEW_THREAD_WORK; ++i) {
+        sum[i] = 0.0f;
+    }
+
+    for (int k = 0; k * TILE_SIZE < K; ++k) {
+        tileA[local_j][local_i] = GET(a, global_j, k * TILE_SIZE + local_i, K, M)
+        for (int work = 0; work < NEW_THREAD_WORK; ++work) {
+            tileB[local_j][local_i] = GET(b, (k * TILE_SIZE + local_j), (TILE_SIZE * NEW_THREAD_WORK * group_i + local_i +
+                                                                            work * TILE_SIZE), N, K)
+
+            barrier(CLK_LOCAL_MEM_FENCE);
+            for (int i = 0; i < TILE_SIZE; ++i) {
+                sum[work] += tileA[local_j][i] * tileB[i][local_i];
+
+            }
+            barrier(CLK_LOCAL_MEM_FENCE);
+        }
+    }
+
+    for (int i = 0; i < NEW_THREAD_WORK; ++i) {
+        result[global_j * N + TILE_SIZE * NEW_THREAD_WORK * group_i + local_i + i * TILE_SIZE] = sum[i];
+    }
+}
