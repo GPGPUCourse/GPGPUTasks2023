@@ -19,10 +19,10 @@ int main(int argc, char **argv)
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 10;
-    unsigned int M = 1024;
-    unsigned int K = 1024;
-    unsigned int N = 1024;
+    const int benchmarkingIters = 10;
+    const unsigned int M = 1024;
+    const unsigned int K = 1024;
+    const unsigned int N = 1024;
     const size_t gflops = ((size_t) M * K * N * 2) / (1000 * 1000 * 1000); // умножить на два, т.к. операция сложения и умножения
 
     std::vector<float> as(M*K, 0);
@@ -177,10 +177,10 @@ int main(int argc, char **argv)
 
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            const unsigned int xWorkGroupSize = 16 / 4;
-            const unsigned int yWorkGroupSize = 16;
-            const unsigned int xGlobalWorkSize = N / 4;
-            const unsigned int yGlobalWorkSize = M;
+            const unsigned int xWorkGroupSize = 16;
+            const unsigned int yWorkGroupSize = 16 / 4;
+            const unsigned int xGlobalWorkSize = N;
+            const unsigned int yGlobalWorkSize = M / 4;
 
             matrix_multiplication_kernel.exec(
                 gpu::WorkSize(xWorkGroupSize, yWorkGroupSize, xGlobalWorkSize, yGlobalWorkSize),

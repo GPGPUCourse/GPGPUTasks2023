@@ -64,8 +64,8 @@ __kernel void matrix_multiplication_many(
     unsigned int K,
     unsigned int N
 ) {
-    const unsigned int grx = get_group_id(0) * BLOCK_SIZE;
-    const unsigned int gy = get_global_id(1);
+    const unsigned int gx = get_global_id(0);
+    const unsigned int gry = get_group_id(1) * BLOCK_SIZE;
 
     const unsigned int lx = get_local_id(0);
     const unsigned int ly = get_local_id(1);
@@ -82,19 +82,22 @@ __kernel void matrix_multiplication_many(
 
     for (unsigned int i = 0; i < K / BLOCK_SIZE; ++i) {
         for (unsigned int j = 0; j < THREAD_WORK; ++j) {
-            const unsigned int cur_x = j * bs2tw + lx;
+            const unsigned int cur_y = j * bs2tw + ly;
 
-            a_buf[ly][cur_x] = a[gy * K + i * BLOCK_SIZE + cur_x];
-            b_buf[ly][cur_x] = b[(i * BLOCK_SIZE + ly) * N + grx + cur_x];
+            // a_buf[ly][lx] = a[gy * K + i * BLOCK_SIZE + lx];
+            // b_buf[ly][lx] = b[(i * BLOCK_SIZE + ly) * N + gx];
+
+            a_buf[cur_y][lx] = a[(gry + cur_y) * K + i * BLOCK_SIZE + lx];
+            b_buf[cur_y][lx] = b[(i * BLOCK_SIZE + cur_y) * N + gx];
         }
 
         barrier(CLK_LOCAL_MEM_FENCE);
 
         for (unsigned int j = 0; j < BLOCK_SIZE; ++j) {
-            const float a_buf_v = a_buf[ly][j];
+            const float b_buf_v = b_buf[j][lx];
 
             for (unsigned int k = 0; k < THREAD_WORK; ++k) {
-                sum[k] += a_buf_v * b_buf[j][k * bs2tw + lx];
+                sum[k] += a_buf[k * bs2tw + ly][j] * b_buf_v;
             }
         }
 
@@ -102,6 +105,6 @@ __kernel void matrix_multiplication_many(
     }
 
     for (unsigned int i = 0; i < THREAD_WORK; ++i) {
-        c[gy * N + grx + i * bs2tw + lx] = sum[i];
+        c[(gry + i * bs2tw + ly) * N + gx] = sum[i];
     }
 }
