@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
 
     int benchmarkingIters = 10;
     // экспериментальным путём установлено, что это самое большое число, на котором работает без ошибок
-    unsigned int n = 4 * 1024;
+    unsigned int n = 32 * 1024 * 1024;
     std::vector<float> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {

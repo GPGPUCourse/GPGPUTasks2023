@@ -21,7 +21,7 @@ __kernel void merge(__global const float *src, __global float *dest, const unsig
     while (l < (r - 1)) {
         const unsigned int ind = (l + r) / 2;
         const float mid_val = src[base_ind + ind];
-        const bool bigger = val > mid_val;
+        const bool bigger = from_right ? val >= mid_val : val > mid_val;
         l = bigger ? ind : l;
         r = !bigger ? ind : r;
     }
