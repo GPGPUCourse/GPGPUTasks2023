@@ -19,8 +19,8 @@ int main(int argc, char **argv)
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 10; // TODO пока тестируетесь удобно выставить единицу
-    bool skipCPUBenchmarking = false;
+    int benchmarkingIters = 1; // TODO пока тестируетесь удобно выставить единицу
+    bool skipCPUBenchmarking = true;
     unsigned int M = 1024;
     unsigned int K = 1025;
     unsigned int N = 1023;
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
         {
             timer t;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
-                unsigned int work_group_size = 16;
+                unsigned int work_group_size = 8;
                 unsigned int work_per_thread = 8;
                 unsigned int global_work_sizeX = (M + work_group_size - 1) / work_group_size * work_group_size;
                 unsigned int global_work_sizeY = (N + work_group_size - 1) / work_group_size * work_group_size;

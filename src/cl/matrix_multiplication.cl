@@ -4,8 +4,8 @@
 
 #line 6
 
-#define GROUP_SIZE 16
-#define THREAD_WORK 8
+#define GROUP_SIZE 8
+#define THREAD_WORK GROUP_SIZE
 #define matrix(as, i, j, n, m) as[(i) * (m) + (j)]
 #define matrixSafeGet(as, i, j, n, m) ((i) < (n) && (j) < (m) ? as[(i) * (m) + (j)] : 0.0f)
 
@@ -22,24 +22,24 @@ __kernel void matrix_multiplication_more_work_per_thread3(__global const float *
     unsigned int lj = get_local_id(0);
 
     __local float as_local[GROUP_SIZE][GROUP_SIZE];
-    __local float bs_local[GROUP_SIZE][THREAD_WORK][GROUP_SIZE];
+    __local float bs_local[GROUP_SIZE][GROUP_SIZE][GROUP_SIZE];
 
-    float sum[THREAD_WORK];
-    for (int t = 0; t < THREAD_WORK; t++) sum[t] = 0.0f;
+    float sum[GROUP_SIZE];
+    for (int t = 0; t < GROUP_SIZE; t++) sum[t] = 0.0f;
 
     for (int t = 0; t < k; t += GROUP_SIZE)
     {
-        as_local[lj][li] = matrixSafeGet(as, gi * GROUP_SIZE + li, t + lj, m, k);
-        for (int s = 0; s < THREAD_WORK; s++)
+        as_local[li][lj] = matrixSafeGet(as, gi * GROUP_SIZE + li, t + lj, m, k);
+        for (int s = 0; s < GROUP_SIZE; s++)
         {
-            bs_local[li][s][lj] = matrixSafeGet(bs, t + li, gj * GROUP_SIZE * THREAD_WORK + lj * THREAD_WORK + s, k, n);
+            bs_local[s][li][lj] = matrixSafeGet(bs, t + s, gj * GROUP_SIZE * GROUP_SIZE + li * GROUP_SIZE + lj, k, n);
         }
         barrier(CLK_LOCAL_MEM_FENCE);
 
         for (int tt = 0; tt < GROUP_SIZE; tt++)
         {
-            float tmp = as_local[tt][li];
-            for (int s = 0; s < THREAD_WORK; s++)
+            float tmp = as_local[li][tt];
+            for (int s = 0; s < GROUP_SIZE; s++)
             {
                 sum[s] += tmp * bs_local[tt][s][lj];
             }
@@ -47,11 +47,11 @@ __kernel void matrix_multiplication_more_work_per_thread3(__global const float *
         barrier(CLK_LOCAL_MEM_FENCE);
     }
 
-    for (int s = 0; s < THREAD_WORK; s++)
+    for (int s = 0; s < GROUP_SIZE; s++)
     {
-        if (gi * GROUP_SIZE + li < m && gj * GROUP_SIZE * THREAD_WORK + lj * THREAD_WORK + s < n)
+        if (gi * GROUP_SIZE + li < m && gj * GROUP_SIZE * GROUP_SIZE + s * GROUP_SIZE + lj < n)
         {
-            matrix(cs, gi * GROUP_SIZE + li, gj * GROUP_SIZE * THREAD_WORK + lj * THREAD_WORK + s, m, n) = sum[s];
+            matrix(cs, gi * GROUP_SIZE + li, gj * GROUP_SIZE * GROUP_SIZE + s * GROUP_SIZE + lj, m, n) = sum[s];
         }
     }
 }
@@ -69,9 +69,9 @@ __kernel void matrix_multiplication_more_work_per_thread2(__global const float *
     unsigned int lj = get_local_id(0);
 
     __local float as_local[GROUP_SIZE][GROUP_SIZE];
-    __local float bs_local[THREAD_WORK][GROUP_SIZE][GROUP_SIZE];
+    __local float bs_local[GROUP_SIZE][GROUP_SIZE][GROUP_SIZE];
 
-    float sum[THREAD_WORK];
+    float sum[GROUP_SIZE];
     for (int t = 0; t < THREAD_WORK; t++) sum[t] = 0.0f;
 
     for (int t = 0; t < k; t += GROUP_SIZE)
