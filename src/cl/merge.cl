@@ -96,8 +96,8 @@ __kernel void merge_local(
 
     binary_search(as, l1, l2, len, x, &ssr1, &ssr2);
 
-    __local float suba[WORK_PER_WORKITEM]; 
-    __local float subb[WORK_PER_WORKITEM];
+    float suba[WORK_PER_WORKITEM]; 
+    float subb[WORK_PER_WORKITEM];
 
     for(unsigned int i=ssl1;i<ssr1;++i) {
         suba[i-ssl1] = as[l1+i];
