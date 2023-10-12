@@ -22,6 +22,12 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 int main(int argc, char **argv)
 {
+	gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+
+	gpu::Context context;
+	context.init(device.device_id_opencl);
+	context.activate();
+	
 	int benchmarkingIters = 10;
 	unsigned int max_n = (1 << 24);
 
@@ -77,7 +83,59 @@ int main(int argc, char **argv)
 		}
 
 		{
-			// TODO: implement on OpenCL
+			bs.assign(n, 0);
+
+			gpu::gpu_mem_32u as_gpu, ss_gpu;
+    		as_gpu.resizeN(n);
+    		ss_gpu.resizeN(n);
+
+			ocl::Kernel prefix_sum(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum");
+       		prefix_sum.compile();
+
+			ocl::Kernel accum(prefix_sum_kernel, prefix_sum_kernel_length, "accum");
+       		accum.compile();
+
+			timer t;
+			for (int iter = 0; iter < 1; ++iter) {
+				as_gpu.writeN(bs.data(), n);
+				ss_gpu.writeN(as.data(), n);
+
+				t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
+				
+				const int work_group_size = 128;
+				prefix_sum.exec(
+					gpu::WorkSize(work_group_size, n), 
+					as_gpu, 
+					ss_gpu,
+					1
+				);
+				for(int i=2;i<=n;i<<=1) {
+					accum.exec(
+						gpu::WorkSize(work_group_size, ((n/i)+work_group_size-1)/work_group_size*work_group_size), 
+						ss_gpu, 
+						i,
+						n
+					);
+					prefix_sum.exec(
+						gpu::WorkSize(work_group_size, n), 
+						as_gpu, 
+						ss_gpu,
+						i
+					);
+				}
+				
+				t.nextLap();
+			}
+
+			std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+			std::cout << "GPU: " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
+
+			as_gpu.readN(as.data(), n);
+		}
+
+		// Проверяем корректность результатов
+		for (int i = 0; i < n; ++i) {
+			EXPECT_THE_SAME(as[i], reference_result[i], "GPU results should be equal to CPU results!" + to_string(i));
 		}
 	}
 }
