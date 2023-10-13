@@ -78,6 +78,11 @@ int main(int argc, char **argv) {
         std::cout << "GPU naive: " << n * 1e-6 / t.lapAvg() << " millions/s" << std::endl;
 
         as_gpu.readN(as.data(), n);
+
+        // Проверяем корректность результатов
+        for (int i = 0; i < n; ++i) {
+            EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
+        }
     }
 
     {
@@ -107,12 +112,12 @@ int main(int argc, char **argv) {
         std::cout << "GPU local mem: " << n * 1e-6 / t.lapAvg() << " millions/s" << std::endl;
 
         as_gpu.readN(as.data(), n);
-    }
 
-    // Проверяем корректность результатов
-    for (int i = 0; i < n; ++i) {
-        EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
-    }// */
+        // Проверяем корректность результатов
+        for (int i = 0; i < n; ++i) {
+            EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
+        }
+    }
 
     return 0;
 }
