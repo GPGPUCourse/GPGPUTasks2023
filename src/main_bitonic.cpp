@@ -30,8 +30,8 @@ int main(int argc, char **argv) {
     context.init(device.device_id_opencl);
     context.activate();
 
-    constexpr int benchmarkingIters = 1;// 10;
-    constexpr cl_uint n = 1024 * 1024;  // 32 * 1024 * 1024;
+    constexpr int benchmarkingIters = 10;
+    constexpr cl_uint n = 32 * 1024 * 1024;
     std::vector<float> as(n, 0);
     FastRandom r(n);
     for (cl_uint i = 0; i < n; ++i) {

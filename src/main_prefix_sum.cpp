@@ -29,7 +29,7 @@ int main(int argc, char **argv) {
     context.init(device.device_id_opencl);
     context.activate();
 
-    constexpr int benchmarkingIters = 1;// 10;
+    constexpr int benchmarkingIters = 10;
 
     constexpr cl_uint workGroupSize = 64;
     std::ostringstream defines;
