@@ -3,6 +3,7 @@
 #include <libutils/fast_random.h>
 #include <libutils/misc.h>
 #include <libutils/timer.h>
+#include <sstream>
 
 // Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
 #include "cl/prefix_sum_cl.h"
@@ -27,7 +28,11 @@ int main(int argc, char **argv) {
     context.activate();
 
     constexpr int benchmarkingIters = 1;// 10;
-    constexpr cl_uint max_n = (1 << 24);
+    constexpr cl_uint max_n = 1 << 24;
+
+    constexpr cl_uint workGroupSize = 64;
+    std::ostringstream defines;
+    defines << "-DWORK_GROUP_SIZE=" << workGroupSize;
 
     for (cl_uint n = 4096; n <= max_n; n *= 4) {
         std::cout << "______________________________________________" << std::endl;
@@ -40,32 +45,26 @@ int main(int argc, char **argv) {
             as[i] = r.next(0, values_range);
         }
 
-        std::vector<cl_uint> bs(n, 0);
-        {
-            for (int i = 0; i < n; ++i) {
-                bs[i] = as[i];
-                if (i) {
-                    bs[i] += bs[i - 1];
-                }
+        std::vector<cl_uint> result(n, 0);
+        for (int i = 0; i < n; ++i) {
+            result[i] = as[i];
+            if (i) {
+                result[i] += result[i - 1];
             }
         }
-        const std::vector<cl_uint> reference_result = bs;
+        const std::vector<cl_uint> reference_result = result;
 
         {
-            {
-                std::vector<cl_uint> result(n);
-                for (int i = 0; i < n; ++i) {
-                    result[i] = as[i];
-                    if (i) {
-                        result[i] += result[i - 1];
-                    }
-                }
-                for (int i = 0; i < n; ++i) {
-                    EXPECT_THE_SAME(reference_result[i], result[i], "CPU result should be consistent!");
+            for (int i = 0; i < n; ++i) {
+                result[i] = as[i];
+                if (i) {
+                    result[i] += result[i - 1];
                 }
             }
+            for (int i = 0; i < n; ++i) {
+                EXPECT_THE_SAME(reference_result[i], result[i], "CPU result should be consistent!");
+            }
 
-            std::vector<cl_uint> result(n);
             timer t;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
                 for (int i = 0; i < n; ++i) {
@@ -81,10 +80,9 @@ int main(int argc, char **argv) {
         }
 
         {
-            constexpr cl_uint workGroupSize = 64;
             gpu::WorkSize ws(workGroupSize, n);
 
-            ocl::Kernel kernel(prefix_sum_kernel, prefix_sum_kernel_length, "cumsum_global");
+            ocl::Kernel kernel(prefix_sum_kernel, prefix_sum_kernel_length, "cumsum_naive", defines.str());
 
             gpu::gpu_mem_32u as_gpu;
             gpu::gpu_mem_32u bs_gpu;
@@ -104,7 +102,6 @@ int main(int argc, char **argv) {
             std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
             std::cout << "GPU: " << n * 1e-6 / t.lapAvg() << " millions/s" << std::endl;
 
-            std::vector<cl_uint> result(n);
             as_gpu.readN(result.data(), n);
             for (int i = 0; i < n; ++i) {
                 EXPECT_THE_SAME(reference_result[i], result[i], "GPU result");
