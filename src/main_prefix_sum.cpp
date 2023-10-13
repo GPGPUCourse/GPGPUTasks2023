@@ -5,6 +5,8 @@
 #include <libutils/timer.h>
 #include <sstream>
 
+#include "CL/cl.h"
+
 // Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
 #include "cl/prefix_sum_cl.h"
 
@@ -28,16 +30,16 @@ int main(int argc, char **argv) {
     context.activate();
 
     constexpr int benchmarkingIters = 1;// 10;
-    constexpr cl_uint max_n = 1 << 24;
 
     constexpr cl_uint workGroupSize = 64;
     std::ostringstream defines;
     defines << "-DWORK_GROUP_SIZE=" << workGroupSize;
 
-    for (cl_uint n = 4096; n <= max_n; n *= 4) {
+    for (cl_uint log2n = 12; log2n <= 24; log2n += 2) {
+        cl_uint n = 1 << log2n;
         std::cout << "______________________________________________" << std::endl;
         cl_uint values_range = std::min<cl_uint>(1023, std::numeric_limits<int>::max() / n);
-        std::cout << "n=" << n << " values in range: [" << 0 << "; " << values_range << "]" << std::endl;
+        std::cout << "n = 2^" << log2n << " = " << n << " values in range: [" << 0 << "; " << values_range << "]\n";
 
         std::vector<cl_uint> as(n, 0);
         FastRandom r(n);
@@ -93,16 +95,71 @@ int main(int argc, char **argv) {
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
                 as_gpu.writeN(as.data(), n);
                 t.restart();
-                for (int ready_len = 1; ready_len < n; ready_len *= 2) {
-                    kernel.exec(ws, as_gpu, bs_gpu, n, ready_len);
+                for (cl_uint step = 1; step < n; step *= 2) {
+                    kernel.exec(ws, as_gpu, bs_gpu, n, step);
                     std::swap(as_gpu, bs_gpu);
                 }
                 t.nextLap();
             }
-            std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-            std::cout << "GPU: " << n * 1e-6 / t.lapAvg() << " millions/s" << std::endl;
+            std::cout << "GPU naive: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+            std::cout << "GPU naive: " << n * 1e-6 / t.lapAvg() << " millions/s" << std::endl;
 
             as_gpu.readN(result.data(), n);
+            for (int i = 0; i < n; ++i) {
+                EXPECT_THE_SAME(reference_result[i], result[i], "GPU result should be the same as CPU");
+            }
+        }
+
+        {
+            ocl::Kernel sweep_up(prefix_sum_kernel, prefix_sum_kernel_length, "cumsum_sweep_up", defines.str());
+            ocl::Kernel sweep_down(prefix_sum_kernel, prefix_sum_kernel_length, "cumsum_sweep_down", defines.str());
+            ocl::Kernel shift_left(prefix_sum_kernel, prefix_sum_kernel_length, "shift_left", defines.str());
+
+            gpu::gpu_mem_32u as_gpu;
+            gpu::gpu_mem_32u bs_gpu;
+            as_gpu.resizeN(n);
+            bs_gpu.resizeN(n);
+
+            timer t;
+            for (int iter = 0; iter < benchmarkingIters; ++iter) {
+                as_gpu.writeN(as.data(), n);
+                t.restart();
+
+                for (cl_uint step = 1; step < n; step *= 2) {
+                    uint len = n / 2 / step;
+                    gpu::WorkSize ws(workGroupSize, len);
+                    sweep_up.exec(ws, as_gpu, len, step);
+                }
+
+                // Можно было бы добавить total в конец вектора на процессоре,
+                // но предполагаем, что задача --- получить кумулятивную сумму
+                // на видеокарте (иначе бы не имело смысла пересылать данные вообще),
+                // поэтому будем делать смещение влево на 1 шаг и дополнение
+                // полной суммой.
+                // В результате этих неявных требований
+                // получается существенное падение производительности
+                // на GTX 1060, с 1400 млн/с до 1200 млн/с
+                cl_uint total = 0;
+                as_gpu.readN(&total, 1, n - 1);
+
+                // Нам не дают clEnqueueFillBuffer :(
+                cl_uint zero = 0;
+                context.cl()->writeBuffer(as_gpu.clmem(), CL_TRUE, (n - 1) * sizeof(cl_uint), sizeof(cl_uint), &zero);
+
+                for (cl_uint step = n / 2; step > 0; step /= 2) {
+                    uint len = n / 2 / step;
+                    gpu::WorkSize ws(workGroupSize, len);
+                    sweep_down.exec(ws, as_gpu, len, step);
+                }
+
+                context.cl()->copyBuffer(as_gpu.clmem(), bs_gpu.clmem(), sizeof(cl_uint), 0, (n - 1) * sizeof(cl_uint));
+                context.cl()->writeBuffer(bs_gpu.clmem(), CL_TRUE, (n - 1) * sizeof(cl_uint), sizeof(cl_uint), &total);
+                t.nextLap();
+            }
+            std::cout << "GPU tree: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+            std::cout << "GPU tree: " << n * 1e-6 / t.lapAvg() << " millions/s" << std::endl;
+
+            bs_gpu.readN(result.data(), n);
             for (int i = 0; i < n; ++i) {
                 EXPECT_THE_SAME(reference_result[i], result[i], "GPU result");
             }
