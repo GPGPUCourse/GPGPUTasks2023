@@ -63,27 +63,51 @@ int main(int argc, char **argv) {
         ocl::Kernel bitonic_global(bitonic_kernel, bitonic_kernel_length, "bitonic_global", defines.str());
         bitonic_global.compile();
 
+        timer t;
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
+            as_gpu.writeN(as.data(), n);
+            t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
+            for (cl_uint half_bitonic_len = 1; half_bitonic_len < n; half_bitonic_len *= 2) {
+                for (cl_uint sorted_len = half_bitonic_len; sorted_len > 0; sorted_len /= 2) {
+                    bitonic_global.exec(ws, as_gpu, n, half_bitonic_len, sorted_len);
+                }
+            }
+            t.nextLap();
+        }
+        std::cout << "GPU naive: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU naive: " << n * 1e-6 / t.lapAvg() << " millions/s" << std::endl;
+
+        as_gpu.readN(as.data(), n);
+    }
+
+    {
+        constexpr cl_uint workGroupSize = 64;
+        gpu::WorkSize ws(workGroupSize, (n + 1) / 2);
+        std::ostringstream defines;
+        defines << "-DWORK_GROUP_SIZE=" << workGroupSize;
+
+        ocl::Kernel bitonic_global(bitonic_kernel, bitonic_kernel_length, "bitonic_global", defines.str());
+        ocl::Kernel bitonic_local(bitonic_kernel, bitonic_kernel_length, "bitonic_local", defines.str());
+        bitonic_global.compile();
+        bitonic_local.compile();
 
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
-            for (cl_uint bitonic_len = 1; bitonic_len < n; bitonic_len *= 2) {
-                for (cl_uint sorted_len = bitonic_len; sorted_len > 0; sorted_len /= 2) {
-                    bitonic_global.exec(ws, as_gpu, n, bitonic_len, sorted_len);
+            bitonic_local.exec(ws, as_gpu, n);
+            for (cl_uint half_bitonic_len = workGroupSize; half_bitonic_len < n; half_bitonic_len *= 2) {
+                for (cl_uint sorted_len = half_bitonic_len; sorted_len > 0; sorted_len /= 2) {
+                    bitonic_global.exec(ws, as_gpu, n, half_bitonic_len, sorted_len);
                 }
             }
             t.nextLap();
         }
-        std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "GPU: " << n * 1e-6 / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "GPU local mem: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU local mem: " << n * 1e-6 / t.lapAvg() << " millions/s" << std::endl;
 
         as_gpu.readN(as.data(), n);
     }
-
-    /* for (cl_uint i = 0; i < n; ++i) {
-        std::cerr << "i = " << i << "; cpu = " << cpu_sorted[i] << "; gpu = " << as[i] << '\n';
-    }// */
 
     // Проверяем корректность результатов
     for (int i = 0; i < n; ++i) {
