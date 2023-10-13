@@ -20,8 +20,14 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 
 int main(int argc, char **argv) {
-    int benchmarkingIters = 1;// 10;
-    cl_uint max_n = 4096;// (1 << 24);
+    gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+
+    gpu::Context context;
+    context.init(device.device_id_opencl);
+    context.activate();
+
+    constexpr int benchmarkingIters = 1;// 10;
+    constexpr cl_uint max_n = (1 << 24);
 
     for (cl_uint n = 4096; n <= max_n; n *= 4) {
         std::cout << "______________________________________________" << std::endl;
@@ -75,9 +81,34 @@ int main(int argc, char **argv) {
         }
 
         {
+            constexpr cl_uint workGroupSize = 64;
+            gpu::WorkSize ws(workGroupSize, n);
+
+            ocl::Kernel kernel(prefix_sum_kernel, prefix_sum_kernel_length, "cumsum_global");
+
             gpu::gpu_mem_32u as_gpu;
+            gpu::gpu_mem_32u bs_gpu;
             as_gpu.resizeN(n);
-            // TODO: implement on OpenCL
+            bs_gpu.resizeN(n);
+
+            timer t;
+            for (int iter = 0; iter < benchmarkingIters; ++iter) {
+                as_gpu.writeN(as.data(), n);
+                t.restart();
+                for (int ready_len = 1; ready_len < n; ready_len *= 2) {
+                    kernel.exec(ws, as_gpu, bs_gpu, n, ready_len);
+                    std::swap(as_gpu, bs_gpu);
+                }
+                t.nextLap();
+            }
+            std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+            std::cout << "GPU: " << n * 1e-6 / t.lapAvg() << " millions/s" << std::endl;
+
+            std::vector<cl_uint> result(n);
+            as_gpu.readN(result.data(), n);
+            for (int i = 0; i < n; ++i) {
+                EXPECT_THE_SAME(reference_result[i], result[i], "GPU result");
+            }
         }
     }
 }

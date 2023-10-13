@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
     as_gpu.resizeN(n);
 
     {
-        cl_uint workGroupSize = 64;
+        constexpr cl_uint workGroupSize = 64;
         gpu::WorkSize ws(workGroupSize, (n + 1) / 2);
         std::ostringstream defines;
         defines << "-DWORK_GROUP_SIZE=" << workGroupSize;
