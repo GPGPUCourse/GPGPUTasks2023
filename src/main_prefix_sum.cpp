@@ -26,7 +26,7 @@ int main(int argc, char **argv) {
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 1;
+    int benchmarkingIters = 10;
     unsigned int max_n = (1 << 24);
 
     for (unsigned int n = 4096; n <= max_n; n *= 4) {
