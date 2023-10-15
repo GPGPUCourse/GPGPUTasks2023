@@ -22,7 +22,7 @@ __kernel void merge_small(__global const float* in,
     unsigned int global_block_pair_start = gid / WORK_GROUP_SIZE * WORK_GROUP_SIZE;
     unsigned int llid = lid - block_pair_start;
     unsigned int offset = llid < block_size ? 1 : 0; // внутри варпа offset не меняется при достаточно больших блоках
-    int l = block_pair_start + offset - 1;
+    unsigned int l = block_pair_start + offset - 1;
     unsigned int r = block_size + l;
     while (r - l > 1) {
         unsigned int m = (l + r + 1 - offset) / 2;
@@ -79,10 +79,12 @@ __kernel void calculate_inds(__global const float* in,
             r = m;
         }
     }
-    float a = in[block_pair_start + r - 1];
-    float b = in[block_pair_start + block_size + local_ind_sum - r];
-    if (a < b) {
-        l = r;
+    if (r > l) {
+        float a = in[block_pair_start + r - 1];
+        float b = in[block_pair_start + block_size + local_ind_sum - r];
+        if (a < b) {
+            l = r;
+        }
     }
     out[gid] = block_pair_start + l;
 }
@@ -135,8 +137,10 @@ __kernel void merge_large(__global const float* in,
             r = m;
         }
     }
-    if (buf[r-1] < buf[as + lid - r]) {
-        l = r;
+    if (r > l) {
+        if (buf[r - 1] < buf[as + lid - r]) {
+            l = r;
+        }
     }
     unsigned int k = lid - l;
     if (l == as) {
@@ -161,7 +165,7 @@ __kernel void merge_base(__global const float* in,
     unsigned int llid = gid - block_pair_start;
     unsigned int offset = llid < block_size ? 1 : 0; // внутри варпа offset не меняется при достаточно больших блоках
 
-    int l = block_pair_start + offset - 1;
+    unsigned int l = block_pair_start + offset - 1;
     unsigned int r = block_size + l;
     while (r - l > 1) {
         unsigned int m = (l + r + 1 - offset) / 2;
