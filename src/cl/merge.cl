@@ -24,7 +24,7 @@ __kernel void mergesortPhase(__global const float *from, __global float *to, uns
     to[newBlockBegin + inBlockPosition + left + 1] = this;
 }
 
-#define K 64
+#define K 128
 
 /// \pre blockLength <= K / 2
 __kernel void mergesortPhaseLocal(__global const float *from, __global float *to, unsigned n, int blockLength) {
@@ -55,18 +55,23 @@ __kernel void mergesortPhaseLocal(__global const float *from, __global float *to
     to[index] = localTo[localIndex];
 }
 
-/// \pre blockLength >= K
-/// \pre blockLength % K == 0
-__kernel void mergesortDiagonalPhase(__global const float *from, __global float *to, unsigned n, int blockLength) {
-    int workItemIndex = get_global_id(0);
-    int workItemBegin = workItemIndex * K;
-    int blockIndex = workItemBegin / blockLength;
-    if (blockIndex % 2 == 1)
-        --blockIndex;
-    int blockBegin = blockIndex * blockLength;
-    __global const float *block0 = from + blockBegin;
-    __global const float *block1 = block0 + blockLength;
-    int workItemShift = workItemBegin - blockBegin;
+///------------------
+/// Diagonal method
+///------------------
+
+#define WORK_GROUP_SIZE 64
+
+struct BlocksShift {
+    int shift0;
+    int shift1;
+};
+
+struct BlocksShift getBlocksShift(
+    __global const float *block0,
+    __global const float *block1,
+    int blockLength,
+    int workItemShift
+) {
     int intersectionPoint;
     {
         int left = -1;
@@ -86,19 +91,43 @@ __kernel void mergesortDiagonalPhase(__global const float *from, __global float 
         }
         intersectionPoint = left + 1;
     }
-    //printf("workItem=%d, blockBegin=%d, intersectionPoint=%d\n", workItemIndex, blockBegin, intersectionPoint);
-    int i = intersectionPoint;
-    int j = workItemShift - intersectionPoint;
-    //printf("i=%d j = %d\n", i, j);
+    struct BlocksShift ret = { intersectionPoint, workItemShift - intersectionPoint };
+    return ret;
+}
+
+/// \pre blockLength >= K
+/// \pre blockLength % K == 0
+__kernel void mergesortDiagonalPhase(__global const float *from, __global float *to, unsigned n, int blockLength) {
+    int workItemBegin = get_global_id(0) * K;
+    int blockIndex = workItemBegin / blockLength;
+    if (blockIndex % 2 == 1)
+        --blockIndex;
+    int blockBegin = blockIndex * blockLength;
+    __global const float *block0 = from + blockBegin;
+    __global const float *block1 = block0 + blockLength;
+    
+    int workItemShift = workItemBegin - blockBegin;
+    struct BlocksShift blocksShift = getBlocksShift(block0, block1, blockLength, workItemShift);
+    int i = blocksShift.shift0;
+    int j = blocksShift.shift1;
+
+    __local float local_to[K * WORK_GROUP_SIZE];
+    int localWorkItemIndex = get_local_id(0);
+    int localWorkItemBegin = localWorkItemIndex * K;
     for (int iter = 0; iter < K; ++iter) {
         float a0 = i < blockLength ? block0[i] : 0;
         float a1 = j < blockLength ? block1[j] : 0;
         if (j >= blockLength || i < blockLength && j < blockLength && a0 <= a1) {
-            to[workItemBegin + iter] = a0;
+            local_to[localWorkItemBegin + iter] = a0;
             ++i;
         } else {
-            to[workItemBegin + iter] = a1;
+            local_to[localWorkItemBegin + iter] = a1;
             ++j;
         }
     }
+    barrier(CLK_LOCAL_MEM_FENCE);
+    int groupIndex = get_group_id(0);
+    int groupBegin = groupIndex * WORK_GROUP_SIZE * K;
+    for (int i = 0; i < K; ++i)
+        to[groupBegin + i * WORK_GROUP_SIZE + localWorkItemIndex] = local_to[i * WORK_GROUP_SIZE + localWorkItemIndex];
 }

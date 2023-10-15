@@ -89,11 +89,12 @@ int main(int argc, char **argv) {
         }
     };
     // number of work groups does not really matter
-    testGPU("mergesortPhase", gpu::WorkSize(8, n));
+    testGPU("mergesortPhase", gpu::WorkSize(128, n));
 
     // Task 5.2
     {
-        static constexpr int K = 64;
+        static constexpr int WORK_GROUP_SIZE = 64;
+        static constexpr int K = 128;
         ocl::Kernel mergesortPhaseLocal(merge_kernel, merge_kernel_length, "mergesortPhaseLocal");
         mergesortPhaseLocal.compile();
         ocl::Kernel mergesortDiagonalPhase(merge_kernel, merge_kernel_length, "mergesortDiagonalPhase");
@@ -109,7 +110,7 @@ int main(int argc, char **argv) {
                         mergesortPhaseLocal.exec(gpu::WorkSize(K, n), *from, *to, n, blockLength);
                     } else {
                         // number of work groups does not really matter
-                        mergesortDiagonalPhase.exec(gpu::WorkSize(1, n / K), *from, *to, n, blockLength);
+                        mergesortDiagonalPhase.exec(gpu::WorkSize(WORK_GROUP_SIZE, n / K), *from, *to, n, blockLength);
                     }
                     std::swap(from, to);
                     // {
@@ -131,8 +132,7 @@ int main(int argc, char **argv) {
         as_gpu.readN(as.data(), n);
         // Проверяем корректность результатов
         for (int i = 0; i < n; ++i) {
-            EXPECT_THE_SAME(as[i], cpu_sorted[i],
-                            "GPU Diag results should be equal to CPU results!");
+            EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU Diag results should be equal to CPU results!");
         }
     }
 
