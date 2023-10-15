@@ -22,7 +22,7 @@ __kernel void merge_small(__global const float* in,
     unsigned int global_block_pair_start = gid / WORK_GROUP_SIZE * WORK_GROUP_SIZE;
     unsigned int llid = lid - block_pair_start;
     unsigned int offset = llid < block_size ? 1 : 0; // внутри варпа offset не меняется при достаточно больших блоках
-    unsigned int l = block_pair_start + offset - 1;
+    int l = block_pair_start + offset - 1;
     unsigned int r = block_size + l;
     while (r - l > 1) {
         unsigned int m = (l + r + 1 - offset) / 2;
@@ -165,7 +165,7 @@ __kernel void merge_base(__global const float* in,
     unsigned int llid = gid - block_pair_start;
     unsigned int offset = llid < block_size ? 1 : 0; // внутри варпа offset не меняется при достаточно больших блоках
 
-    unsigned int l = block_pair_start + offset - 1;
+    int l = block_pair_start + offset - 1;
     unsigned int r = block_size + l;
     while (r - l > 1) {
         unsigned int m = (l + r + 1 - offset) / 2;
