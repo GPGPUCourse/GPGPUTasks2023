@@ -1,27 +1,23 @@
 #define max(x, y) x > y ? x : y
 #define min(x, y) x < y ? x : y
 
-__kernel void bitonic(__global float *as, const unsigned len) {
-    unsigned gid = get_global_id(0);
-    unsigned point = len;
-
-    while (point) {
-        gid = get_global_id(0);
-        unsigned decreasing = (2 * gid / len) % 2;
-        gid = (2 * gid) / point * point + gid % (point / 2);
-        point = point / 2;
-        float max = max(as[gid], as[gid + point]);
-        float min = min(as[gid], as[gid + point]);
-        if (decreasing) {
-            as[gid] = max;
-            as[gid + point] = min;
-        } else {
-            as[gid] = min;
-            as[gid + point] = max;
-        }
-
-        point /= 2;
-
-        barrier(CLK_LOCAL_MEM_FENCE);
+__kernel void bitonic(__global float *as, const unsigned window, const unsigned arrow, const unsigned size) {
+    unsigned id = get_global_id(0);
+    unsigned id2x = id << 1;
+    if (id2x >= size) {
+        return;
     }
+    unsigned start = (id2x / window) * window;
+    int decreasing = (id2x / window) % 2;
+    if (id == 1) {
+        printf("\nid: %d\n\ndecreasing: %d\n\n", id2x, decreasing);
+    }
+    unsigned arrow2x = arrow << 1;
+    id = start + id % arrow + (id2x - start) / arrow2x * arrow2x;
+
+    float max = max(as[id], as[id + arrow]);
+    float min = min(as[id], as[id + arrow]);
+
+    as[id] = (decreasing) ? max : min;
+    as[id + arrow] = (decreasing) ? min : max;
 }
