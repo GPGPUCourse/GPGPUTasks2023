@@ -30,8 +30,9 @@ int main(int argc, char **argv) {
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 10;
+    int benchmarkingIters = 1;
     unsigned int n = 32 * 1024 * 1024;
+//    unsigned int n = 1024;
     std::vector<float> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -56,7 +57,7 @@ int main(int argc, char **argv) {
     as_gpu.resizeN(n);
     bs_gpu.resizeN(n);
 
-#define SINGLE_ITEM_WORK 256
+#define WORK_PER_THREAD 2
     {
         ocl::Kernel merge(merge_kernel, merge_kernel_length, "merge_sort");
         merge.compile();
@@ -69,14 +70,22 @@ int main(int argc, char **argv) {
 			for (int sort_size = 1; sort_size <= n / 2; sort_size <<= 1)
 			{
 				merge.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, bs_gpu, n, sort_size);
-				if (sort_size > SINGLE_ITEM_WORK)
+				if (sort_size > WORK_PER_THREAD)
 					std::swap(as_gpu, bs_gpu);
+
+//				as_gpu.readN(as.data(), sort_size * 2);
+//				for (int i = 0; i < sort_size * 2; ++i) {
+//					std::cout << as[i] << " ";
+//					if (i % sort_size == sort_size - 1)
+//						std::cout << ";\n";
+//				}
+//				std::cout << std::endl;
 			}
             t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
-        bs_gpu.readN(as.data(), n);
+		as_gpu.readN(as.data(), n);
     }
     // Проверяем корректность результатов
     for (int i = 0; i < n; ++i) {
