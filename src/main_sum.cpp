@@ -129,7 +129,7 @@ int main(int argc, char **argv)
         unsigned int sum = 0;
         for (int i = 0; i < benchmarkingIters; ++i) {
             sum_buffer.writeN(&sum, 1);
-            kernel.exec(gpu::WorkSize(workGroupSize, global_work_size),
+            kernel.exec(gpu::WorkSize(workGroupSize, global_work_size / 32),
                         as_buffer, n, sum_buffer);
             t.nextLap();
         }
