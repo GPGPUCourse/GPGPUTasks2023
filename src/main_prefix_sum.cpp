@@ -101,5 +101,50 @@ int main(int argc, char **argv) {
                 EXPECT_THE_SAME(reference_result[i], result[i], "CPU result should be consistent!");
             }
         }
+
+        {
+            gpu::gpu_mem_32u as_gpu, bs_gpu;
+            as_gpu.resizeN(n);
+            bs_gpu.resizeN(n);
+
+            ocl::Kernel prefix_sum_up_sweep(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum_up_sweep");
+            ocl::Kernel prefix_sum_down_sweep(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum_down_sweep");
+            ocl::Kernel prefix_sum_shift(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum_shift");
+
+            prefix_sum_up_sweep.compile();
+            prefix_sum_down_sweep.compile();
+            prefix_sum_shift.compile();
+
+            std::vector<unsigned int> result(n);
+            timer t;
+            for (int iter = 0; iter < benchmarkingIters; ++iter) {
+                as_gpu.writeN(as.data(), n);
+                bs_gpu.writeN(std::vector<unsigned>(n, 0).data(), n);
+                t.restart();
+                for (unsigned offset = 1; offset < n; offset *= 2) {
+                    prefix_sum_up_sweep.exec(gpu::WorkSize(128, n), as_gpu, bs_gpu, offset, n);
+                    std::swap(as_gpu, bs_gpu);
+                }
+                unsigned total = 0;
+                as_gpu.readN(&total, 1, n - 1);
+                for (unsigned offset = n / 2; offset > 0; offset /= 2) {
+                    prefix_sum_down_sweep.exec(gpu::WorkSize(128, n), as_gpu, bs_gpu, offset, n);
+                    std::swap(as_gpu, bs_gpu);
+                }
+                prefix_sum_shift.exec(gpu::WorkSize(128, n), as_gpu, bs_gpu, total, n);
+                std::swap(as_gpu, bs_gpu);
+
+                t.nextLap();
+            }
+            std::cout << "GPU (tree): " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+            std::cout << "GPU (tree): " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
+
+            as_gpu.readN(result.data(), n);
+
+            for (int i = 0; i < n; ++i) {
+                EXPECT_THE_SAME(reference_result[i], result[i], "CPU result should be consistent!");
+            }
+            std::cout << std::endl;
+        }
     }
 }
