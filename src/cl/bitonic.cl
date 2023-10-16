@@ -10,11 +10,11 @@ __kernel void bitonic(__global float *as, const unsigned window, const unsigned 
     }
 
     unsigned start = (id2x / window);
-    int decreasing = start % 2;
+    int decreasing = start & 1;
 
     start = start * window;
     unsigned arrow2x = arrow << 1;
-    id = start + id % arrow + (id2x - start) / arrow2x * arrow2x;
+    id = start + (id - id / arrow * arrow) + (id2x - start) / arrow2x * arrow2x;
 
     float max = max(as[id], as[id + arrow]);
     float min = min(as[id], as[id + arrow]);
