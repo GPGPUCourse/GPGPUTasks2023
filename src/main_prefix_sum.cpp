@@ -122,8 +122,7 @@ int main(int argc, char **argv) {
                 bs_gpu.writeN(std::vector<unsigned>(n, 0).data(), n);
                 t.restart();
                 for (unsigned offset = 1; offset < n; offset *= 2) {
-                    prefix_sum_up_sweep.exec(gpu::WorkSize(128, n), as_gpu, bs_gpu, offset, n);
-                    std::swap(as_gpu, bs_gpu);
+                    prefix_sum_up_sweep.exec(gpu::WorkSize(128, n), as_gpu, offset, n);
                 }
                 unsigned total = 0;
                 as_gpu.readN(&total, 1, n - 1);
