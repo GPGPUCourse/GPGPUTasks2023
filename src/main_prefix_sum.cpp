@@ -74,10 +74,8 @@ int main(int argc, char **argv) {
 
         {
             gpu::gpu_mem_32u as_gpu, bs_gpu;
-            as_gpu.resizeN(2 * n);
+            as_gpu.resizeN(n);
             bs_gpu.resizeN(n);
-
-            as.resize(2 * n, 0);
 
             ocl::Kernel prefix_sum(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum_naive");
             prefix_sum.compile();
@@ -85,7 +83,7 @@ int main(int argc, char **argv) {
             std::vector<unsigned int> result(n);
             timer t;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
-                as_gpu.writeN(as.data(), 2 * n);
+                as_gpu.writeN(as.data(), n);
                 bs_gpu.writeN(std::vector<unsigned>(n, 0).data(), n);
                 t.restart();
                 for (unsigned offset = 1; offset < n; offset *= 2) {
