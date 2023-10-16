@@ -20,18 +20,16 @@ __kernel void prefix_sum_up_sweep(__global unsigned *as, const unsigned offset, 
     }
 }
 
-__kernel void prefix_sum_down_sweep(__global unsigned *as, __global unsigned *bs, const unsigned offset,
-                                    const unsigned size) {
+__kernel void prefix_sum_down_sweep(__global unsigned *as, const unsigned offset, const unsigned size) {
     unsigned gid = get_global_id(0);
 
     if (gid >= size)
         return;
 
     if (!((gid + 1) % (offset << 1))) {
-        bs[gid - offset] = as[gid];
-        bs[gid] = as[gid] + as[gid - offset];
-    } else if ((1 + gid) % offset) {
-        bs[gid] = as[gid];
+        unsigned temp = as[gid];
+        as[gid] = temp + as[gid - offset];
+        as[gid - offset] = temp;
     }
 }
 

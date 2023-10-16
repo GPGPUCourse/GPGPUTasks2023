@@ -127,8 +127,7 @@ int main(int argc, char **argv) {
                 unsigned total = 0;
                 as_gpu.readN(&total, 1, n - 1);
                 for (unsigned offset = n / 2; offset > 0; offset /= 2) {
-                    prefix_sum_down_sweep.exec(gpu::WorkSize(128, n), as_gpu, bs_gpu, offset, n);
-                    std::swap(as_gpu, bs_gpu);
+                    prefix_sum_down_sweep.exec(gpu::WorkSize(128, n), as_gpu, offset, n);
                 }
                 prefix_sum_shift.exec(gpu::WorkSize(128, n), as_gpu, bs_gpu, total, n);
                 std::swap(as_gpu, bs_gpu);
