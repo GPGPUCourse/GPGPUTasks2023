@@ -39,6 +39,8 @@ __kernel void prefix_sum_reduce(__global unsigned int *as, int n, int w) {
     } else {
         to = from + 1;
     }
-    as[to] += as[from];
-    as[from] = to_v;
+    if (from < n) {
+        as[to] += as[from];
+        as[from] = to_v;
+    }
 }
