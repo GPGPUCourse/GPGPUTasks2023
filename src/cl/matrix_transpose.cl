@@ -23,7 +23,15 @@ __kernel void matrix_transpose(__global const float *mat, __global float *mat_tr
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    const int ind_tr = (col * nrow) + row;
+    const int local_ind_tr = (local_col * local_ncol) + local_row;
+    
+    const int tile_col_tr = local_ind_tr % TILE_COLS;
+    const int tile_row_tr = local_ind_tr / TILE_COLS;
 
-    mat_tr[ind_tr] = local_mat[tile_row][tile_col];
+    const int base_col = get_group_id(1) * local_nrow;
+    const int base_row = get_group_id(0) * local_ncol;
+
+    const int ind_tr = ((base_row + local_row) * ncol) + (base_col + local_col);
+
+    mat_tr[ind_tr] = local_mat[tile_row_tr][tile_col_tr];
 }
