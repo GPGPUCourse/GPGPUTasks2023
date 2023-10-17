@@ -85,7 +85,7 @@ int main(int argc, char **argv) {
             {
                 ocl::Kernel prefix_sum(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum");
                 prefix_sum.compile();
-                unsigned int workGroupSize = 2;
+                unsigned int workGroupSize = 128;
                 timer t;
                 for (int iter = 0; iter < benchmarkingIters; ++iter) {
                     as_gpu.writeN(bs.data(), n);
