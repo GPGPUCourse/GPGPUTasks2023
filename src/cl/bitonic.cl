@@ -1,7 +1,6 @@
 
 __kernel void bitonic_step(__global float *as, int n, int sort_len, int cmp_dist) {
     int id = get_global_id(0);
-    //TODO use n
     int i;
     {
         int pairs_block_start = id / cmp_dist * cmp_dist;
@@ -17,7 +16,3 @@ __kernel void bitonic_step(__global float *as, int n, int sort_len, int cmp_dist
         as[j] = x;
     }
 }
-
-
-
-
