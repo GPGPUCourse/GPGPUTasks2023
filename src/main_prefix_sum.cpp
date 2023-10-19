@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
     context.activate();
 
 
-    int benchmarkingIters = 10;
+    int benchmarkingIters = 1;
     unsigned int max_n = (1 << 24);
 
     for (unsigned int n = 4096; n <= max_n; n *= 4) {
@@ -82,22 +82,35 @@ int main(int argc, char **argv) {
         }
 
         {
-            gpu::gpu_mem_32u as_gpu;
-            as_gpu.resizeN(n);
-            gpu::gpu_mem_32u result_gpu;
-            result_gpu.resizeN(n);
-
             ocl::Kernel prefix_sum(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum");
             prefix_sum.compile();
-            as_gpu.writeN(as.data(), n);
-            unsigned int global_work_size = 1;
-            unsigned int workGroupSize = 128;
-            {
-                std::vector<unsigned int> result(n);
-                prefix_sum.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, result_gpu, n);
 
-                result_gpu.readN(result.data(), n);
-                for (int i = 0; i < n; ++i) {
+
+            const std::vector<unsigned int> zeros(n, 0);
+			unsigned int workGroupSize = 128;
+            unsigned int global_work_size =
+                    ((n / 2) / workGroupSize + ((n / 2) % workGroupSize > 0 ? 1 : 0)) * workGroupSize;
+            {
+                gpu::gpu_mem_32u as_gpu;
+                as_gpu.resizeN(n);
+            	as_gpu.writeN(as.data(), n);
+
+                gpu::gpu_mem_32u result_gpu;
+                result_gpu.resizeN(n);
+                result_gpu.writeN(zeros.data(), n);
+                
+                for (unsigned int cur_block_size = 1; cur_block_size < n; cur_block_size <<= 1) {
+                    prefix_sum.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, result_gpu, n,
+                                    cur_block_size);
+                }
+
+				std::vector<unsigned int> result(n);
+                
+				as_gpu.readN(result.data(), n);
+
+
+				result_gpu.readN(result.data(), n);
+                for (int i = 0; i < 32; ++i) {
                     EXPECT_THE_SAME(reference_result[i], result[i], "CPU result should be consistent!");
                 }
             }
@@ -105,6 +118,18 @@ int main(int argc, char **argv) {
             std::vector<unsigned int> result(n);
             timer t;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
+				gpu::gpu_mem_32u as_gpu;
+                as_gpu.resizeN(n);
+            	as_gpu.writeN(as.data(), n);
+
+                gpu::gpu_mem_32u result_gpu;
+                result_gpu.resizeN(n);
+                result_gpu.writeN(zeros.data(), n);
+                t.restart();
+                for (unsigned int cur_block_size = 1; cur_block_size < n; cur_block_size <<= 1) {
+                    prefix_sum.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, result_gpu, n,
+                                    cur_block_size);
+                }
                 prefix_sum.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, result_gpu, n);
                 t.nextLap();
             }
