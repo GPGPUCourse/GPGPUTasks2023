@@ -31,7 +31,8 @@ int main(int argc, char **argv) {
     context.activate();
 
     int benchmarkingIters = 10;
-    unsigned int n = 32 * 1024 * 1024;
+    int log2_size_ceil = 25;
+    unsigned int n = (1 << log2_size_ceil);
     std::vector<float> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -65,7 +66,6 @@ int main(int argc, char **argv) {
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
             // TODO
-            int log2_size_ceil = 25;
             int work_size = n >> 1;
             for (int p = 1; p <= log2_size_ceil; ++p)
             {
