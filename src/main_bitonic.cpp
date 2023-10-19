@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
-    /*
+    
     gpu::gpu_mem_32f as_gpu;
     as_gpu.resizeN(n);
 
@@ -65,6 +65,18 @@ int main(int argc, char **argv) {
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
             // TODO
+            int log2_size_ceil = 25;
+            int work_size = n >> 1;
+            for (int p = 1; p <= log2_size_ceil; ++p)
+            {
+                int big_window_size = (1 << p);
+                for (int cur_p = p; cur_p > 0; --cur_p) {
+                    const unsigned int workGroupSize = 128;
+                    int small_window_size = (1 << cur_p);
+                    bitonic.exec(gpu::WorkSize(work_size < workGroupSize ? work_size : workGroupSize, work_size), as_gpu, big_window_size, small_window_size);
+                }
+            }
+            t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
@@ -76,6 +88,6 @@ int main(int argc, char **argv) {
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
-*/
+
     return 0;
 }
