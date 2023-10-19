@@ -62,14 +62,10 @@ int main(int argc, char **argv) {
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
 
-            unsigned int global_work_size = 1;
-            while (global_work_size < n) {
-                global_work_size <<= 1;
-            }
             unsigned int workGroupSize = 128;
+            unsigned int global_work_size =
+                    ((n / 2) / workGroupSize + ((n / 2) % workGroupSize > 0 ? 1 : 0)) * workGroupSize;
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
-            // TODO
-            global_work_size >>= 1;
 
             for (int cur_block_size = 1; cur_block_size < n; cur_block_size <<= 1) {
                 for (int j = cur_block_size; j >= 1; j >>= 1) {
