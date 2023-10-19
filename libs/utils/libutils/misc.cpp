@@ -16,9 +16,9 @@ void gpu::printDeviceInfo(gpu::Device &device)
 	{
 		ocl::DeviceInfo info;
 		info.init(device.device_id_opencl);
-		if (info.device_type == CL_DEVICE_TYPE_GPU) {
+		if (info.device_type & CL_DEVICE_TYPE_GPU) {
 			std::cout << "GPU.";
-		} else if (info.device_type == CL_DEVICE_TYPE_CPU) {
+		} else if (info.device_type & CL_DEVICE_TYPE_CPU) {
 			std::cout << "CPU.";
 		} else {
 			throw std::runtime_error(

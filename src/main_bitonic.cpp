@@ -23,6 +23,14 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 
 
+void run_bitonic(ocl::Kernel &kernel, gpu::WorkSize ws, gpu::gpu_mem_32f &as, int n) {
+    for (int sort_len = 2; sort_len < 2*n; sort_len <<= 1) {
+        for (int cmd_dist = sort_len >> 1; cmd_dist > 0; cmd_dist >>= 1) {
+            kernel.exec(ws, as, n, sort_len, cmd_dist);
+        }
+    }
+}
+
 int main(int argc, char **argv) {
     gpu::Device device = gpu::chooseGPUDevice(argc, argv);
 
@@ -50,32 +58,32 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
-    /*
+
     gpu::gpu_mem_32f as_gpu;
     as_gpu.resizeN(n);
 
     {
-        ocl::Kernel bitonic(bitonic_kernel, bitonic_kernel_length, "bitonic");
+        ocl::Kernel bitonic(bitonic_kernel, bitonic_kernel_length, "bitonic_step");
         bitonic.compile();
 
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
-
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
-
-            // TODO
+            run_bitonic(bitonic, gpu::WorkSize(128, n / 2), as_gpu, n);
+            t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
-
-        as_gpu.readN(as.data(), n);
     }
+
+
+    as_gpu.readN(as.data(), n);
 
     // Проверяем корректность результатов
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
-*/
+
     return 0;
 }
