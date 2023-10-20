@@ -97,6 +97,7 @@ int main(int argc, char **argv)
 			timer t;
 			for (int iter = 0; iter < benchmarkingIters; ++iter) {
 				as_gpu.writeN(as.data(), n);
+				t.restart();
 				unsigned int offset;
 				for (offset = 1; offset * 2 <= n; offset <<= 1) {
 					scan_reduce.exec(gpu::WorkSize(workGroupSize, (n + offset - 1) / offset),
@@ -111,12 +112,12 @@ int main(int argc, char **argv)
 										 n,
 										 offset);
 				}
-				as_gpu.readN(result.data(), n);
 				t.nextLap();
 			}
 			std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
 			std::cout << "GPU: " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
 
+			as_gpu.readN(result.data(), n);
 			for (int i = 0; i < n; ++i) {
 				EXPECT_THE_SAME(reference_result[i], result[i], "GPU result should be consistent!");
 			}
