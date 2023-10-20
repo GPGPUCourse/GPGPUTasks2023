@@ -93,13 +93,13 @@ int main(int argc, char **argv)
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
                 as_gpu.writeN(as.data(), n);
 
-                const unsigned int workGroupSize = std::min<unsigned int>(n, 128);
+                const unsigned int workGroupSize = std::min<unsigned int>(n / 2, 128);
 
                 t.restart();
 
                 unsigned int steps = 1;
                 for (unsigned int mask = 1; mask <= n; mask <<= 1) {
-                    prefix_sum.exec(gpu::WorkSize(workGroupSize, n), as_gpu, mask);
+                    prefix_sum.exec(gpu::WorkSize(workGroupSize, n / 2), as_gpu, mask);
                 }
 
                 t.nextLap();

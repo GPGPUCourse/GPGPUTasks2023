@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
 
-            const unsigned int workGroupSize = std::min<unsigned int>(n, 128);
+            const unsigned int workGroupSize = std::min<unsigned int>(n / 2, 128);
 
             t.restart();
 
