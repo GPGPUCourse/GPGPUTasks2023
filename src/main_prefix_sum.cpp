@@ -97,8 +97,7 @@ int main(int argc, char **argv)
 
                 t.restart();
 
-                unsigned int steps = 1;
-                for (unsigned int mask = 1; mask <= n; mask <<= 1) {
+                for (unsigned int mask = 1; mask < n; mask <<= 1) {
                     prefix_sum.exec(gpu::WorkSize(workGroupSize, n / 2), as_gpu, mask);
                 }
 
