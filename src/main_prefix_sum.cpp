@@ -7,6 +7,7 @@
 // Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
 #include "cl/prefix_sum_cl.h"
 
+#define WORK_GROUP_SIZE 128
 
 template<typename T>
 void raiseFail(const T &a, const T &b, std::string message, std::string filename, int line)
@@ -22,6 +23,20 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 int main(int argc, char **argv)
 {
+	gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+
+	gpu::Context context;
+	context.init(device.device_id_opencl);
+	context.activate();
+
+	ocl::Kernel scan_reduce(prefix_sum_kernel, prefix_sum_kernel_length, "scan_reduce");
+	ocl::Kernel scan_down_sweep(prefix_sum_kernel, prefix_sum_kernel_length, "scan_down_sweep");
+	scan_reduce.compile();
+	scan_down_sweep.compile();
+
+	gpu::gpu_mem_32u as_gpu;
+	unsigned int workGroupSize = WORK_GROUP_SIZE;
+
 	int benchmarkingIters = 10;
 	unsigned int max_n = (1 << 24);
 
@@ -77,7 +92,34 @@ int main(int argc, char **argv)
 		}
 
 		{
-			// TODO: implement on OpenCL
+			as_gpu.resizeN(n);
+			std::vector<unsigned int> result(n);
+			timer t;
+			for (int iter = 0; iter < benchmarkingIters; ++iter) {
+				as_gpu.writeN(as.data(), n);
+				unsigned int offset;
+				for (offset = 1; offset * 2 <= n; offset <<= 1) {
+					scan_reduce.exec(gpu::WorkSize(workGroupSize, (n + offset - 1) / offset),
+									 as_gpu,
+									 n,
+									 offset);
+				}
+
+				for (offset = offset >> 1; offset >= 1; offset >>= 1) {
+					scan_down_sweep.exec(gpu::WorkSize(workGroupSize, (n + offset - 1) / offset),
+										 as_gpu,
+										 n,
+										 offset);
+				}
+				as_gpu.readN(result.data(), n);
+				t.nextLap();
+			}
+			std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+			std::cout << "GPU: " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
+
+			for (int i = 0; i < n; ++i) {
+				EXPECT_THE_SAME(reference_result[i], result[i], "GPU result should be consistent!");
+			}
 		}
 	}
 }
