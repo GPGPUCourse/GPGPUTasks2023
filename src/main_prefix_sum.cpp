@@ -22,6 +22,11 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 int main(int argc, char **argv)
 {
+	gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+    gpu::Context context;
+    context.init(device.device_id_opencl);
+    context.activate();
+
 	int benchmarkingIters = 10;
 	unsigned int max_n = (1 << 24);
 
@@ -77,7 +82,43 @@ int main(int argc, char **argv)
 		}
 
 		{
-			// TODO: implement on OpenCL
+			std::vector<unsigned int> res(n, 0);
+			gpu::gpu_mem_32u as_gpu, res_gpu;
+			as_gpu.resizeN(n);
+			res_gpu.resizeN(n);
+
+			ocl::Kernel compress(prefix_sum_kernel, prefix_sum_kernel_length, "compress");
+			compress.compile();
+			ocl::Kernel prefix_sum(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum");
+			prefix_sum.compile();
+
+			unsigned int work_group_size = 128;
+			unsigned int global_work_size = (n + work_group_size - 1) / work_group_size * work_group_size;
+
+			timer t;
+			for (int iter = 0; iter < benchmarkingIters; ++iter) {
+				res_gpu.writeN(res.data(), n);
+				as_gpu.writeN(as.data(), n);
+
+				t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
+
+				unsigned m = n, depth = 0, compress_coef = 2;
+				for (; m > 0; m /= 2, ++depth, compress_coef *= 2) {
+					prefix_sum.exec(gpu::WorkSize(work_group_size, global_work_size), as_gpu, res_gpu, n, depth, compress_coef);
+					// compress_coef *= 2;
+					compress.exec(gpu::WorkSize(work_group_size, global_work_size), as_gpu, n, compress_coef);
+				}
+				t.nextLap();
+			}
+			std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+			std::cout << "GPU: " << (static_cast<float>(n) / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+
+			res_gpu.readN(res.data(), n);
+
+			// Проверяем корректность результатов
+			for (int i = 0; i < n; ++i) {
+				EXPECT_THE_SAME(res[i], reference_result[i], "GPU results should be equal to CPU results!");
+			}
 		}
 	}
 }
