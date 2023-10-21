@@ -32,6 +32,9 @@ int main(int argc, char **argv) {
 
     int benchmarkingIters = 10;
     unsigned int n = 32 * 1024 * 1024;
+//    int benchmarkingIters = 1;
+//    unsigned int n = 128;
+
     std::vector<float> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -48,9 +51,8 @@ int main(int argc, char **argv) {
             t.nextLap();
         }
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "CPU: " << (n / 1000.0 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
-    /*
     gpu::gpu_mem_32f as_gpu;
     as_gpu.resizeN(n);
 
@@ -64,10 +66,18 @@ int main(int argc, char **argv) {
 
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
-            // TODO
+
+            for (unsigned sortingBlockSize = 2; sortingBlockSize <= n; sortingBlockSize <<= 1) {
+                for (unsigned swapBlockSize = sortingBlockSize; swapBlockSize > 1; swapBlockSize >>= 1) {
+//                    printf("Start layer: sortingBlockSize=%d, swapBlockSize=%d\n", sortingBlockSize, swapBlockSize);
+                    bitonic.exec(gpu::WorkSize(128, (n + 1) / 2), as_gpu, n, sortingBlockSize, swapBlockSize);
+//                    printf("Finish layer\n");
+                }
+            }
+            t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "GPU: " << (n / 1000.0 / 1000) / t.lapAvg() << " millions/s" << std::endl;
 
         as_gpu.readN(as.data(), n);
     }
@@ -76,6 +86,5 @@ int main(int argc, char **argv) {
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
-*/
     return 0;
 }
