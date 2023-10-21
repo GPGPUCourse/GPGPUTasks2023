@@ -1,6 +1,7 @@
 #define _uint unsigned int
 #define CHECK_BIT(var, pos) ((var) & (1 << (pos)))
 #define MAX_NUM_OFSIZE(n) ((1 << (n + 1)) - 1)
+#define BITWISE_AND(lhs, rhs) ((lhs) & (rhs))
 
 __kernel void prefix_sum_reduce(__global _uint *reduce_lst, const int power) {
     const int gid = get_global_id(0);
@@ -20,6 +21,6 @@ __kernel void prefix_sum_write(__global _uint *reduce_lst, __global _uint *resul
     const int gid_from_one = gid + 1;
     const bool need_this_power = CHECK_BIT(gid_from_one, power);
     const int max_num = MAX_NUM_OFSIZE(power);
-    const int needed_ind = gid_from_one - (max_num & gid_from_one);
+    const int needed_ind = gid_from_one - BITWISE_AND(max_num, gid_from_one);
     result[gid] += need_this_power ? reduce_lst[needed_ind] : 0;
 }
