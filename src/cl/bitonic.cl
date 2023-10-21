@@ -2,12 +2,6 @@
 #include <libgpu/opencl/cl/clion_defines.cl>
 #endif
 
-void swap(float* a, float* b) {
-    float tmp = *a;
-    *a = *b;
-    *b = tmp;
-}
-
 __kernel void bitonic(__global float *as, int K, int local_k) {
     int gid = get_global_id(0);
     int r_id = gid / local_k;
@@ -15,6 +9,8 @@ __kernel void bitonic(__global float *as, int K, int local_k) {
     int idx = 2 * local_k * r_id + rl_id;
     bool is_left = (gid / K) % 2 == 0 ? as[idx + local_k] < as[idx] : as[idx + local_k] > as[idx];
     if (is_left) {
-        swap(&as[idx], &as[idx + local_k]);
+        float tmp = as[idx];
+        as[idx] = as[idx + local_k];
+        as[idx + local_k] = tmp;
     }
 }
