@@ -22,6 +22,12 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 int main(int argc, char **argv)
 {
+    gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+
+    gpu::Context context;
+    context.init(device.device_id_opencl);
+    context.activate();
+
 	int benchmarkingIters = 10;
 	unsigned int max_n = (1 << 24);
 
@@ -77,7 +83,40 @@ int main(int argc, char **argv)
 		}
 
 		{
-			// TODO: implement on OpenCL
+            gpu::gpu_mem_32u sparse_in, sparse_out;
+            sparse_in.resizeN(n);
+            sparse_out.resizeN(n);
+
+            gpu::gpu_mem_32u res_gpu;
+            res_gpu.resizeN(n);
+
+            ocl::Kernel prefix_sum_sparse(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum_sparse");
+            ocl::Kernel prefix_sum_supplement(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum_supplement");
+
+            timer t;
+            unsigned int workGroupSize = 128;
+            unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
+            auto work_size = gpu::WorkSize(workGroupSize, global_work_size);
+
+            for (int iter = 0; iter < benchmarkingIters; ++iter) {
+                sparse_in.writeN(as.data(), n);
+                t.restart();
+                for (int sz = 1; sz <= n; sz *= 2) {
+                    prefix_sum_supplement.exec(work_size, sparse_in, res_gpu, sz);
+                    prefix_sum_sparse.exec(work_size, sparse_in, sparse_out,  sz,n);
+                    sparse_in.swap(sparse_out);
+                }
+                t.nextLap();
+            }
+
+            std::vector<unsigned> result(n);
+            res_gpu.readN(result.data(), n);
+            for (int i = 0; i < n; ++i) {
+                EXPECT_THE_SAME(reference_result[i], result[i], "GPU result should be consistent!");
+            }
+
+            std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+            std::cout << "GPU: " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
 		}
 	}
 }
