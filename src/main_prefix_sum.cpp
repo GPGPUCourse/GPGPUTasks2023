@@ -22,6 +22,12 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 int main(int argc, char **argv)
 {
+    gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+
+    gpu::Context context;
+    context.init(device.device_id_opencl);
+    context.activate();
+
 	int benchmarkingIters = 10;
 	unsigned int max_n = (1 << 24);
 
@@ -77,7 +83,36 @@ int main(int argc, char **argv)
 		}
 
 		{
-			// TODO: implement on OpenCL
+            gpu::gpu_mem_32u as_gpu, res_gpu;
+            as_gpu.resizeN(n);
+            res_gpu.resizeN(n);
+
+            ocl::Kernel prefix_sum(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum");
+            prefix_sum.compile();
+
+            timer t;
+            for (int iter = 0; iter < benchmarkingIters; ++iter) {
+                as_gpu.writeN(as.data(), n);
+
+                unsigned int workGroupSize = 128;
+                unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
+                t.restart();
+
+                for (unsigned int k = 1; k < n; k <<= 1) {
+                    prefix_sum.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, res_gpu, k);
+                    as_gpu.swap(res_gpu);
+                }
+                t.nextLap();
+            }
+            std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+            std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+
+            as_gpu.readN(as.data(), n);
+
+            // Проверяем корректность результатов
+            for (int i = 0; i < n; ++i) {
+                EXPECT_THE_SAME(as[i], reference_result[i], "GPU results should be equal to CPU results!");
+            }
 		}
 	}
 }
