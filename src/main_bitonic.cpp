@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
 
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
-            unsigned int n_log = 33 - __builtin_clz(n - 1);
+            unsigned int n_log = 32 - __builtin_clz(n - 1);
             unsigned int workgroup_size = 32;
             for (unsigned int k_log = 1; k_log <= n_log; k_log++) {
                 for (unsigned int step = k_log; step >= 1; step--) {
