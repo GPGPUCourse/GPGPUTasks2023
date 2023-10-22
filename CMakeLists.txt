@@ -21,7 +21,8 @@ endif()
 # Обратите внимание что это происходит на этапе компиляции, кроме того необходимо чтобы файл src/cl/aplusb_cl.h был перечислен среди исходников для компиляции при вызове add_executable
 
 convertIntoHeader(src/cl/bitonic.cl src/cl/bitonic_cl.h bitonic_kernel)
-add_executable(bitonic src/main_bitonic.cpp src/cl/bitonic_cl.h)
+add_executable(bitonic src/main_bitonic.cpp src/cl/bitonic_cl.h
+        src/cl/bitonic.cl)
 target_link_libraries(bitonic libclew libgpu libutils)
 
 convertIntoHeader(src/cl/prefix_sum.cl src/cl/prefix_sum_cl.h prefix_sum_kernel)
