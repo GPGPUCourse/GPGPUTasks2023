@@ -61,10 +61,16 @@ int main(int argc, char **argv) {
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
+            t.restart();
+            for (int target_size = 1; target_size <= n / 2; target_size *= 2) {
+                for (int current_size = target_size; current_size >= 1; current_size /= 2) {
+                    bitonic.exec(gpu::WorkSize(128, n / 2), as_gpu, current_size, target_size);
+                }
+            }
 
-            t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
+            // Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
-            // TODO
+            t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
