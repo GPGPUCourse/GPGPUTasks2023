@@ -22,6 +22,11 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 int main(int argc, char **argv)
 {
+    gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+    gpu::Context context;
+    context.init(device.device_id_opencl);
+    context.activate();
+
 	int benchmarkingIters = 10;
 	unsigned int max_n = (1 << 24);
 
@@ -78,6 +83,44 @@ int main(int argc, char **argv)
 
 		{
 			// TODO: implement on OpenCL
-		}
+            std::vector<unsigned int> answer(n, 0);
+            gpu::gpu_mem_32u as_gpu, answer_gpu;
+            as_gpu.resizeN(n);
+            answer_gpu.resizeN(n);
+
+            {
+                ocl::Kernel reduce(prefix_sum_kernel, prefix_sum_kernel_length, "Reduce");
+                ocl::Kernel summarize(prefix_sum_kernel, prefix_sum_kernel_length, "Summarize");
+                reduce.compile();
+                summarize.compile();
+
+                timer t;
+                for (int iter = 0; iter < benchmarkingIters; ++iter) {
+                    as_gpu.writeN(as.data(), n);
+                    answer_gpu.writeN(answer.data(), n);
+                    unsigned int work_group_size = 64;
+                    unsigned int global_work_size_add = n / 2;
+                    gpu::WorkSize work_size_add = gpu::WorkSize(work_group_size, global_work_size_add);
+                    t.restart();
+                    unsigned int block_size = 1;
+                    while (block_size < n){
+                        summarize.exec(work_size_add, as_gpu, answer_gpu, block_size);
+                        reduce.exec(gpu::WorkSize(work_group_size, n / (2 * block_size)), as_gpu, block_size, n);
+                        block_size *= 2;
+                    }
+                    t.nextLap();
+                }
+                std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+                std::cout << "GPU: " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
+
+                answer_gpu.readN(answer.data(), n-1);
+                as_gpu.readN(&answer[n-1], 1, n-1);
+            }
+
+            // Проверяем корректность результатов
+            for (int i = 0; i < n; ++i) {
+                EXPECT_THE_SAME(answer[i], reference_result[i], "GPU results should be equal to CPU results!");
+            }
+            }
 	}
 }
