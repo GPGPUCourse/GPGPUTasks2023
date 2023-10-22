@@ -25,6 +25,11 @@ int main(int argc, char **argv)
 	int benchmarkingIters = 10;
 	unsigned int max_n = (1 << 24);
 
+    gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+    gpu::Context context;
+    context.init(device.device_id_opencl);
+    context.activate();
+
 	for (unsigned int n = 4096; n <= max_n; n *= 4) {
 		std::cout << "______________________________________________" << std::endl;
 		unsigned int values_range = std::min<unsigned int>(1023, std::numeric_limits<int>::max() / n);
@@ -77,7 +82,44 @@ int main(int argc, char **argv)
 		}
 
 		{
-			// TODO: implement on OpenCL
-		}
-	}
+        // TODO: implement on OpenCL
+        gpu::gpu_mem_32u as_gpu;
+        as_gpu.resizeN(n);
+        as_gpu.writeN(as.data(), n);
+
+        ocl::Kernel prefix(prefix_sum_kernel, prefix_sum_kernel_length, "prefix");
+        ocl::Kernel reduce(prefix_sum_kernel, prefix_sum_kernel_length, "reduce");
+        prefix.compile();
+        reduce.compile();
+
+        std::vector<unsigned int> result(n, 0);
+        gpu::gpu_mem_32u result_gpu;
+        result_gpu.resizeN(n);
+        result_gpu.writeN(result.data(), n);
+
+        for (unsigned k = 0; (1u << k) <= n; ++k) {
+            reduce.exec(gpu::WorkSize(256, n), as_gpu, k);
+            prefix.exec(gpu::WorkSize(256, n), as_gpu, result_gpu, k);
+        }
+        result_gpu.readN(result.data(), n);
+        for (int i = 0; i < n; ++i) {
+            EXPECT_THE_SAME(reference_result[i], result[i], "GPU result should be equal to CPU!");
+        }
+
+        timer t;
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
+            as_gpu.writeN(as.data(), n);
+
+            t.restart();
+            for (unsigned k = 0; (1u << k) <= n; ++k) {
+                reduce.exec(gpu::WorkSize(256, n), as_gpu, k);
+                prefix.exec(gpu::WorkSize(256, n), as_gpu, result_gpu, k);
+            }
+            t.nextLap();
+        }
+        std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU: " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
+
+        }
+    }
 }
