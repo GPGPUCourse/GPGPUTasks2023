@@ -64,7 +64,7 @@ int main(int argc, char **argv) {
 
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
-            gpu::WorkSize workGroupSize(16, n / 2);
+            gpu::WorkSize workGroupSize(256, n / 2);
 
             for (int blockSize = 2; blockSize <= n; blockSize <<= 1) {
                 for (int partialSize = blockSize; partialSize > 1; partialSize >>= 1) {
