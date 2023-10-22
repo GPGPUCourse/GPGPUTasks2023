@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
 
                     for (int size = 1; size <= n; size *= 2) {
                         if (size != 1)
-                            calculate_parts.exec(gpu::WorkSize(128, n / size), part_sums_gpu, size);
+                            calculate_parts.exec(gpu::WorkSize(std::min(128u, n / size), n / size), part_sums_gpu, size);
                         calculate_prefix_sums.exec(gpu::WorkSize(128, n), result_gpu, part_sums_gpu, size);
                     }
 
