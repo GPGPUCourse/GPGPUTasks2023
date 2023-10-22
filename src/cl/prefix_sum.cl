@@ -1,12 +1,14 @@
 __kernel void prefix_sum_up(__global unsigned int *as, unsigned int n, unsigned int d) {
     unsigned int gid = get_global_id(0);
     unsigned int k = (gid << (d + 1));
+    if (k + (1 << (d + 1)) - 1 >= n) return;
     as[k + (1 << (d + 1)) - 1] += as[k + (1 << d) - 1];
 }
 
 __kernel void prefix_sum_down(__global unsigned int *as, unsigned int n, unsigned int d) {
     unsigned int gid = get_global_id(0);
     unsigned int k = (gid << (d + 1));
+    if (k + (1 << (d + 1)) - 1 >= n) return;
     unsigned int tmp = as[k + (1 << d) - 1];
     as[k + (1 << d) - 1] = as[k + (1 << (d + 1)) - 1];
     as[k + (1 << (d + 1)) - 1] += tmp;

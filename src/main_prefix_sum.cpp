@@ -110,12 +110,12 @@ int main(int argc, char **argv)
 				unsigned int log_n = 32 - __builtin_clz(n - 1);
 
 				for (int d = 0; d < log_n; d++) {
-					prefix_sum_up.exec(gpu::WorkSize(workgroup_size, gpu::divup(n / (1 << (d + 1)), workgroup_size) * workgroup_size),
+					prefix_sum_up.exec(gpu::WorkSize(workgroup_size, gpu::divup(n / (1 << d), workgroup_size) * workgroup_size),
 						as_gpu, n, d);
 				}
 				set_0_as_zero.exec(gpu::WorkSize(workgroup_size, 1), as_gpu, n);
 				for (int d = log_n - 1; d >= 0; d--) {
-					prefix_sum_down.exec(gpu::WorkSize(workgroup_size, gpu::divup(n / (1 << (d + 1)), workgroup_size) * workgroup_size),
+					prefix_sum_down.exec(gpu::WorkSize(workgroup_size, gpu::divup(n / (1 << d), workgroup_size) * workgroup_size),
 						as_gpu, n, d);
 				}
 				shift.exec(gpu::WorkSize(workgroup_size, gpu::divup(n, workgroup_size) * workgroup_size),
