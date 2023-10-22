@@ -107,8 +107,8 @@ int main(int argc, char **argv) {
     const std::vector<float> cs_cpu_reference = cs;
 
     unsigned int const global_work_size = 128;
-    unsigned int const global_x = 32;
-    unsigned int const global_y = 32;
+    unsigned int const global_x = 16;
+    unsigned int const global_y = 16;
     unsigned int const threads = 8;
 
     calc_gpu("matrix_multiplication_naive", as, bs, cs, cs_cpu_reference,
@@ -118,7 +118,7 @@ int main(int argc, char **argv) {
              gpu::WorkSize(global_x, global_y, N, M));
 
     calc_gpu("matrix_multiplication_more_work_per_thread", as, bs, cs, cs_cpu_reference,
-             gpu::WorkSize(global_x, global_work_size / global_x, N, M / threads));
+             gpu::WorkSize(global_x, global_y / threads, N, M / threads));
 
 
     return 0;

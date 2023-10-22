@@ -15,7 +15,7 @@ __kernel void matrix_multiplication_naive(
     cs[x * N + y] = sum;
 }
 
-#define WORK_GROUP_SIZE 32
+#define WORK_GROUP_SIZE 16
 
 __kernel void matrix_multiplication_local_mem(
     __global float const *as, 
@@ -32,8 +32,6 @@ __kernel void matrix_multiplication_local_mem(
 
     __local float tileA[WORK_GROUP_SIZE * WORK_GROUP_SIZE];
     __local float tileB[WORK_GROUP_SIZE * WORK_GROUP_SIZE];
-
-    barrier(CLK_LOCAL_MEM_FENCE);
 
     unsigned int Ax = 0;
     unsigned int Bx = 0;
