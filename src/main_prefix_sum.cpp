@@ -29,9 +29,18 @@ int main(int argc, char **argv)
 	context.init(device.device_id_opencl);
 	context.activate();
 
-	ocl::Kernel prefix_sum(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum");
-	prefix_sum.compile();
+	ocl::Kernel prefix_sum_up(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum_up");
+	prefix_sum_up.compile();
 	
+	ocl::Kernel prefix_sum_down(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum_down");
+	prefix_sum_down.compile();
+
+	ocl::Kernel shift(prefix_sum_kernel, prefix_sum_kernel_length, "shift");
+	shift.compile();
+
+	ocl::Kernel set_0_as_zero(prefix_sum_kernel, prefix_sum_kernel_length, "set_0_as_zero");
+	set_0_as_zero.compile();
+
 	int benchmarkingIters = 10;
 	unsigned int max_n = (1 << 24);
 
@@ -87,8 +96,9 @@ int main(int argc, char **argv)
 		}
 
 		{
-			gpu::gpu_mem_32u as_gpu;
+			gpu::gpu_mem_32u as_gpu, bs_gpu;
 			as_gpu.resizeN(n);
+			bs_gpu.resizeN(n);
 
 			timer t;
 			for (int iter = 0; iter < benchmarkingIters; ++iter) {
@@ -97,19 +107,32 @@ int main(int argc, char **argv)
 				t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
 				unsigned int workgroup_size = 32;
-				for (unsigned int d = 0; (1 << d) < n; d++) {
-					prefix_sum.exec(gpu::WorkSize(workgroup_size, gpu::divup(n - (1 << d), workgroup_size) * workgroup_size),
+				unsigned int log_n = 32 - __builtin_clz(n - 1);
+
+				for (int d = 0; d < log_n; d++) {
+					prefix_sum_up.exec(gpu::WorkSize(workgroup_size, gpu::divup(n / (1 << (d + 1)), workgroup_size) * workgroup_size),
 						as_gpu, n, d);
 				}
+				set_0_as_zero.exec(gpu::WorkSize(workgroup_size, 1), as_gpu, n);
+				for (int d = log_n - 1; d >= 0; d--) {
+					prefix_sum_down.exec(gpu::WorkSize(workgroup_size, gpu::divup(n / (1 << (d + 1)), workgroup_size) * workgroup_size),
+						as_gpu, n, d);
+				}
+				shift.exec(gpu::WorkSize(workgroup_size, gpu::divup(n, workgroup_size) * workgroup_size),
+					as_gpu, bs_gpu, n);
 
 				t.nextLap();
 			}
 			std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
 			std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
 
-			as_gpu.readN(as.data(), n);
+			std::vector<unsigned int> result(n);
+			bs_gpu.readN(result.data(), n);
+			result[n - 1] = result[n - 2] + as[n - 1];
 
-			
+			for (int i = 0; i < n; ++i) {
+				EXPECT_THE_SAME(reference_result[i], result[i], "CPU result should be consistent!");
+			}
 		}
 	}
 }
