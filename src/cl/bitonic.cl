@@ -15,6 +15,7 @@ __kernel void bitonic(__global float *as, const unsigned k, const unsigned n) {
             as[start] = as[start + n];
             as[start + n] = temp;
         }
+
     } else if (idx_i % 2 == 1) {
         float temp = as[start];
         as[start] = as[start + n];
