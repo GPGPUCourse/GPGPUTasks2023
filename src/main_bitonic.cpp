@@ -50,21 +50,47 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
-    /*
     gpu::gpu_mem_32f as_gpu;
     as_gpu.resizeN(n);
 
     {
         ocl::Kernel bitonic(bitonic_kernel, bitonic_kernel_length, "bitonic");
         bitonic.compile();
+        ocl::Kernel bitonic_local(bitonic_kernel, bitonic_kernel_length, "bitonic_local");
+        bitonic_local.compile();
 
         timer t;
+        unsigned int wg_size = 128;
+        unsigned int grid_size = (n + wg_size - 1) / wg_size * wg_size;
+
+        // Ищем наименьшую степень двойки, большую нашего n
+        unsigned int max_size = 2;
+        while (max_size < n) max_size <<= 1;
+
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
 
-            t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
+            t.restart();
 
-            // TODO
+            // Начинаем с сортировки подмассивов длины 2
+            unsigned int size = 2;
+
+            while (size <= max_size) {
+                // Размер части массива одного "тона"
+                unsigned int batch_size = size >> 1;
+
+                // Обработка больших кусков
+                while (2 * batch_size > wg_size) {
+                    bitonic.exec(gpu::WorkSize(wg_size, grid_size), as_gpu, batch_size, size, n);
+                    batch_size >>= 1;
+                }
+
+                // Локальная обработка
+                bitonic_local.exec(gpu::WorkSize(wg_size, grid_size), as_gpu, batch_size, size, n);
+                size <<= 1;
+            }
+
+            t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
@@ -76,6 +102,5 @@ int main(int argc, char **argv) {
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
-*/
     return 0;
 }
