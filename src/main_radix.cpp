@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
         radix_sort.compile();
 
         timer t;
-        for (int iter = 0; iter < 1; ++iter) {
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
             bs_gpu.writeN(zeros.data(), n);
 
