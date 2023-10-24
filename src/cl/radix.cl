@@ -57,13 +57,13 @@ __kernel void fill_zero(__global unsigned *as, const unsigned size) {
 }
 
 __kernel void shift(__global const unsigned *as, __global unsigned *bs, const unsigned size) {
-    unsigned gid = get_global_id(0), ngid = gid + 1;
+    int gid = get_global_id(0);
 
-    if (ngid > size) {
+    if (gid >= size) {
         return;
     }
 
-    bs[ngid == size ? 0 : ngid] = ngid == size ? 0 : as[gid];
+    bs[gid] = gid > 0 ? as[gid - 1] : 0;
 }
 
 __kernel void radix(__global const unsigned int *as, __global unsigned int *bs, __global const unsigned int *offsets,
