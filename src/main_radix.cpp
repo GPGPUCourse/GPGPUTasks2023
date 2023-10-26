@@ -281,5 +281,27 @@ int main(int argc, char **argv) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
 
+    {
+        auto as_gpu = get_mem(n);
+        MergeSort merge_sort;
+        
+        timer t;
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
+            as_gpu.writeN(as.data(), n);
+
+            t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
+            merge_sort(as_gpu, n, 0, sizeof(uint)*8);
+            t.nextLap();
+        }
+        std::cout << "GPU (merge): " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU (merge): " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+
+        as_gpu.readN(as.data(), n);
+    }
+    // Проверяем корректность результатов
+    for (int i = 0; i < n; ++i) {
+        EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
+    }
+
     return 0;
 }
