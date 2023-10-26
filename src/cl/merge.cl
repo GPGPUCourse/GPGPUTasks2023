@@ -1,4 +1,4 @@
-__kernel void mergesortPhase(__global const float *from, __global float *to, unsigned n, int blockLength) {
+__kernel void mergesortPhase(__global const unsigned *from, __global unsigned *to, unsigned n, int blockLength) {
     int index = get_global_id(0);
     if (index >= n)
         return;
@@ -6,15 +6,15 @@ __kernel void mergesortPhase(__global const float *from, __global float *to, uns
     int blockBegin = blockIndex * blockLength;
     int blockSide = blockIndex % 2;
     int inBlockPosition = index % blockLength;
-    __global const float *block = from + blockBegin;
-    float this = block[inBlockPosition];
+    __global const unsigned *block = from + blockBegin;
+    unsigned this = block[inBlockPosition];
     int otherBlockBegin = blockBegin + (blockSide == 0 ? +blockLength : -blockLength);
-    __global const float *otherBlock = from + otherBlockBegin;
+    __global const unsigned *otherBlock = from + otherBlockBegin;
     int left = -1;
     int right = blockLength;
     while (right - left > 1) {
         int mid = (left + right) / 2;
-        float other = otherBlock[mid];
+        unsigned other = otherBlock[mid];
         if (other < this || other == this && blockSide)
             left = mid;
         else
@@ -27,11 +27,11 @@ __kernel void mergesortPhase(__global const float *from, __global float *to, uns
 #define K 128
 
 /// \pre blockLength <= K / 2
-__kernel void mergesortPhaseLocal(__global const float *from, __global float *to, unsigned n, int blockLength) {
-    __local float localFrom[K];
+__kernel void mergesortPhaseLocal(__global const unsigned *from, __global unsigned *to, unsigned n, int blockLength) {
+    __local unsigned localFrom[K];
     int index = get_global_id(0);
     int localIndex = get_local_id(0);
-    float this = from[index];
+    unsigned this = from[index];
     localFrom[localIndex] = this;
     barrier(CLK_LOCAL_MEM_FENCE);
     int blockIndex = localIndex / blockLength;
@@ -42,13 +42,13 @@ __kernel void mergesortPhaseLocal(__global const float *from, __global float *to
     int right = blockLength;
     while (right - left > 1) {
         int mid = (left + right) / 2;
-        float other = localFrom[otherBlockBegin + mid];
+        unsigned other = localFrom[otherBlockBegin + mid];
         if (other < this || other == this && blockSide)
             left = mid;
         else
             right = mid;
     }
-    __local float localTo[K];
+    __local unsigned localTo[K];
     int newBlockBegin = (blockSide == 0 ? blockBegin : otherBlockBegin);
     localTo[newBlockBegin + localIndex % blockLength + left + 1] = this;
     barrier(CLK_LOCAL_MEM_FENCE);
@@ -67,8 +67,8 @@ struct BlocksShift {
 };
 
 struct BlocksShift getBlocksShift(
-    __global const float *block0,
-    __global const float *block1,
+    __global const unsigned *block0,
+    __global const unsigned *block1,
     int blockLength,
     int workItemShift
 ) {
@@ -97,26 +97,26 @@ struct BlocksShift getBlocksShift(
 
 /// \pre blockLength >= K
 /// \pre blockLength % K == 0
-__kernel void mergesortDiagonalPhase(__global const float *from, __global float *to, unsigned n, int blockLength) {
+__kernel void mergesortDiagonalPhase(__global const unsigned *from, __global unsigned *to, unsigned n, int blockLength) {
     int workItemBegin = get_global_id(0) * K;
     int blockIndex = workItemBegin / blockLength;
     if (blockIndex % 2 == 1)
         --blockIndex;
     int blockBegin = blockIndex * blockLength;
-    __global const float *block0 = from + blockBegin;
-    __global const float *block1 = block0 + blockLength;
+    __global const unsigned *block0 = from + blockBegin;
+    __global const unsigned *block1 = block0 + blockLength;
     
     int workItemShift = workItemBegin - blockBegin;
     struct BlocksShift blocksShift = getBlocksShift(block0, block1, blockLength, workItemShift);
     int i = blocksShift.shift0;
     int j = blocksShift.shift1;
 
-    __local float local_to[K * WORK_GROUP_SIZE];
+    __local unsigned local_to[K * WORK_GROUP_SIZE];
     int localWorkItemIndex = get_local_id(0);
     int localWorkItemBegin = localWorkItemIndex * K;
     for (int iter = 0; iter < K; ++iter) {
-        float a0 = i < blockLength ? block0[i] : 0;
-        float a1 = j < blockLength ? block1[j] : 0;
+        unsigned a0 = i < blockLength ? block0[i] : 0;
+        unsigned a1 = j < blockLength ? block1[j] : 0;
         if (j >= blockLength || i < blockLength && j < blockLength && a0 <= a1) {
             local_to[localWorkItemBegin + iter] = a0;
             ++i;

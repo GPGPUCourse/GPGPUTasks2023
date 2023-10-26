@@ -6,6 +6,7 @@
 
 // Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
 #include "cl/bitonic_cl.h"
+#include "cl/merge_cl.h"
 #include "cl/radix_cl.h"
 
 #include <iostream>
@@ -82,6 +83,45 @@ int main(int argc, char **argv) {
         }
     };
     examineGPUSortAlgo("bitonic", bitonicSort);
+
+    ocl::Kernel mergesortPhase(merge_kernel, merge_kernel_length, "mergesortPhase");
+    mergesortPhase.compile();
+    gpu::gpu_mem_32u aux_gpu;
+    aux_gpu.resizeN(n);
+    auto mergeSortNaive = [&](gpu::gpu_mem_32u &as_gpu) {
+        gpu::gpu_mem_32u *from = &as_gpu, *to = &aux_gpu;
+        for (int blockLength = 1; blockLength < n; blockLength *= 2) {
+            mergesortPhase.exec(gpu::WorkSize(128, n), *from, *to, n, blockLength);
+            std::swap(from, to);
+        }
+        if (from == &aux_gpu)
+            aux_gpu.copyToN(as_gpu, n);
+    };
+    examineGPUSortAlgo("mergeSortNaive", mergeSortNaive);
+
+    {
+        static constexpr int WORK_GROUP_SIZE = 64;
+        static constexpr int K = 128;
+        ocl::Kernel mergesortPhaseLocal(merge_kernel, merge_kernel_length, "mergesortPhaseLocal");
+        mergesortPhaseLocal.compile();
+        ocl::Kernel mergesortDiagonalPhase(merge_kernel, merge_kernel_length, "mergesortDiagonalPhase");
+        mergesortDiagonalPhase.compile();
+        auto mergeSortDiagonal = [&](gpu::gpu_mem_32u &as_gpu) {
+            gpu::gpu_mem_32u *from = &as_gpu, *to = &aux_gpu;
+            for (int blockLength = 1; blockLength < n; blockLength *= 2) {
+                if (blockLength * 2 <= K) {
+                    mergesortPhaseLocal.exec(gpu::WorkSize(K, n), *from, *to, n, blockLength);
+                } else {
+                    // number of work groups does not really matter
+                    mergesortDiagonalPhase.exec(gpu::WorkSize(WORK_GROUP_SIZE, n / K), *from, *to, n, blockLength);
+                }
+                std::swap(from, to);
+            };
+            if (from == &aux_gpu)
+                aux_gpu.copyToN(as_gpu, n);
+        };
+        examineGPUSortAlgo("mergeSortDiagonal", mergeSortDiagonal);
+    }
 
     return 0;
 }
