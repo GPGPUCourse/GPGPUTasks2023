@@ -24,17 +24,17 @@ __kernel void counting(__global unsigned int *as, __global unsigned int *bs, con
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    unsigned v;
+    unsigned index;
     if (gid < size) {
-        v = (as[gid] >> degree) & MASK;
+        index = (as[gid] >> degree) & MASK;
 
-        atomic_add(&counter[v], 1);
+        atomic_add(&counter[index], 1);
     }
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    if (gid < size) {
-        bs[groups * v + wid] = counter[v];
+    if (lid < COUNTER_SIZE) {
+        bs[groups * lid + wid] = counter[lid];
     }
 }
 
@@ -88,12 +88,12 @@ __kernel void radix(__global const unsigned int *as, __global unsigned int *bs, 
         return;
     }
 
-    unsigned v, diff = gid / gsize * gsize, count = 0, myv = nums[lid];
+    unsigned temp, diff = gid / gsize * gsize, count = 0, value = nums[lid];
 
     for (unsigned i = 0, end = gid - diff, nsize = size - diff; i < end && i < nsize; i++) {
-        v = nums[i];
-        count += (v == myv) ? 1 : 0;
+        temp = nums[i];
+        count += (temp == value) ? 1 : 0;
     }
     unsigned offset = count;
-    bs[offsets[groups * myv + wid] + offset] = as[gid];
+    bs[offsets[groups * value + wid] + offset] = as[gid];
 }
