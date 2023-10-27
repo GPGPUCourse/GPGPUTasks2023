@@ -2,6 +2,10 @@
     #define ARRAY_SIZE 4
 #endif
 
+#ifndef MASK
+    #define MASK (ARRAY_SIZE - 1)
+#endif
+
 #ifndef LOCAL_ARRAY_SIZE
     #define LOCAL_ARRAY_SIZE 128
 #endif
@@ -14,7 +18,7 @@ __kernel void counting(__global unsigned int *as, __global unsigned int *bs, con
 
     __local unsigned counter[ARRAY_SIZE];
 
-    if (lid < 4) {
+    if (lid < ARRAY_SIZE) {
         counter[lid] = 0;
     }
 
@@ -22,7 +26,7 @@ __kernel void counting(__global unsigned int *as, __global unsigned int *bs, con
 
     unsigned v;
     if (gid < size) {
-        v = (as[gid] >> degree) & 3;
+        v = (as[gid] >> degree) & MASK;
 
         atomic_add(&counter[v], 1);
     }
@@ -76,7 +80,7 @@ __kernel void radix(__global const unsigned int *as, __global unsigned int *bs, 
 
     __local unsigned nums[LOCAL_ARRAY_SIZE];
 
-    nums[lid] = (as[gid] >> degree) & 3;
+    nums[lid] = (as[gid] >> degree) & MASK;
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
