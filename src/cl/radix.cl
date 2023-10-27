@@ -1,9 +1,9 @@
-#ifndef ARRAY_SIZE
-    #define ARRAY_SIZE 4
+#ifndef COUNTER_SIZE
+    #define COUNTER_SIZE 4
 #endif
 
 #ifndef MASK
-    #define MASK (ARRAY_SIZE - 1)
+    #define MASK (COUNTER_SIZE - 1)
 #endif
 
 #ifndef LOCAL_ARRAY_SIZE
@@ -16,9 +16,9 @@ __kernel void counting(__global unsigned int *as, __global unsigned int *bs, con
     unsigned lid = get_local_id(0);
     unsigned groups = get_num_groups(0);
 
-    __local unsigned counter[ARRAY_SIZE];
+    __local unsigned counter[COUNTER_SIZE];
 
-    if (lid < ARRAY_SIZE) {
+    if (lid < COUNTER_SIZE) {
         counter[lid] = 0;
     }
 
