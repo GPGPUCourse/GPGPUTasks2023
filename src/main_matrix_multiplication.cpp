@@ -67,12 +67,10 @@ int main(int argc, char **argv)
     as_gpu.writeN(as.data(), M*K);
     bs_gpu.writeN(bs.data(), K*N);
 
-
-    unsigned int tile_size = 16;
-
     
     std::cout << "Naive approach:\n";
     {
+        unsigned int tile_size = 16;
         ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, "naive_multiplication", "-DTILE_SIZE=" + std::to_string(tile_size));
         matrix_multiplication_kernel.compile();
 
@@ -112,6 +110,7 @@ int main(int argc, char **argv)
     }
     std::cout << "Local memory 1:\n";
     {
+        unsigned int tile_size = 16;
         ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, "local_memory_multiplication_1", "-DTILE_SIZE=" + std::to_string(tile_size));
         matrix_multiplication_kernel.compile();
 
@@ -149,13 +148,14 @@ int main(int argc, char **argv)
     }
     std::cout << "Local memory 2:\n";
     {
+        unsigned int tile_size = 16;
         ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length, "local_memory_multiplication_2", "-DTILE_SIZE=" + std::to_string(tile_size));
         matrix_multiplication_kernel.compile();
 
         {
             timer t;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
-                matrix_multiplication_kernel.exec(gpu::WorkSize(tile_size, 1, N, M), as_gpu, bs_gpu, cs_gpu, M, K, N);
+                matrix_multiplication_kernel.exec(gpu::WorkSize(tile_size, 1, N, M / tile_size), as_gpu, bs_gpu, cs_gpu, M, K, N);
 
                 t.nextLap();
             }

@@ -48,7 +48,8 @@ __kernel void local_memory_multiplication_2(__global const float *a,
                                             unsigned int K,
                                             unsigned int N)
 {
-    int i = get_global_id(1);
+    //int i = get_global_id(1);
+    int tileI = get_global_id(1);
     int j = get_global_id(0);
     int local_i = get_local_id(0);
     __local float tileA[TILE_SIZE][TILE_SIZE];
@@ -57,18 +58,20 @@ __kernel void local_memory_multiplication_2(__global const float *a,
     for(int k = 0; k < TILE_SIZE; k++) {
         accs[k] = 0.f;
     }
-    int tileI = i / TILE_SIZE;
+    //int tileI = i / TILE_SIZE;
     int tileJ = j / TILE_SIZE;
     for(int tileK = 0; tileK * TILE_SIZE < K; tileK++) {
         for(int k = 0; k < TILE_SIZE; k++) {
-            tileA[local_i][k] = a[(tileI * TILE_SIZE + local_i) * K + (tileK * TILE_SIZE + k)];
-            tileB[local_i][k] = b[(tileK * TILE_SIZE + local_i) * N + (tileJ * TILE_SIZE + k)];
+            tileA[k][local_i] = a[(tileI * TILE_SIZE + k) * K + (tileK * TILE_SIZE + local_i)];
+            tileB[k][local_i] = b[(tileK * TILE_SIZE + k) * N + (tileJ * TILE_SIZE + local_i)];
+            //tileA[local_i][k] = a[(tileI * TILE_SIZE + local_i) * K + (tileK * TILE_SIZE + k)];
+            //tileB[local_i][k] = b[(tileK * TILE_SIZE + local_i) * N + (tileJ * TILE_SIZE + k)];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
         for(int k = 0; k < TILE_SIZE; k++) {
             float tmp = tileB[k][local_i];
             for(int w = 0; w < TILE_SIZE; w++) {
-                accs[w] += tmp * tileA[w][k];
+                accs[w] += tileA[w][k] * tmp;
             }
         }
         barrier(CLK_LOCAL_MEM_FENCE);
