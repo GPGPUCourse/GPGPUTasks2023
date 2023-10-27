@@ -11,6 +11,7 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <tuple>
 #include <vector>
 
@@ -35,8 +36,9 @@ int main(int argc, char **argv) {
 
     int benchmarkingIters = 10;
     const unsigned work_size = 128;
+    const unsigned counter_size = 4;
     const unsigned int n = 32 * 1024 * 1024;
-    const unsigned int nd4 = 4 * n / work_size;
+    const unsigned int nd = counter_size * n / work_size;
     std::vector<unsigned int> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -57,16 +59,18 @@ int main(int argc, char **argv) {
     }
     gpu::gpu_mem_32u as_gpu, bs_gpu, cs_gpu, ds_gpu;
     as_gpu.resizeN(n);
-    bs_gpu.resizeN(nd4);
-    cs_gpu.resizeN(nd4);
+    bs_gpu.resizeN(nd);
+    cs_gpu.resizeN(nd);
     ds_gpu.resizeN(n);
 
     {
-        ocl::Kernel fill_zero(radix_kernel, radix_kernel_length, "fill_zero");
-        ocl::Kernel counting(radix_kernel, radix_kernel_length, "counting");
-        ocl::Kernel prefix_sum(radix_kernel, radix_kernel_length, "prefix_sum");
-        ocl::Kernel shift(radix_kernel, radix_kernel_length, "shift");
-        ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix");
+        std::string flags = "-DCOUNTER_SIZE=" + std::to_string(counter_size);
+
+        ocl::Kernel fill_zero(radix_kernel, radix_kernel_length, "fill_zero", flags);
+        ocl::Kernel counting(radix_kernel, radix_kernel_length, "counting", flags);
+        ocl::Kernel prefix_sum(radix_kernel, radix_kernel_length, "prefix_sum", flags);
+        ocl::Kernel shift(radix_kernel, radix_kernel_length, "shift", flags);
+        ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix", flags);
         fill_zero.compile();
         counting.compile();
         prefix_sum.compile();
@@ -77,21 +81,21 @@ int main(int argc, char **argv) {
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
 
-            gpu::WorkSize wsnd4(work_size, nd4);
+            gpu::WorkSize wsnd(work_size, nd);
             gpu::WorkSize wsn(work_size, n);
 
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
             for (unsigned i = 0; i < 32; i += 2) {
-                fill_zero.exec(wsnd4, bs_gpu, nd4);
-                fill_zero.exec(wsnd4, cs_gpu, nd4);
+                fill_zero.exec(wsnd, bs_gpu, nd);
+                fill_zero.exec(wsnd, cs_gpu, nd);
 
                 counting.exec(wsn, as_gpu, bs_gpu, i, n);
-                for (unsigned offset = 1; offset < nd4; offset *= 2) {
-                    prefix_sum.exec(wsnd4, bs_gpu, cs_gpu, offset, nd4);
+                for (unsigned offset = 1; offset < nd; offset *= 2) {
+                    prefix_sum.exec(wsnd, bs_gpu, cs_gpu, offset, nd);
                     std::swap(bs_gpu, cs_gpu);
                 }
-                shift.exec(wsnd4, bs_gpu, cs_gpu, nd4);
+                shift.exec(wsnd, bs_gpu, cs_gpu, nd);
                 radix.exec(wsn, as_gpu, ds_gpu, cs_gpu, i, n);
                 std::swap(as_gpu, ds_gpu);
             }
