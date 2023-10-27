@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstddef>
 #include <libgpu/context.h>
 #include <libgpu/shared_device_buffer.h>
@@ -36,7 +37,7 @@ int main(int argc, char **argv) {
 
     int benchmarkingIters = 10;
     const unsigned work_size = 128;
-    const unsigned counter_size = 4;
+    const unsigned counter_size = 16;
     const unsigned int n = 32 * 1024 * 1024;
     const unsigned int nd = counter_size * n / work_size;
     std::vector<unsigned int> as(n, 0);
@@ -86,7 +87,7 @@ int main(int argc, char **argv) {
 
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
-            for (unsigned i = 0; i < 32; i += 2) {
+            for (unsigned i = 0, addition = std::log2(counter_size); i < 32; i += addition) {
                 fill_zero.exec(wsnd, bs_gpu, nd);
                 fill_zero.exec(wsnd, cs_gpu, nd);
 
