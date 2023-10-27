@@ -16,6 +16,8 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 
+#define VALUES_PER_WORKITEM 32
+#define WORKGROUP_SIZE 64
 
 int main(int argc, char **argv)
 {
@@ -70,16 +72,21 @@ int main(int argc, char **argv)
         unsigned int n = as.size();
         unsigned int work_group_size = 64;
         unsigned int global_work_size = (n + work_group_size - 1) / work_group_size * work_group_size;
-        gpu::WorkSize workSize = gpu::WorkSize(work_group_size, global_work_size);
 
         gpu::gpu_mem_32u as_gpu, sum_gpu;
         as_gpu.resizeN(n);
         sum_gpu.resizeN(1);
         as_gpu.writeN(as.data(), n);
 
+        std::string defines =  "-DVALUES_PER_WORKITEM=" + std::to_string(VALUES_PER_WORKITEM) + " "
+                + "-DWORKGROUP_SIZE=" + std::to_string(WORKGROUP_SIZE);
+
+        std::cout << defines << std::endl;
+
         std::string kernel_name;
         {
-            ocl::Kernel kernel(sum_kernel, sum_kernel_length, "sum_gpu_1");
+            gpu::WorkSize workSize = gpu::WorkSize(work_group_size, global_work_size);
+            ocl::Kernel kernel(sum_kernel, sum_kernel_length, "sum_gpu_1", defines);
             bool printLog = true;
             kernel.compile(printLog);
 
@@ -96,7 +103,9 @@ int main(int argc, char **argv)
             std::cout << "GPU " << kernel_name << ": " << (n/1000.0/1000.0) / t.lapAvg() << " millions/s" << std::endl;
         }
         {
-            ocl::Kernel kernel(sum_kernel, sum_kernel_length, "sum_gpu_3");
+            gpu::WorkSize workSize = gpu::WorkSize(work_group_size,
+            ((global_work_size + VALUES_PER_WORKITEM - 1) / VALUES_PER_WORKITEM + work_group_size - 1) / work_group_size * work_group_size);
+            ocl::Kernel kernel(sum_kernel, sum_kernel_length, "sum_gpu_3", defines);
             bool printLog = false;
             kernel.compile(printLog);
 
@@ -113,7 +122,9 @@ int main(int argc, char **argv)
             std::cout << "GPU " << kernel_name << ": " << (n/1000.0/1000.0) / t.lapAvg() << " millions/s" << std::endl;
         }
         {
-            ocl::Kernel kernel(sum_kernel, sum_kernel_length, "sum_gpu_4");
+            gpu::WorkSize workSize = gpu::WorkSize(work_group_size,
+            ((global_work_size + VALUES_PER_WORKITEM - 1) / VALUES_PER_WORKITEM + work_group_size - 1) / work_group_size * work_group_size);
+            ocl::Kernel kernel(sum_kernel, sum_kernel_length, "sum_gpu_4", defines);
             bool printLog = false;
             kernel.compile(printLog);
 
@@ -130,7 +141,8 @@ int main(int argc, char **argv)
             std::cout << "GPU " << kernel_name << ": " << (n/1000.0/1000.0) / t.lapAvg() << " millions/s" << std::endl;
         }
         {
-            ocl::Kernel kernel(sum_kernel, sum_kernel_length, "sum_gpu_5");
+            gpu::WorkSize workSize = gpu::WorkSize(work_group_size, global_work_size);
+            ocl::Kernel kernel(sum_kernel, sum_kernel_length, "sum_gpu_5", defines);
             bool printLog = false;
             kernel.compile(printLog);
 
@@ -147,7 +159,8 @@ int main(int argc, char **argv)
             std::cout << "GPU " << kernel_name << ": " << (n/1000.0/1000.0) / t.lapAvg() << " millions/s" << std::endl;
         }
         {
-            ocl::Kernel kernel(sum_kernel, sum_kernel_length, "sum_gpu_6");
+            gpu::WorkSize workSize = gpu::WorkSize(work_group_size, global_work_size);
+            ocl::Kernel kernel(sum_kernel, sum_kernel_length, "sum_gpu_6", defines);
             bool printLog = false;
             kernel.compile(printLog);
 
