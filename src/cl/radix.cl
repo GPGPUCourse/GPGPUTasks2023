@@ -10,7 +10,8 @@
     #define LOCAL_ARRAY_SIZE 128
 #endif
 
-__kernel void counting(__global unsigned int *as, __global unsigned int *bs, const unsigned degree, unsigned size) {
+__kernel void counting(const __global unsigned int *as, __global unsigned int *bs, const unsigned degree,
+                       const unsigned size) {
     unsigned gid = get_global_id(0);
     unsigned wid = get_group_id(0);
     unsigned lid = get_local_id(0);
@@ -38,7 +39,8 @@ __kernel void counting(__global unsigned int *as, __global unsigned int *bs, con
     }
 }
 
-__kernel void prefix_sum(__global unsigned *as, __global unsigned *bs, const unsigned offset, const unsigned size) {
+__kernel void prefix_sum(const __global unsigned *as, __global unsigned *bs, const unsigned offset,
+                         const unsigned size) {
     unsigned gid = get_global_id(0);
 
     if (gid >= size) {
@@ -60,7 +62,7 @@ __kernel void fill_zero(__global unsigned *as, const unsigned size) {
     }
 }
 
-__kernel void shift(__global const unsigned *as, __global unsigned *bs, const unsigned size) {
+__kernel void shift(const __global unsigned *as, __global unsigned *bs, const unsigned size) {
     int gid = get_global_id(0);
 
     if (gid >= size) {
@@ -70,7 +72,7 @@ __kernel void shift(__global const unsigned *as, __global unsigned *bs, const un
     bs[gid] = gid > 0 ? as[gid - 1] : 0;
 }
 
-__kernel void radix(__global const unsigned int *as, __global unsigned int *bs, __global const unsigned int *offsets,
+__kernel void radix(__global const unsigned int *as, __global unsigned int *bs, const __global unsigned int *offsets,
                     const unsigned degree, const unsigned size) {
     unsigned gid = get_global_id(0);
     unsigned lid = get_local_id(0);
