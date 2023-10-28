@@ -10,8 +10,9 @@
     #define LOCAL_ARRAY_SIZE 128
 #endif
 
-__kernel void radix(__global const unsigned int *as, __global unsigned int *bs, const __global unsigned int *offsets,
-                    const __global unsigned int *counting, const unsigned degree, const unsigned size) {
+__kernel void radix_with_merge(__global const unsigned int *as, __global unsigned int *bs,
+                               const __global unsigned int *offsets, const __global unsigned int *counting,
+                               const unsigned degree, const unsigned size) {
     unsigned gid = get_global_id(0);
     unsigned lid = get_local_id(0);
     unsigned wid = get_group_id(0);
@@ -37,5 +38,33 @@ __kernel void radix(__global const unsigned int *as, __global unsigned int *bs, 
         count += counting[groups * i + wid];
     }
     unsigned offset = lid - count;
+    bs[offsets[groups * value + wid] + offset] = as[gid];
+}
+
+__kernel void radix(__global const unsigned int *as, __global unsigned int *bs, __global const unsigned int *offsets,
+                    const unsigned degree, const unsigned size) {
+    unsigned gid = get_global_id(0);
+    unsigned lid = get_local_id(0);
+    unsigned wid = get_group_id(0);
+    unsigned gsize = get_local_size(0);
+    unsigned groups = get_num_groups(0);
+
+    __local unsigned nums[LOCAL_ARRAY_SIZE];
+
+    nums[lid] = (as[gid] >> degree) & MASK;
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    if (gid >= size) {
+        return;
+    }
+
+    unsigned temp, diff = gid / gsize * gsize, count = 0, value = nums[lid];
+
+    for (unsigned i = 0, end = gid - diff, nsize = size - diff; i < end && i < nsize; i++) {
+        temp = nums[i];
+        count += (temp == value) ? 1 : 0;
+    }
+    unsigned offset = count;
     bs[offsets[groups * value + wid] + offset] = as[gid];
 }
