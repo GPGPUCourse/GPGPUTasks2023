@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <libgpu/context.h>
@@ -69,7 +68,6 @@ int main(int argc, char **argv) {
     bs_gpu.resizeN(nd);
     cs_gpu.resizeN(nd);
     ds_gpu.resizeN(n);
-    es_gpu.resizeN(nd);
 
     std::string flags = "-DCOUNTER_SIZE=" + std::to_string(counter_size);
     ocl::Kernel fill_zero(utils_kernel, utils_kernel_length, "fill_zero");
@@ -81,6 +79,9 @@ int main(int argc, char **argv) {
     counting.compile();
     prefix_sum.compile();
     {
+        gpu::gpu_mem_32u es_gpu;
+        es_gpu.resizeN(nd);
+
         ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix_with_merge", flags);
         ocl::Kernel merge(merge_sort_kernel, merge_sort_kernel_length, "merge", flags);
         radix.compile();
@@ -148,7 +149,6 @@ int main(int argc, char **argv) {
                 fill_zero.exec(wsnd, cs_gpu, nd);
 
                 counting.exec(wsn, as_gpu, bs_gpu, i, n);
-                bs_gpu.copyToN(es_gpu, nd);
 
                 for (unsigned offset = 1; offset < nd; offset *= 2) {
                     prefix_sum.exec(wsnd, bs_gpu, cs_gpu, offset, nd);
