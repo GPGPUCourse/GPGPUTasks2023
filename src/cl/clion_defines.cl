@@ -9,9 +9,9 @@
 #define __constant
 #define __private
 
-#define half float
+using half = float;
 
-struct float2 { float x;          };
+struct float2 { float x, y;       };
 struct float3 { float x, y, z;    };
 struct float4 { float x, y, z, w; };
 
@@ -71,5 +71,6 @@ void atomic_add(...);
 
 // 64 for AMD, 32 for NVidia, 8 for intel GPUs, 1 for CPU
 #define WARP_SIZE 64
+#define WORK_GROUP_SIZE 64
 
 #endif // pragma once
