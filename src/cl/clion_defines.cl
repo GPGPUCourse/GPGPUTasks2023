@@ -78,5 +78,6 @@ void atomic_add(...);
 #define RADIX_BASE (1 << STEP_BITS)
 #define RADIX_MASK (RADIX_BASE - 1)
 // #define N_WORK_GROUPS ((n + WORK_GROUP_SIZE - 1) / WORK_GROUP_SIZE)
+#define TILE_SIZE 32
 
 #endif // pragma once
