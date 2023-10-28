@@ -22,7 +22,7 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 #define WORKGROUP_SIZE 128
-#define LOG_MAX_DIGIT 4
+#define LOG_MAX_DIGIT 2
 #define MAX_DIGIT (1 << LOG_MAX_DIGIT)
 
 int main(int argc, char **argv) {
