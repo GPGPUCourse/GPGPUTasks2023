@@ -8,6 +8,7 @@
 
 // Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
 #include "cl/counting_cl.h"
+#include "cl/matrix_transpose_cl.h"
 #include "cl/merge_sort_cl.h"
 #include "cl/prefix_sum_cl.h"
 #include "cl/radix_cl.h"
@@ -132,6 +133,58 @@ int main(int argc, char **argv) {
     }
 
     {
+        ocl::Kernel counting(counting_kernel, counting_kernel_length, "counting_without_transpose", flags);
+        ocl::Kernel transpose(matrix_transpose_kernel, matrix_transpose_kernel_length, "transpose", flags);
+        ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix", flags);
+        radix.compile();
+        transpose.compile();
+
+        es_gpu.resizeN(nd);
+
+        timer t;
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
+            as_gpu.writeN(as.data(), n);
+
+            gpu::WorkSize wsnd(work_size, nd);
+            gpu::WorkSize wsn(work_size, n);
+
+            t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
+
+            for (unsigned i = 0, addition = std::log2(counter_size); i < 32; i += addition) {
+                fill_zero.exec(wsnd, bs_gpu, nd);
+                fill_zero.exec(wsnd, cs_gpu, nd);
+
+                counting.exec(wsn, as_gpu, bs_gpu, i, n);
+                transpose.exec(gpu::WorkSize(counter_size, counter_size, counter_size, nd / counter_size), bs_gpu,
+                               es_gpu, nd / counter_size, counter_size);
+
+                std::swap(bs_gpu, es_gpu);
+
+                for (unsigned offset = 1; offset < nd; offset *= 2) {
+                    prefix_sum.exec(wsnd, bs_gpu, cs_gpu, offset, nd);
+                    std::swap(bs_gpu, cs_gpu);
+                }
+
+                shift.exec(wsnd, bs_gpu, cs_gpu, nd);
+
+                radix.exec(wsn, as_gpu, ds_gpu, cs_gpu, i, n);
+                std::swap(as_gpu, ds_gpu);
+            }
+
+            t.nextLap();
+        }
+        std::cout << "GPU (with transpose): " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU (with transpose): " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+
+        as_gpu.readN(as.data(), n);
+
+        // Проверяем корректность результатов
+        for (int i = 0; i < n; ++i) {
+            EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
+        }
+    }
+
+    {
         ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix", flags);
         radix.compile();
 
@@ -163,8 +216,8 @@ int main(int argc, char **argv) {
 
             t.nextLap();
         }
-        std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "GPU (simple): " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU (simple): " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
 
         as_gpu.readN(as.data(), n);
 
