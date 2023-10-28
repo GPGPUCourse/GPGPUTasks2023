@@ -60,22 +60,22 @@ public:
 	}
 
 	void scan(const gpu::gpu_mem_32u &buffer,
-	unsigned int n,
-	int bit_offset) {
+	unsigned int n) {
 		int binsPerChunk = 1 << RADIX_BITS;
 		int numChunks = n / WORKGROUP_SIZE;
+		int buffer_size = binsPerChunk * numChunks;
 		unsigned int offset;
-		for (offset = 1; offset * 2 <= n; offset <<= 1) {
-			reduce_kernel.exec(gpu::WorkSize(0, 0),
+		for (offset = 1; offset * 2 <= buffer_size; offset <<= 1) {
+			reduce_kernel.exec(gpu::WorkSize(WORKGROUP_SIZE, (buffer_size + offset - 1) / offset),
 							   buffer,
-							   n,
+							   buffer_size,
 							   offset);
 		}
 
 		for (offset = offset >> 1; offset >= 1; offset >>= 1) {
-			down_sweep_kernel.exec(gpu::WorkSize(0,0),
+			down_sweep_kernel.exec(gpu::WorkSize(WORKGROUP_SIZE,(buffer_size + offset - 1) / offset),
 								   buffer,
-								   n,
+								   buffer_size,
 								   offset);
 		}
 	}
@@ -142,10 +142,12 @@ int main(int argc, char **argv) {
     gpu::gpu_mem_32u buffer_gpu;
     gpu::gpu_mem_32u buffer_copy_gpu;
     as_gpu.resizeN(n);
-	int binsPerChunk = 1 << RADIX_BITS;
-	int numChunks = n / WORKGROUP_SIZE;
+	unsigned int binsPerChunk = 1 << RADIX_BITS;
+	unsigned int numChunks = (n  + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
 	buffer_gpu.resizeN(numChunks * binsPerChunk);
 	buffer_copy_gpu.resizeN(numChunks * binsPerChunk);
+
+	unsigned int work_size = numChunks * WORKGROUP_SIZE;
 
     {
         ocl::Kernel radix = get_kernel("radix");
@@ -162,17 +164,35 @@ int main(int argc, char **argv) {
 			for (int bit_offset = 0; bit_offset < 32; bit_offset += RADIX_BITS) {
 //			for (int bit_offset = 0; bit_offset <= 0; bit_offset += RADIX_BITS) {
 				// count into bins
-				count.exec(gpu::WorkSize(WORKGROUP_SIZE, n), as_gpu, buffer_gpu, n, bit_offset);
+				count.exec(gpu::WorkSize(WORKGROUP_SIZE, work_size), as_gpu, buffer_gpu, n, bit_offset);
 				// transpose to increase coalesced access
 				transpose.exec(gpu::WorkSize(TRANSPOSE_WORKGROUP_SIZE,
 											 TRANSPOSE_WORKGROUP_SIZE,
 											 (binsPerChunk + TRANSPOSE_WORKGROUP_SIZE - 1) / TRANSPOSE_WORKGROUP_SIZE * TRANSPOSE_WORKGROUP_SIZE,
 											 (numChunks + TRANSPOSE_WORKGROUP_SIZE - 1) / TRANSPOSE_WORKGROUP_SIZE * TRANSPOSE_WORKGROUP_SIZE), buffer_gpu, buffer_copy_gpu, binsPerChunk, numChunks);
 				std::swap(buffer_gpu, buffer_copy_gpu);
-//				// prefix sum (aka scan) on bins
-				scanSingleton::getInstance().scan(buffer_gpu, n, bit_offset);
-//				// sort using bin info
-//				radix.exec(gpu::WorkSize(binsPerChunk, numChunks), as_gpu, buffer_gpu, bit_offset);
+
+				buffer_gpu.readN(as.data(), binsPerChunk * numChunks);
+				for (int i = 0; i < binsPerChunk; ++i) {
+					for (int j = 0; j < numChunks; ++j) {
+						std::cout << as[i * numChunks + j] << " ";
+					}
+					std::cout << std::endl;
+				}
+				std::cout << std::endl;
+				// prefix sum (aka scan) on bins
+				scanSingleton::getInstance().scan(buffer_gpu, n);
+
+				buffer_gpu.readN(as.data(), binsPerChunk * numChunks);
+				for (int i = 0; i < binsPerChunk; ++i) {
+					for (int j = 0; j < numChunks; ++j) {
+						std::cout << as[i * numChunks + j] << " ";
+					}
+					std::cout << std::endl;
+				}
+				std::cout << std::endl;
+				// sort using bin info
+				radix.exec(gpu::WorkSize(WORKGROUP_SIZE, work_size), as_gpu, buffer_gpu, n, bit_offset);
 			}
 
 			t.nextLap();

@@ -20,6 +20,7 @@ __kernel void scan_reduce_global(__global unsigned int *array,
 						  const unsigned int offset)
 {
 	// TODO: rewrite for many bins
+	// ...or not?
 	const unsigned int gid = get_global_id(0);
 	unsigned int index_cur = (gid + 1) * offset * 2 - 1;
 	if (index_cur >= limit)
@@ -111,9 +112,33 @@ __kernel void count(__global const unsigned int *array,
 }
 
 
-__kernel void radix(__global unsigned int *as) {
-#if WITH_LOCAL_SORT
+__kernel void radix(__global unsigned int *as,
+					__global const unsigned int *buffer,
+					const int n,
+					const int bit_offset) {
+	// buffer is `chunks` wide, 'bins` tall
+	const unsigned int lid = get_local_id(0);
+	const unsigned int bins_num = 1 << RADIX_BITS;
+	const unsigned int chunk = get_group_id(0);
+	const unsigned int chunk_size = WORKGROUP_SIZE;
+	unsigned int chunks_num = (n + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
+
 	// sort every chunk locally
-#endif
-    // TODO
+	__local unsigned int chunk_arr[WORKGROUP_SIZE];
+	// TODO
+
+	barrier(CLK_LOCAL_MEM_FENCE);
+	// index of item = prefix for item + (index within chunk - sum of (items of lesser value within chunk))
+	const unsigned int local_item_index = lid;
+	const unsigned int item_value = get_radix_value(chunk_arr[local_item_index], bit_offset);
+
+	unsigned int lesser_values_within_chunk = 0;
+	for (int i = 0; i < item_value; ++i) {
+		lesser_values_within_chunk += buffer[i * chunks_num + chunk] - ((chunk == 0 && i == 0 && lid == 0) ? 0 : buffer[i * chunks_num + chunk - 1]);
+	}
+
+	const unsigned int item_index = ((chunk == 0 && item_value == 0 && lid == 0) ? 0 : buffer[item_value * chunks_num + chunk - 1])
+									+ local_item_index
+									- (lesser_values_within_chunk);
+	as[item_index] = chunk_arr[local_item_index];
 }
