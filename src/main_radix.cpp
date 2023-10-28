@@ -22,7 +22,7 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 #define WORKGROUP_SIZE 128
-#define LOG_MAX_DIGIT 4
+#define LOG_MAX_DIGIT 3
 #define MAX_DIGIT (1 << LOG_MAX_DIGIT)
 
 int main(int argc, char **argv) {
@@ -79,7 +79,7 @@ int main(int argc, char **argv) {
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
             unsigned int all_work1 = (n + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE * WORKGROUP_SIZE;
-            for (int d = 0; d < 8; d++)
+            for (int d = 0; d < (32 + LOG_MAX_DIGIT - 1) / LOG_MAX_DIGIT; d++)
             {
                 for (int len = 1; len < 2 * n; len <<= 1)
                 {
