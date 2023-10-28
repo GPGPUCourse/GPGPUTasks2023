@@ -73,8 +73,6 @@ void radix_cpu(std::vector<cl_uint> &dst) {
 }
 
 void radix_gpu(const cl_uint STEP_BITS, bool local, bool transposed) {
-    // constexpr cl_uint STEP_BITS = 2;
-    // static_assert(BIT_SIZE % STEP_BITS == 0);
     const cl_uint N_STEPS = BIT_SIZE / STEP_BITS;
     const cl_uint RADIX_BASE = 1 << STEP_BITS;
     const cl_uint RADIX_MASK = RADIX_BASE - 1;
@@ -139,17 +137,6 @@ void radix_gpu(const cl_uint STEP_BITS, bool local, bool transposed) {
                 std::swap(gpu_off_src, gpu_off_dst);
             }
 
-            // std::vector<cl_uint> off_expected(N_OFFSETS);
-            // gpu_off_src.readN(off_expected.data(), N_OFFSETS);
-
-            // for (cl_uint i = N_OFFSETS - 1; i > 0; --i) {
-            //     off_expected[i] = off_expected[i - 1];
-            // }
-            // off_expected[0] = 0;
-            // for (cl_uint i = 1; i < N_OFFSETS; ++i) {
-            //     off_expected[i] += off_expected[i - 1];
-            // }
-
             for (cl_uint step = 1; step < N_OFFSETS; step *= 2) {
                 const cl_uint len = N_OFFSETS / 2 / step;
                 gpu::WorkSize ws(WORK_GROUP_SIZE, len);
@@ -166,13 +153,6 @@ void radix_gpu(const cl_uint STEP_BITS, bool local, bool transposed) {
                 gpu::WorkSize ws(WORK_GROUP_SIZE, len);
                 k_cumsum_down.exec(ws, gpu_off_src, len, step);
             }
-
-            // std::vector<cl_uint> off_actual(N_OFFSETS);
-            // gpu_off_src.readN(off_actual.data(), N_OFFSETS);
-
-            // for (cl_uint i = 0; i < N_OFFSETS; ++i) {
-            //     EXPECT_THE_SAME(off_expected[i], off_actual[i], "Prefix sum");
-            // }
 
             k_reorder.exec(ws_count, gpu_src, gpu_dst, gpu_off_src, N, shift);
             std::swap(gpu_src, gpu_dst);
@@ -230,14 +210,10 @@ int main(int argc, char **argv) {
         radix_gpu(STEP_BITS, true, true);
     }
 
-    // dbg_vec("cpu_sorted", cpu_sorted);
-    // dbg_vec("result", result);
-
     // Проверяем корректность результатов
     for (int i = 0; i < N; ++i) {
         EXPECT_THE_SAME(result[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
-    // */
 
     return 0;
 }
