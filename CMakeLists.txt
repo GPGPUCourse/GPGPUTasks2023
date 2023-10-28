@@ -28,6 +28,10 @@ endif()
 convertintoheader(src/cl/radix.cl src/cl/radix_cl.h radix_kernel)
 convertintoheader(src/cl/bitonic.cl src/cl/bitonic_cl.h bitonic_kernel)
 convertintoheader(src/cl/merge.cl src/cl/merge_cl.h merge_kernel)
-add_executable(radix src/main_radix.cpp src/cl/radix_cl.h src/cl/bitonic_cl.h
-                     src/cl/merge_cl.h)
+convertintoheader(src/cl/matrix_transpose.cl src/cl/matrix_transpose_cl.h
+                  matrix_transpose_kernel)
+convertintoheader(src/cl/prefix_sum.cl src/cl/prefix_sum_cl.h prefix_sum_kernel)
+add_executable(
+  radix src/main_radix.cpp src/cl/radix_cl.h src/cl/bitonic_cl.h
+        src/cl/merge_cl.h src/cl/matrix_transpose_cl.h src/cl/prefix_sum_cl.h)
 target_link_libraries(radix libclew libgpu libutils)
