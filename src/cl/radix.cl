@@ -4,40 +4,39 @@
 
 #line 6
 
-__kernel void sums1(__global unsigned int *as,
-                    __global unsigned int *t,
-                    const unsigned int d,
-                    const unsigned int len,
-                    const unsigned int n)
+__kernel void sums(__global unsigned int *as,
+                   __global unsigned int *t,
+                   const unsigned int x,
+                   const unsigned int d,
+                   const unsigned int len,
+                   const unsigned int n)
 {
     unsigned int pos = get_global_id(0) * len + len - 1;
     if (pos >= n) return;
 
-    for (unsigned int x = 0; x < MAX_DIGIT; x++)
-    {
-        if (len == 1) t[pos + x * n] = (as[pos] >> (LOG_MAX_DIGIT * d) & (MAX_DIGIT - 1)) == x;
-        else t[pos + x * n] += t[pos + x * n - len / 2];
-    }
+    if (len == 1) t[pos] = (as[pos] >> (LOG_MAX_DIGIT * d) & (MAX_DIGIT - 1)) == x;
+    else t[pos] += t[pos - len / 2];
 }
 
 __kernel void radix(__global unsigned int *as,
                     __global unsigned int *bs,
                     __global unsigned int *t,
-                    const unsigned int d,
-                    const unsigned int n)
+                    const unsigned int pnt,
+                    const unsigned int n,
+                    const unsigned int w)
 {
     unsigned int i = get_global_id(0);
-    if (i < n)
+    if (i >= w) return;
+
+    unsigned int j = i;
+    int pos = -1;
+    for (int len = n / 2; len >= 1; len >>= 1)
     {
-        unsigned int x = as[i] >> (LOG_MAX_DIGIT * d) & (MAX_DIGIT - 1);
-        unsigned int calc = 0;
-        for (unsigned int y = 0; y < x; y++) calc += t[y * n + n - 1];
-        int j = i;
-        while (j >= 0)
+        if (t[pos + len] <= i)
         {
-            calc += t[x * n + j];
-            j = (j & (j + 1)) - 1;
+            i -= t[pos + len];
+            pos += len;
         }
-        bs[calc - 1] = as[i];
     }
+    bs[pnt + j] = as[pos + 1];
 }
