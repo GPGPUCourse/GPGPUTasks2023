@@ -23,8 +23,9 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 
-constexpr int BENCHMARKING_ITERS = 1;// 10;
+constexpr int BENCHMARKING_ITERS = 10;
 constexpr cl_uint N = 32 * 1024 * 1024;
+constexpr cl_uint BIT_SIZE = 32;
 constexpr cl_uint WORK_GROUP_SIZE = 64;
 
 std::vector<cl_uint> as(N, 0);
@@ -36,8 +37,40 @@ void dbg_vec(std::string_view name, const std::vector<T> &v) {
     }
 }
 
-void radix_local(const cl_uint STEP_BITS, bool local, bool transposed) {
-    constexpr cl_uint BIT_SIZE = 32;
+void radix_cpu(std::vector<cl_uint> &dst) {
+    constexpr cl_uint STEP_BITS = 8;
+    const cl_uint RADIX_BASE = 1 << STEP_BITS;
+    const cl_uint RADIX_MASK = RADIX_BASE - 1;
+    cl_uint off[RADIX_BASE];
+    std::vector<cl_uint> src = as;
+    for (cl_uint shift = 0; shift < BIT_SIZE; shift += STEP_BITS) {
+        for (cl_uint i = 0; i < RADIX_BASE; ++i) {
+            off[i] = 0;
+        }
+        for (cl_uint i = 0; i < N; ++i) {
+            const cl_uint key = (src[i] >> shift) & RADIX_MASK;
+            off[key]++;
+        }
+
+        for (cl_uint i = RADIX_BASE - 1; i > 0; --i) {
+            off[i] = off[i - 1];
+        }
+        off[0] = 0;
+        for (cl_uint i = 1; i < RADIX_BASE; ++i) {
+            off[i] += off[i - 1];
+        }
+
+        for (cl_uint i = 0; i < N; ++i) {
+            const cl_uint x = src[i];
+            const cl_uint key = (x >> shift) & RADIX_MASK;
+            dst[off[key]++] = x;
+        }
+        std::swap(src, dst);
+    }
+    std::swap(src, dst);
+}
+
+void radix_gpu(const cl_uint STEP_BITS, bool local, bool transposed) {
     // constexpr cl_uint STEP_BITS = 2;
     // static_assert(BIT_SIZE % STEP_BITS == 0);
     const cl_uint N_STEPS = BIT_SIZE / STEP_BITS;
@@ -142,12 +175,11 @@ int main(int argc, char **argv) {
     }
     std::cout << "Data generated for n=" << N << "!" << std::endl;
 
-    std::vector<unsigned int> cpu_sorted;
+    std::vector<unsigned int> cpu_sorted(N, 0);
     {
         timer t;
         for (int iter = 0; iter < BENCHMARKING_ITERS; ++iter) {
-            cpu_sorted = as;
-            std::sort(cpu_sorted.begin(), cpu_sorted.end());
+            radix_cpu(cpu_sorted);
             t.nextLap();
         }
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
@@ -157,10 +189,10 @@ int main(int argc, char **argv) {
     // 8 уже слишком много, 256 * 32 уже не влезает в локальную память,
     // а делать work group меньше 32 нет смысла.
     for (cl_uint STEP_BITS = 1; STEP_BITS < 8; STEP_BITS *= 2) {
-        radix_local(STEP_BITS, false, false);
-        radix_local(STEP_BITS, false, true);
-        radix_local(STEP_BITS, true, false);
-        radix_local(STEP_BITS, true, true);
+        radix_gpu(STEP_BITS, false, false);
+        radix_gpu(STEP_BITS, false, true);
+        radix_gpu(STEP_BITS, true, false);
+        radix_gpu(STEP_BITS, true, true);
     }
 
     // dbg_vec("cpu_sorted", cpu_sorted);
