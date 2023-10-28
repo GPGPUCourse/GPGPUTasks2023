@@ -28,7 +28,9 @@ constexpr cl_uint N = 32 * 1024 * 1024;
 constexpr cl_uint BIT_SIZE = 32;
 constexpr cl_uint WORK_GROUP_SIZE = 64;
 
+gpu::Context context;
 std::vector<cl_uint> as(N, 0);
+std::vector<cl_uint> result(N, 0);
 
 template<typename T>
 void dbg_vec(std::string_view name, const std::vector<T> &v) {
@@ -110,10 +112,14 @@ void radix_gpu(const cl_uint STEP_BITS, bool local, bool transposed) {
     ocl::Kernel k_count(radix_kernel, radix_kernel_length, k_count_name.str(), defines.str());
     ocl::Kernel k_transpose(radix_kernel, radix_kernel_length, "matrix_transpose", defines.str());
     ocl::Kernel k_reorder(radix_kernel, radix_kernel_length, "radix_reorder", defines.str());
-    ocl::Kernel k_cumsum(radix_kernel, radix_kernel_length, "cumsum_naive", defines.str());
+    ocl::Kernel k_cumsum_up(radix_kernel, radix_kernel_length, "cumsum_sweep_up", defines.str());
+    ocl::Kernel k_cumsum_down(radix_kernel, radix_kernel_length, "cumsum_sweep_down", defines.str());
+    k_reset.compile();
     k_count.compile();
+    k_transpose.compile();
     k_reorder.compile();
-    k_cumsum.compile();
+    k_cumsum_up.compile();
+    k_cumsum_down.compile();
 
     timer t;
     for (int iter = 0; iter < BENCHMARKING_ITERS; ++iter) {
@@ -133,10 +139,40 @@ void radix_gpu(const cl_uint STEP_BITS, bool local, bool transposed) {
                 std::swap(gpu_off_src, gpu_off_dst);
             }
 
+            // std::vector<cl_uint> off_expected(N_OFFSETS);
+            // gpu_off_src.readN(off_expected.data(), N_OFFSETS);
+
+            // for (cl_uint i = N_OFFSETS - 1; i > 0; --i) {
+            //     off_expected[i] = off_expected[i - 1];
+            // }
+            // off_expected[0] = 0;
+            // for (cl_uint i = 1; i < N_OFFSETS; ++i) {
+            //     off_expected[i] += off_expected[i - 1];
+            // }
+
             for (cl_uint step = 1; step < N_OFFSETS; step *= 2) {
-                k_cumsum.exec(ws_offset, gpu_off_src, gpu_off_dst, N_OFFSETS, step);
-                std::swap(gpu_off_src, gpu_off_dst);
+                const cl_uint len = N_OFFSETS / 2 / step;
+                gpu::WorkSize ws(WORK_GROUP_SIZE, len);
+                k_cumsum_up.exec(ws, gpu_off_src, len, step);
             }
+
+            // We still don't have clEnqueueFillBuffer :(
+            cl_uint zero = 0;
+            context.cl()->writeBuffer(gpu_off_src.clmem(), CL_TRUE, (N_OFFSETS - 1) * sizeof(cl_uint), sizeof(cl_uint),
+                                      &zero);
+
+            for (cl_uint step = N_OFFSETS / 2; step > 0; step /= 2) {
+                const cl_uint len = N_OFFSETS / 2 / step;
+                gpu::WorkSize ws(WORK_GROUP_SIZE, len);
+                k_cumsum_down.exec(ws, gpu_off_src, len, step);
+            }
+
+            // std::vector<cl_uint> off_actual(N_OFFSETS);
+            // gpu_off_src.readN(off_actual.data(), N_OFFSETS);
+
+            // for (cl_uint i = 0; i < N_OFFSETS; ++i) {
+            //     EXPECT_THE_SAME(off_expected[i], off_actual[i], "Prefix sum");
+            // }
 
             k_reorder.exec(ws_count, gpu_src, gpu_dst, gpu_off_src, N, shift);
             std::swap(gpu_src, gpu_dst);
@@ -159,13 +195,12 @@ void radix_gpu(const cl_uint STEP_BITS, bool local, bool transposed) {
     std::cout << run_name.str() << t.lapAvg() << "+-" << t.lapStd() << " s\n";
     std::cout << run_name.str() << 1e-6 * N / t.lapAvg() << " millions/s\n";
 
-    gpu_src.readN(as.data(), N);
+    gpu_src.readN(result.data(), N);
 }
 
 int main(int argc, char **argv) {
     gpu::Device device = gpu::chooseGPUDevice(argc, argv);
 
-    gpu::Context context;
     context.init(device.device_id_opencl);
     context.activate();
 
@@ -196,11 +231,11 @@ int main(int argc, char **argv) {
     }
 
     // dbg_vec("cpu_sorted", cpu_sorted);
-    // dbg_vec("as", as);
+    // dbg_vec("result", result);
 
     // Проверяем корректность результатов
     for (int i = 0; i < N; ++i) {
-        EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
+        EXPECT_THE_SAME(result[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
     // */
 

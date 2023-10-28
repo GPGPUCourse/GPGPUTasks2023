@@ -126,7 +126,7 @@ __kernel void radix_reorder(__global const uint *src, __global uint *dst, __glob
         buf1[my_off_lid] = 1;
     }
     const uint src_off_gid = my_key * n_work_groups + wid;
-    const uint dst_off_wg = src_off_gid == 0 ? 0 : offsets[src_off_gid - 1];
+    const uint dst_off_wg = offsets[src_off_gid];
 
     __local uint *loc_off_src = buf1;
     __local uint *loc_off_dst = buf2;
@@ -149,9 +149,9 @@ __kernel void radix_reorder(__global const uint *src, __global uint *dst, __glob
     const uint dst_off_lid = lid == 0 ? 0 : loc_off_src[my_off_lid - 1];
     const uint dst_off_gid = dst_off_wg + dst_off_lid;
     if (gid < len) {
-        if (dst_off_gid >= len) {
-            printf("[ERROR]: gid = %u, dst_off_gid = %u\n", gid, dst_off_gid);
-        }
+        // if (dst_off_gid >= len) {
+        //     printf("[ERROR]: gid = %u, dst_off_gid = %u\n", gid, dst_off_gid);
+        // }
         dst[dst_off_gid] = my_x;
     }
 }
@@ -192,7 +192,6 @@ __kernel void cumsum_naive(__global const uint *src, __global uint *dst, uint le
     dst[gid] = x;
 }
 
-#if false
 // Must ensure that array len is 2^n
 __kernel void cumsum_sweep_up(__global uint *as, uint len, uint step) {
     uint gid = get_global_id(0);
@@ -222,4 +221,3 @@ __kernel void shift_left(__global const uint *src, __global uint *dst, uint len)
     }
     dst[gid] = src[gid + 1];
 }
-#endif
