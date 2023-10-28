@@ -21,5 +21,8 @@ endif()
 # Обратите внимание что это происходит на этапе компиляции, кроме того необходимо чтобы файл src/cl/aplusb_cl.h был перечислен среди исходников для компиляции при вызове add_executable
 
 convertIntoHeader(src/cl/radix.cl src/cl/radix_cl.h radix_kernel)
-add_executable(radix src/main_radix.cpp src/cl/radix_cl.h)
+convertIntoHeader(src/cl/prefix_sum.cl src/cl/prefix_sum_cl.h prefix_sum_kernel)
+convertIntoHeader(src/cl/merge.cl src/cl/merge_cl.h merge_kernel)
+convertIntoHeader(src/cl/matrix_transpose.cl src/cl/matrix_transpose_cl.h matrix_transpose_kernel)
+add_executable(radix src/main_radix.cpp src/cl/radix_cl.h src/cl/prefix_sum_cl.h src/cl/merge_cl.h src/cl/matrix_transpose_cl.h)
 target_link_libraries(radix libclew libgpu libutils)
