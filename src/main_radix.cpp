@@ -71,21 +71,20 @@ int main(int argc, char **argv) {
     ds_gpu.resizeN(n);
     es_gpu.resizeN(nd);
 
+    std::string flags = "-DCOUNTER_SIZE=" + std::to_string(counter_size);
+    ocl::Kernel fill_zero(utils_kernel, utils_kernel_length, "fill_zero");
+    ocl::Kernel shift(utils_kernel, utils_kernel_length, "shift");
+    ocl::Kernel counting(counting_kernel, counting_kernel_length, "counting", flags);
+    ocl::Kernel prefix_sum(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum", flags);
+    fill_zero.compile();
+    shift.compile();
+    counting.compile();
+    prefix_sum.compile();
     {
-        std::string flags = "-DCOUNTER_SIZE=" + std::to_string(counter_size);
-
-        ocl::Kernel fill_zero(utils_kernel, utils_kernel_length, "fill_zero");
-        ocl::Kernel shift(utils_kernel, utils_kernel_length, "shift");
-        ocl::Kernel counting(counting_kernel, counting_kernel_length, "counting", flags);
-        ocl::Kernel prefix_sum(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum", flags);
+        ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix_with_merge", flags);
         ocl::Kernel merge(merge_sort_kernel, merge_sort_kernel_length, "merge", flags);
-        ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix", flags);
-        fill_zero.compile();
-        shift.compile();
-        counting.compile();
-        prefix_sum.compile();
-        merge.compile();
         radix.compile();
+        merge.compile();
 
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
@@ -120,15 +119,60 @@ int main(int argc, char **argv) {
 
             t.nextLap();
         }
+        std::cout << "GPU (with merge sort): " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU (with merge sort): " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+
+        as_gpu.readN(as.data(), n);
+
+        // Проверяем корректность результатов
+        for (int i = 0; i < n; ++i) {
+            EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
+        }
+    }
+
+    {
+        ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix", flags);
+        radix.compile();
+
+        timer t;
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
+            as_gpu.writeN(as.data(), n);
+
+            gpu::WorkSize wsnd(work_size, nd);
+            gpu::WorkSize wsn(work_size, n);
+
+            t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
+
+            for (unsigned i = 0, addition = std::log2(counter_size); i < 32; i += addition) {
+                fill_zero.exec(wsnd, bs_gpu, nd);
+                fill_zero.exec(wsnd, cs_gpu, nd);
+
+                counting.exec(wsn, as_gpu, bs_gpu, i, n);
+                bs_gpu.copyToN(es_gpu, nd);
+
+                for (unsigned offset = 1; offset < nd; offset *= 2) {
+                    prefix_sum.exec(wsnd, bs_gpu, cs_gpu, offset, nd);
+                    std::swap(bs_gpu, cs_gpu);
+                }
+
+                shift.exec(wsnd, bs_gpu, cs_gpu, nd);
+
+                radix.exec(wsn, as_gpu, ds_gpu, cs_gpu, i, n);
+                std::swap(as_gpu, ds_gpu);
+            }
+
+            t.nextLap();
+        }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
 
         as_gpu.readN(as.data(), n);
+
+        // Проверяем корректность результатов
+        for (int i = 0; i < n; ++i) {
+            EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
+        }
     }
 
-    // Проверяем корректность результатов
-    for (int i = 0; i < n; ++i) {
-        EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
-    }
     return 0;
 }
