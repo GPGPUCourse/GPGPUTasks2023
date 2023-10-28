@@ -8,6 +8,7 @@
 #include "cl/radix_cl.h"
 
 #include <iostream>
+#include <sstream>
 #include <stdexcept>
 #include <vector>
 
@@ -30,14 +31,18 @@ int main(int argc, char **argv) {
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 10;
-    unsigned int n = 32 * 1024 * 1024;
-    std::vector<unsigned int> as(n, 0);
+    constexpr int benchmarkingIters = 1; // 10;
+    constexpr cl_uint n = 4 * 1024 * 1024; // 32 * 1024 * 1024;
+    std::vector<cl_uint> as(n, 0);
     FastRandom r(n);
-    for (unsigned int i = 0; i < n; ++i) {
-        as[i] = (unsigned int) r.next(0, std::numeric_limits<int>::max());
+    for (cl_uint i = 0; i < n; ++i) {
+        as[i] = static_cast<cl_uint>(r.next(0, std::numeric_limits<int>::max()));
     }
     std::cout << "Data generated for n=" << n << "!" << std::endl;
+
+    // for (cl_uint i = 0; i < n; ++i) {
+    //     std::cout << "as[" << i << "] = " << as[i] << "\n";
+    // }
 
     std::vector<unsigned int> cpu_sorted;
     {
@@ -48,34 +53,79 @@ int main(int argc, char **argv) {
             t.nextLap();
         }
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "CPU: " << 1e-6 * n / t.lapAvg() << " millions/s" << std::endl;
     }
-    /*
-    gpu::gpu_mem_32u as_gpu;
-    as_gpu.resizeN(n);
 
     {
-        ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix");
-        radix.compile();
+        constexpr cl_uint BIT_SIZE = 32;
+        constexpr cl_uint STEP_BITS = 1; // With 8 we already run out of local memory
+        constexpr cl_uint N_STEPS = BIT_SIZE / STEP_BITS;
+        constexpr cl_uint RADIX_BASE = 1 << STEP_BITS;
+        constexpr cl_uint RADIX_MASK = RADIX_BASE - 1;
+        constexpr cl_uint WORK_GROUP_SIZE = 64;
+        constexpr cl_uint N_WORK_GROUPS = (n + WORK_GROUP_SIZE - 1) / WORK_GROUP_SIZE;
+        static_assert(BIT_SIZE % STEP_BITS == 0);
+
+        constexpr cl_uint N_OFFSETS = RADIX_BASE * N_WORK_GROUPS;
+
+        const gpu::WorkSize ws_n(WORK_GROUP_SIZE, n);
+        const gpu::WorkSize ws_cumsum(WORK_GROUP_SIZE, N_OFFSETS);
+
+        gpu::gpu_mem_32u gpu_src;
+        gpu::gpu_mem_32u gpu_dst;
+        gpu::gpu_mem_32u gpu_off_src;
+        gpu::gpu_mem_32u gpu_off_dst;
+        gpu_src.resizeN(n);
+        gpu_dst.resizeN(n);
+        gpu_off_src.resizeN(N_OFFSETS);
+        gpu_off_dst.resizeN(N_OFFSETS);
+
+        std::ostringstream defines;
+        defines << "-DRADIX_BASE=" << RADIX_BASE << " -DRADIX_MASK=" << RADIX_MASK
+                << " -DWORK_GROUP_SIZE=" << WORK_GROUP_SIZE;
+
+        ocl::Kernel k_count(radix_kernel, radix_kernel_length, "radix_count_local_t", defines.str());
+        ocl::Kernel k_reorder(radix_kernel, radix_kernel_length, "radix_reorder", defines.str());
+        ocl::Kernel k_cumsum(radix_kernel, radix_kernel_length, "cumsum_naive", defines.str());
+        k_count.compile();
+        k_reorder.compile();
+        k_cumsum.compile();
 
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            as_gpu.writeN(as.data(), n);
+            gpu_src.writeN(as.data(), n);
 
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
-            // TODO
+            for (cl_uint shift = 0; shift < BIT_SIZE; shift += STEP_BITS) {
+                k_count.exec(ws_n, gpu_src, gpu_off_src, n, shift);
+
+                for (cl_uint step = 1; step < N_OFFSETS; step *= 2) {
+                    k_cumsum.exec(ws_cumsum, gpu_off_src, gpu_off_dst, N_OFFSETS, step);
+                    std::swap(gpu_off_src, gpu_off_dst);
+                }
+
+                k_reorder.exec(ws_n, gpu_src, gpu_dst, gpu_off_src, n, shift);
+                std::swap(gpu_src, gpu_dst);
+            }
+
+            t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "GPU: " << 1e-6 * n / t.lapAvg() << " millions/s" << std::endl;
 
-        as_gpu.readN(as.data(), n);
+        gpu_src.readN(as.data(), n);
     }
+
+    // for (cl_uint i = 0; i < n; ++i) {
+    //     std::cout << "as[" << i << "] = " << as[i] << "\n";
+    // }
 
     // Проверяем корректность результатов
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
-*/
+    // */
+
     return 0;
 }

@@ -72,5 +72,11 @@ void atomic_add(...);
 // 64 for AMD, 32 for NVidia, 8 for intel GPUs, 1 for CPU
 #define WARP_SIZE 64
 #define WORK_GROUP_SIZE 64
+// #define BIT_SIZE 32
+#define STEP_BITS 4
+// #define N_STEPS (BIT_SIZE / STEP_BITS)
+#define RADIX_BASE (1 << STEP_BITS)
+#define RADIX_MASK (RADIX_BASE - 1)
+// #define N_WORK_GROUPS ((n + WORK_GROUP_SIZE - 1) / WORK_GROUP_SIZE)
 
 #endif // pragma once
