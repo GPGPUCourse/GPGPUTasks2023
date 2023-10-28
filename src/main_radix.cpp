@@ -8,6 +8,9 @@
 
 // Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
 #include "cl/radix_cl.h"
+#include "cl/utils_cl.h"
+#include "cl/counting_cl.h"
+#include "cl/prefix_sum_cl.h"
 #include "libgpu/work_size.h"
 
 #include <iostream>
@@ -67,15 +70,15 @@ int main(int argc, char **argv) {
     {
         std::string flags = "-DCOUNTER_SIZE=" + std::to_string(counter_size);
 
-        ocl::Kernel fill_zero(radix_kernel, radix_kernel_length, "fill_zero", flags);
-        ocl::Kernel counting(radix_kernel, radix_kernel_length, "counting", flags);
-        ocl::Kernel prefix_sum(radix_kernel, radix_kernel_length, "prefix_sum", flags);
-        ocl::Kernel shift(radix_kernel, radix_kernel_length, "shift", flags);
+        ocl::Kernel fill_zero(utils_kernel, utils_kernel_length, "fill_zero", flags);
+        ocl::Kernel shift(utils_kernel, utils_kernel_length, "shift", flags);
+        ocl::Kernel counting(counting_kernel, counting_kernel_length, "counting", flags);
+        ocl::Kernel prefix_sum(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum", flags);
         ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix", flags);
         fill_zero.compile();
+        shift.compile();
         counting.compile();
         prefix_sum.compile();
-        shift.compile();
         radix.compile();
 
         timer t;
