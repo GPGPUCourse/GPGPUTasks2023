@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <libgpu/context.h>
@@ -7,13 +8,15 @@
 #include <libutils/timer.h>
 
 // Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
+#include "cl/counting_cl.h"
+#include "cl/merge_sort_cl.h"
+#include "cl/prefix_sum_cl.h"
 #include "cl/radix_cl.h"
 #include "cl/utils_cl.h"
-#include "cl/counting_cl.h"
-#include "cl/prefix_sum_cl.h"
 #include "libgpu/work_size.h"
 
 #include <iostream>
+#include <ostream>
 #include <stdexcept>
 #include <string>
 #include <tuple>
@@ -61,24 +64,27 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
-    gpu::gpu_mem_32u as_gpu, bs_gpu, cs_gpu, ds_gpu;
+    gpu::gpu_mem_32u as_gpu, bs_gpu, cs_gpu, ds_gpu, es_gpu;
     as_gpu.resizeN(n);
     bs_gpu.resizeN(nd);
     cs_gpu.resizeN(nd);
     ds_gpu.resizeN(n);
+    es_gpu.resizeN(nd);
 
     {
         std::string flags = "-DCOUNTER_SIZE=" + std::to_string(counter_size);
 
-        ocl::Kernel fill_zero(utils_kernel, utils_kernel_length, "fill_zero", flags);
-        ocl::Kernel shift(utils_kernel, utils_kernel_length, "shift", flags);
+        ocl::Kernel fill_zero(utils_kernel, utils_kernel_length, "fill_zero");
+        ocl::Kernel shift(utils_kernel, utils_kernel_length, "shift");
         ocl::Kernel counting(counting_kernel, counting_kernel_length, "counting", flags);
         ocl::Kernel prefix_sum(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum", flags);
+        ocl::Kernel merge(merge_sort_kernel, merge_sort_kernel_length, "merge", flags);
         ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix", flags);
         fill_zero.compile();
         shift.compile();
         counting.compile();
         prefix_sum.compile();
+        merge.compile();
         radix.compile();
 
         timer t;
@@ -95,12 +101,20 @@ int main(int argc, char **argv) {
                 fill_zero.exec(wsnd, cs_gpu, nd);
 
                 counting.exec(wsn, as_gpu, bs_gpu, i, n);
+                bs_gpu.copyToN(es_gpu, nd);
+
                 for (unsigned offset = 1; offset < nd; offset *= 2) {
                     prefix_sum.exec(wsnd, bs_gpu, cs_gpu, offset, nd);
                     std::swap(bs_gpu, cs_gpu);
                 }
+
                 shift.exec(wsnd, bs_gpu, cs_gpu, nd);
-                radix.exec(wsn, as_gpu, ds_gpu, cs_gpu, i, n);
+
+                for (unsigned size = 1, end = std::min(work_size, n); size <= end; size *= 2) {
+                    merge.exec(wsn, as_gpu, ds_gpu, i, size, n);
+                    std::swap(as_gpu, ds_gpu);
+                }
+                radix.exec(wsn, as_gpu, ds_gpu, cs_gpu, es_gpu, i, n);
                 std::swap(as_gpu, ds_gpu);
             }
 
