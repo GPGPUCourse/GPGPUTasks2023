@@ -209,7 +209,7 @@ __kernel void radix_reorder(__global const uint *src, __global uint *dst, __glob
 
     __local uint *loc_off_src = loc_off1;
     __local uint *loc_off_dst = loc_off2;
-    for (uint step = 1; step < WORK_GROUP_SIZE; step *= 2) {
+    for (uint step = 1; step < RADIX_BASE; step *= 2) {
         barrier(CLK_LOCAL_MEM_FENCE);
 
         for (uint off = 0; off < RADIX_BASE; off += WORK_GROUP_SIZE) {
@@ -231,17 +231,8 @@ __kernel void radix_reorder(__global const uint *src, __global uint *dst, __glob
 
     const uint loc_key_beg = my_key == 0 ? 0 : loc_off_src[my_key - 1];
     const uint dst_off_lid = lid - loc_key_beg;
-    {
-        const uint loc_key_end = loc_off_src[my_key];
-        if (loc_key_beg > lid || lid >= loc_key_end) {
-            printf("[ERROR]: %u <= %u < %u, key=%u\n", loc_key_beg, lid, loc_key_end, my_key);
-        }
-    }
     const uint dst_off_gid = dst_off_wg + dst_off_lid;
     if (gid < len) {
-        // if (dst_off_gid >= len) {
-        //     printf("[ERROR]: gid = %u, dst_off_gid = %u\n", gid, dst_off_gid);
-        // }
         dst[dst_off_gid] = my_x;
     }
 }

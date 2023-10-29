@@ -78,10 +78,10 @@ void radix_gpu(const cl_uint STEP_BITS, bool local, bool transposed) {
     const cl_uint RADIX_MASK = RADIX_BASE - 1;
     const cl_uint N_WORK_GROUPS = (N + WORK_GROUP_SIZE - 1) / WORK_GROUP_SIZE;
     const cl_uint N_OFFSETS = RADIX_BASE * N_WORK_GROUPS;
-    const cl_uint TILE_SIZE = std::min(RADIX_BASE, cl_uint(32));
+    const cl_uint TILE_SIZE = std::min(RADIX_BASE, cl_uint(16));
 
     const gpu::WorkSize ws_count(WORK_GROUP_SIZE, N);
-    const gpu::WorkSize ws_matrix(TILE_SIZE, RADIX_BASE, TILE_SIZE, N_WORK_GROUPS);
+    const gpu::WorkSize ws_matrix(TILE_SIZE, TILE_SIZE, RADIX_BASE, N_WORK_GROUPS);
     const gpu::WorkSize ws_offset(WORK_GROUP_SIZE, N_OFFSETS);
 
     gpu::gpu_mem_32u gpu_src;
@@ -188,7 +188,7 @@ int main(int argc, char **argv) {
     for (cl_uint i = 0; i < N; ++i) {
         as[i] = static_cast<cl_uint>(r.next(0, std::numeric_limits<int>::max()));
     }
-    std::cout << "Data generated for n=" << N << "!" << std::endl;
+    std::cout << "Data generated for n=" << N << "!\n\n";
 
     std::vector<unsigned int> cpu_sorted(N, 0);
     {
@@ -201,9 +201,9 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << 1e-6 * N / t.lapAvg() << " millions/s" << std::endl;
     }
 
-    // 8 уже слишком много, 256 * 32 уже не влезает в локальную память,
-    // а делать work group меньше 32 нет смысла.
-    for (cl_uint STEP_BITS = 1; STEP_BITS < 8; STEP_BITS *= 2) {
+    // 16 уже слишком много, 2^16 счётчиков уже
+    // не влезает в локальную память.
+    for (cl_uint STEP_BITS = 1; STEP_BITS <= 8; STEP_BITS *= 2) {
         radix_gpu(STEP_BITS, false, false);
         radix_gpu(STEP_BITS, false, true);
         radix_gpu(STEP_BITS, true, false);
