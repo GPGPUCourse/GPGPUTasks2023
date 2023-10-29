@@ -50,32 +50,90 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
-    /*
+
+    const unsigned int digits_number = 4;
+    const unsigned int bits_number = 2;
+    const unsigned int bits_in_uint = 32;
+    const unsigned int work_group_size = 32;
+    const unsigned int global_work_size = n;
+    const unsigned int work_groups_number = n / work_group_size + (n % work_group_size == 0 ? 0 : 1);
+    const unsigned int counters_size = work_groups_number * digits_number;
+
+    const std::vector<unsigned int> zeros(counters_size, 0);
     gpu::gpu_mem_32u as_gpu;
     as_gpu.resizeN(n);
+    gpu::gpu_mem_32u as_sorted_gpu;
+    as_sorted_gpu.resizeN(n);
+    gpu::gpu_mem_32u counters_gpu;
+    counters_gpu.resizeN(counters_size);
+    gpu::gpu_mem_32u prefix_sums_gpu;
+    prefix_sums_gpu.resizeN(counters_size);
 
     {
-        ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix");
-        radix.compile();
+        ocl::Kernel radix_count(radix_kernel, radix_kernel_length, "radix_count");
+        radix_count.compile();
+
+        ocl::Kernel radix_prefix_sum(radix_kernel, radix_kernel_length, "radix_prefix_sum");
+        radix_prefix_sum.compile();
+
+        ocl::Kernel radix_prefix_sum_reduce(radix_kernel, radix_kernel_length, "radix_prefix_sum_reduce");
+        radix_prefix_sum_reduce.compile();
+
+        ocl::Kernel radix_sort(radix_kernel, radix_kernel_length, "radix_sort");
+        radix_sort.compile();
 
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
-
-            t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
-
-            // TODO
+            t.restart();
+            for (int bits_offset = 0; bits_offset < bits_in_uint; bits_offset += bits_number) {
+                counters_gpu.writeN(zeros.data(), counters_size);
+                prefix_sums_gpu.writeN(zeros.data(), counters_size);
+                radix_count.exec(
+                    gpu::WorkSize(work_group_size, global_work_size),
+                    as_gpu, 
+                    n, 
+                    counters_gpu,
+                    work_groups_number,
+                    bits_offset
+                );
+                for (unsigned int cur_block_size = 1; cur_block_size <= work_groups_number; cur_block_size <<= 1) {
+                    radix_prefix_sum.exec(
+                        gpu::WorkSize(work_group_size, work_groups_number), 
+                        counters_gpu,
+                        prefix_sums_gpu,
+                        work_groups_number,
+                        cur_block_size
+                    );
+                    radix_prefix_sum_reduce.exec(
+                        gpu::WorkSize(work_group_size, work_groups_number / cur_block_size),
+                        counters_gpu,
+                        work_groups_number,
+                        cur_block_size
+                    );
+                }
+                radix_sort.exec(
+                    gpu::WorkSize(work_group_size, global_work_size),
+                    as_gpu, 
+                    as_sorted_gpu,
+                    n, 
+                    prefix_sums_gpu,
+                    work_groups_number,
+                    bits_offset
+                );
+            }
+            t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
 
-        as_gpu.readN(as.data(), n);
+        as_sorted_gpu.readN(as.data(), n);
     }
 
     // Проверяем корректность результатов
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
-*/
+
     return 0;
 }
