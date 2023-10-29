@@ -92,7 +92,6 @@ int main(int argc, char **argv) {
                 counters_gpu.writeN(zeros.data(), counters_size);
                 prefix_sums_gpu.writeN(zeros.data(), counters_size);
                 // as_sorted_gpu.writeN(zeros.data(), n);
-                std::cout << "DEBUG 1\n";
                 radix_count.exec(gpu::WorkSize(work_group_size, global_work_size), as_gpu, n, counters_gpu,
                                  work_groups_number, bits_offset);
                 for (unsigned int cur_block_size = 1; cur_block_size <= work_groups_number; cur_block_size <<= 1) {
@@ -128,7 +127,8 @@ int main(int argc, char **argv) {
             std::cout << "\n";
             for (int j = 0; j < n; ++j) {
                 if (as[j] != 0) {
-                    for (int e = j; e < 32; ++e) {
+                    std::cout << j << '\n';
+                    for (int e = j; e < j + 32; ++e) {
                         std::cout << as[e] << " ";
                     }
                     std::cout << '\n';

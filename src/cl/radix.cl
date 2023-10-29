@@ -13,6 +13,7 @@ __kernel void radix_count(const __global unsigned int *as, const unsigned int n,
         local_counters[local_i] = 0;
     }
     atomic_add(&local_counters[(as[i] >> mask_offset) & mask], 1);
+    barrier(CLK_LOCAL_MEM_FENCE);
     if (local_i < DIGITS_NUMBER) {
         counters[local_i * working_groups_number + get_group_id(0)] = local_counters[local_i];
     }
