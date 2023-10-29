@@ -12,7 +12,7 @@ __kernel void radix_count(const __global unsigned int *as, const unsigned int n,
     if (local_i < DIGITS_NUMBER) {
         local_counters[local_i] = 0;
     }
-    atomic_inc(&local_counters[(as[i] >> mask_offset) & mask]);
+    atomic_add(&local_counters[(as[i] >> mask_offset) & mask], 1);
     if (local_i < DIGITS_NUMBER) {
         counters[local_i * working_groups_number + get_group_id(0)] = local_counters[local_i];
     }
