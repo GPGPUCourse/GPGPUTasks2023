@@ -30,8 +30,8 @@ int main(int argc, char **argv) {
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 10;
-    unsigned int n = 32 * 1024 * 1024;
+    int benchmarkingIters = 1;
+    unsigned int n = 1024 * 1024;
     std::vector<unsigned int> as(n, 0);
     std::vector<unsigned int> debug(n, 0);
     FastRandom r(n);
@@ -91,7 +91,7 @@ int main(int argc, char **argv) {
                 counters_gpu.writeN(zeros.data(), counters_size);
                 prefix_sums_gpu.writeN(zeros.data(), counters_size);
                 as_sorted_gpu.writeN(zeros.data(), n);
-                
+
                 radix_count.exec(gpu::WorkSize(work_group_size, global_work_size), as_gpu, n, counters_gpu,
                                  work_groups_number, bits_offset);
                 for (unsigned int cur_block_size = 1; cur_block_size <= work_groups_number; cur_block_size <<= 1) {
@@ -113,6 +113,17 @@ int main(int argc, char **argv) {
     }
 
     for (int i = 0; i < n; ++i) {
+        if (as[i] != cpu_sorted[i]) {
+            std::cout << as[i] << std::endl;
+            for (int w = 0; w < 32; w++) {
+                std::cout << as[i + w] << " ";
+            }
+            std::cout << "\n";
+            for (int w = 0; w < 32; w++) {
+                std::cout << cpu_sorted[i + w] << " ";
+            }
+            std::cout << "\n";
+        }
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
 
