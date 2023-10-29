@@ -22,6 +22,11 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 int main(int argc, char **argv)
 {
+    gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+    gpu::Context context;
+    context.init(device.device_id_opencl);
+    context.activate();
+
 	int benchmarkingIters = 10;
 	unsigned int max_n = (1 << 24);
 
@@ -78,6 +83,42 @@ int main(int argc, char **argv)
 
 		{
 			// TODO: implement on OpenCL
+			ocl::Kernel prefixSum(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum");
+			prefixSum.compile();
+
+			// Prepare empty arrays
+			gpu::gpu_mem_32u as_gpu, gpuResult;
+			as_gpu.resizeN(n);
+			gpuResult.resizeN(n);
+
+			timer t;
+			for (int iter = 0; iter < benchmarkingIters; ++iter) {
+				// Move as into gpu
+				as_gpu.writeN(as.data(), n);
+				t.restart();
+
+				// Do the sorting
+				for (uint blockSize = 1; blockSize <= n; blockSize *= 2) {
+					prefixSum.exec(gpu::WorkSize(128, n), as_gpu, gpuResult, blockSize, n);
+					as_gpu.swap(gpuResult);
+				}
+
+				t.nextLap();
+
+				// Check results
+				std::vector<unsigned int> gpuResultCPU(n);
+				as_gpu.readN(gpuResultCPU.data(), n);
+				// for (int i = 0; i < 10; ++i) {
+				// 	std::cout << as[i] << ";" << gpuResultCPU[i] << ";" << reference_result[i] << std::endl;
+				// }
+
+				for (int i = 0; i < n; ++i) {
+					EXPECT_THE_SAME(reference_result[i], gpuResultCPU[i], "GPU results should be equal to CPU results!");
+				}
+			}
+
+			std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+			std::cout << "GPU: " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
 		}
 	}
 }
