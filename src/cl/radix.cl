@@ -1,12 +1,7 @@
 #define DIGITS_NUMBER 4
 
-__kernel void radix_count(
-    __global unsigned int *as, 
-    const unsigned int n,
-     __global unsigned int *counters,
-    const unsigned int working_groups_number,
-     const unsigned int mask_offset
-) {
+__kernel void radix_count(__global unsigned int *as, const unsigned int n, __global unsigned int *counters,
+                          const unsigned int working_groups_number, const unsigned int mask_offset) {
     const unsigned int i = get_global_id(0);
     if (i >= n) {
         return;
@@ -25,12 +20,8 @@ __kernel void radix_count(
     }
 }
 
-__kernel void radix_prefix_sum(
-    const __global unsigned int *counters,
-     __global unsigned int *prefix_sums_dst,
-    const unsigned int working_groups_number,
-    const unsigned int cur_block_size
-) {
+__kernel void radix_prefix_sum(const __global unsigned int *counters, __global unsigned int *prefix_sums_dst,
+                               const unsigned int working_groups_number, const unsigned int cur_block_size) {
     const unsigned int i = get_global_id(0);
     if (i >= working_groups_number) {
         return;
@@ -51,28 +42,21 @@ __kernel void radix_prefix_sum(
     }
 }
 
-__kernel void radix_prefix_sum_reduce(
-    __global unsigned int *counters,
-    const unsigned int working_groups_number,
-    const unsigned int cur_block_size
-) {
+__kernel void radix_prefix_sum_reduce(__global unsigned int *counters, const unsigned int working_groups_number,
+                                      const unsigned int cur_block_size) {
     const unsigned int i = get_global_id(0);
     if ((i + 1) * cur_block_size < working_groups_number + 1 && i * cur_block_size > 0) {
         for (unsigned int cur_bit_offset = 0; cur_bit_offset < DIGITS_NUMBER * working_groups_number;
              cur_bit_offset += working_groups_number) {
-            counters[cur_bit_offset + (i + 1) * cur_block_size - 1] += counters[cur_bit_offset + i * cur_block_size - 1];
+            counters[cur_bit_offset + (i + 1) * cur_block_size - 1] +=
+                    counters[cur_bit_offset + i * cur_block_size - 1];
         }
     }
 }
 
-__kernel void radix_sort(
-    const __global unsigned int *as,
-    __global unsigned int *as_sorted_dst,
-    const unsigned int n,
-    __global unsigned int *prefix_sums,
-    const unsigned int working_groups_number,
-    const unsigned int mask_offset
-) {
+__kernel void radix_sort(const __global unsigned int *as, __global unsigned int *as_sorted_dst, const unsigned int n,
+                         __global unsigned int *prefix_sums, const unsigned int working_groups_number,
+                         const unsigned int mask_offset) {
     const unsigned int i = get_global_id(0);
     if (i >= n) {
         return;
@@ -94,6 +78,3 @@ __kernel void radix_sort(
     }
     as_sorted_dst[dst_i] = as[i];
 }
-
-
-

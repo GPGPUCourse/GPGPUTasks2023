@@ -32,8 +32,6 @@ int main(int argc, char **argv) {
 
     int benchmarkingIters = 10;
     unsigned int n = 32 * 1024 * 1024;
-    // int benchmarkingIters = 1;
-    // unsigned int n = 1024 * 1024;
     std::vector<unsigned int> as(n, 0);
     std::vector<unsigned int> debug(n, 0);
     FastRandom r(n);
@@ -41,14 +39,6 @@ int main(int argc, char **argv) {
         as[i] = (unsigned int) r.next(0, std::numeric_limits<int>::max());
     }
     std::cout << "Data generated for n=" << n << "!" << std::endl;
-    // for (int k = 0; k < 32; ++k) {
-    //     std::cout << as[k] << " ";
-    // }
-    // std::cout << "\n";
-    // for (int k = 32; k < 64; ++k) {
-    //     std::cout << as[k] << " ";
-    // }
-    // std::cout << "\n";
 
     std::vector<unsigned int> cpu_sorted;
     {
@@ -97,77 +87,21 @@ int main(int argc, char **argv) {
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
             t.restart();
-            for (int bits_offset = 0; bits_offset < bits_in_uint; bits_offset += bits_number) {
+            for (int bits_offset = 0; bits_offset <= bits_in_uint; bits_offset += bits_number) {
                 counters_gpu.writeN(zeros.data(), counters_size);
                 prefix_sums_gpu.writeN(zeros.data(), counters_size);
-                as_sorted_gpu.writeN(zeros.data(), n);;
-                radix_count.exec(
-                    gpu::WorkSize(work_group_size, global_work_size),
-                    as_gpu, 
-                    n, 
-                    counters_gpu,
-                    work_groups_number,
-                    bits_offset
-                );
-                // std::cout << '\n';
-                // std::cout << '\n';
-                // counters_gpu.readN(debug.data(), counters_size);
-                // for (int q = 0; q < 4; ++q) {
-                //     std::cout << debug[q * work_groups_number] << ' ';
-                // }
-                // std::cout << '\n';
-                // for (int q = 0; q < 4; ++q) {
-                //     std::cout << debug[q * work_groups_number + 1] << ' ';
-                // }
-                // std::cout << '\n';
-                // for (int q = 0; q < 4; ++q) {
-                //     std::cout << debug[q * work_groups_number + 2] << ' ';
-                // }
-                
-                // std::cout << '\n';
+                as_sorted_gpu.writeN(zeros.data(), n);
+                ;
+                radix_count.exec(gpu::WorkSize(work_group_size, global_work_size), as_gpu, n, counters_gpu,
+                                 work_groups_number, bits_offset);
                 for (unsigned int cur_block_size = 1; cur_block_size <= work_groups_number; cur_block_size <<= 1) {
-                    radix_prefix_sum.exec(
-                        gpu::WorkSize(work_group_size, work_groups_number), 
-                        counters_gpu,
-                        prefix_sums_gpu,
-                        work_groups_number,
-                        cur_block_size
-                    );
-                    radix_prefix_sum_reduce.exec(
-                        gpu::WorkSize(work_group_size, work_groups_number / cur_block_size),
-                        counters_gpu,
-                        work_groups_number,
-                        cur_block_size
-                    );
+                    radix_prefix_sum.exec(gpu::WorkSize(work_group_size, work_groups_number), counters_gpu,
+                                          prefix_sums_gpu, work_groups_number, cur_block_size);
+                    radix_prefix_sum_reduce.exec(gpu::WorkSize(work_group_size, work_groups_number / cur_block_size),
+                                                 counters_gpu, work_groups_number, cur_block_size);
                 }
-                // std::cout << '\n';
-                // std::cout << '\n';
-                
-                // prefix_sums_gpu.readN(debug.data(), counters_size);
-                // for (int q = 0; q < 4; ++q) {
-                //     std::cout << debug[q * work_groups_number] << ' ';
-                // }
-                // std::cout << '\n';
-                // for (int q = 0; q < 4; ++q) {
-                //     std::cout << debug[q * work_groups_number + 1] << ' ';
-                // }
-
-                // std::cout << '\n';
-                // for (int q = 0; q < 4; ++q) {
-                //     std::cout << debug[q * work_groups_number + 2] << ' ';
-                // }
-                // std::cout << '\n';
-                // std::cout << '\n';
-
-                radix_sort.exec(
-                    gpu::WorkSize(work_group_size, global_work_size),
-                    as_gpu, 
-                    as_sorted_gpu,
-                    n, 
-                    prefix_sums_gpu,
-                    work_groups_number,
-                    bits_offset
-                );
+                radix_sort.exec(gpu::WorkSize(work_group_size, global_work_size), as_gpu, as_sorted_gpu, n,
+                                prefix_sums_gpu, work_groups_number, bits_offset);
                 std::swap(as_sorted_gpu, as_gpu);
             }
             t.nextLap();
@@ -178,28 +112,19 @@ int main(int argc, char **argv) {
         as_sorted_gpu.readN(as.data(), n);
     }
 
-    // Проверяем корректность результатов
-    // for (int i = 0; i < 64; ++i) {
-    //     std::cout << as[i] << ' ';
-    // }
-    // std::cout << '\n';
-    // for (int i = 0; i < 64; ++i) {
-    //     std::cout << cpu_sorted[i] << ' ';
-    // }
-    // std::cout << '\n';
     for (int i = 0; i < n; ++i) {
         if (as[i] != cpu_sorted[i]) {
             std::cout << i << '\n';
             for (int w = 0; w < 32; ++w) {
-                std::cout  << as[i + w - 1] << ' ';
+                std::cout << as[i + w - 1] << ' ';
             }
-            std::cout  << '\n';
+            std::cout << '\n';
             for (int w = 0; w < 32; ++w) {
-                std::cout  << cpu_sorted[i + w - 1] << ' ';
+                std::cout << cpu_sorted[i + w - 1] << ' ';
             }
-            std::cout  << '\n';
+            std::cout << '\n';
         }
-            
+
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
 
