@@ -1,8 +1,8 @@
-#include <libgpu/context.h>
-#include <libgpu/shared_device_buffer.h>
-#include <libutils/fast_random.h>
-#include <libutils/misc.h>
-#include <libutils/timer.h>
+#include "../libs/gpu/libgpu/context.h"
+#include "../libs/gpu/libgpu/shared_device_buffer.h"
+#include "../libs/utils/libutils/fast_random.h"
+#include "../libs/utils/libutils/misc.h"
+#include "../libs/utils/libutils/timer.h"
 
 // Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
 #include "cl/radix_cl.h"
@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
-    /*
+
     gpu::gpu_mem_32u as_gpu;
     as_gpu.resizeN(n);
 
@@ -76,6 +76,6 @@ int main(int argc, char **argv) {
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
-*/
+
     return 0;
 }
