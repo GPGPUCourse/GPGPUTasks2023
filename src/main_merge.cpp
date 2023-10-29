@@ -29,10 +29,8 @@ int main(int argc, char **argv) {
     gpu::Context context;
     context.init(device.device_id_opencl);
     context.activate();
-
-
     
-    int benchmarkingIters = 10;
+    int benchmarkingIters = 1;
     unsigned int n = 32 * 1024 * 1024;
 
     std::vector<float> as(n, 0);
@@ -54,49 +52,72 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
 
-    gpu::gpu_mem_32f input_gpu;
-    input_gpu.resizeN(n);
-    gpu::gpu_mem_32f output_gpu;
-    output_gpu.resizeN(n);
+    std::vector<float> gpu_sorted(n);
+    {
+        gpu::gpu_mem_32f input_gpu;
+        input_gpu.resizeN(n);
+        gpu::gpu_mem_32f output_gpu;
+        output_gpu.resizeN(n);
 
-    std::vector<int> split_a(2 * n);
-    std::vector<int> split_b(2 * n);
+        std::vector<int> split_a(2 * n);
+        std::vector<int> split_b(2 * n);
 
-    gpu::gpu_mem_32i split_a_gpu;
-    split_a_gpu.resizeN(2 * n);
-    gpu::gpu_mem_32i split_b_gpu;
-    split_b_gpu.resizeN(2 * n);
+        gpu::gpu_mem_32i split_a_gpu;
+        split_a_gpu.resizeN(2 * n);
+        gpu::gpu_mem_32i split_b_gpu;
+        split_b_gpu.resizeN(2 * n);
 
-    const int WORK_PER_ITEM = 8;
+        const int WORK_PER_ITEM = 128;
 
-    ocl::Kernel diag_binsearch(merge_kernel, merge_kernel_length, "diag_binsearch", "-DWORK_PER_ITEM=" + std::to_string(WORK_PER_ITEM));
-    diag_binsearch.compile();
+        ocl::Kernel diag_binsearch(merge_kernel, merge_kernel_length, "diag_binsearch",
+                                   "-DWORK_PER_ITEM=" + std::to_string(WORK_PER_ITEM));
+        diag_binsearch.compile();
 
-    ocl::Kernel merge(merge_kernel, merge_kernel_length, "merge", "-DWORK_PER_ITEM=" + std::to_string(WORK_PER_ITEM));
-    merge.compile();
-    
-    unsigned int workGroupSize = 64;
-    unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
+        ocl::Kernel merge(merge_kernel, merge_kernel_length, "merge",
+                          "-DWORK_PER_ITEM=" + std::to_string(WORK_PER_ITEM));
+        merge.compile();
 
-    input_gpu.writeN(as.data(), n);
+        ocl::Kernel merge_smart(merge_kernel, merge_kernel_length, "merge_smart",
+                          "-DWORK_PER_ITEM=" + std::to_string(WORK_PER_ITEM));
+        merge_smart.compile();
 
-    timer t;
-    for(int i = 0; i < benchmarkingIters; i++) {
-        for(int block_size = 2; block_size / 2 < n; block_size <<= 1) {
-            diag_binsearch.exec(gpu::WorkSize(workGroupSize, global_work_size), input_gpu, split_a_gpu, split_b_gpu, n, block_size);
-            merge.exec(gpu::WorkSize(workGroupSize, global_work_size), input_gpu, output_gpu, split_a_gpu, split_b_gpu, n, block_size);
-            std::swap(input_gpu, output_gpu);
+        unsigned int workGroupSize = 64;
+        unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
+
+        input_gpu.writeN(as.data(), n);
+
+        timer t;
+        for (int i = 0; i < benchmarkingIters; i++) {
+            for (int block_size = 2; block_size / 2 < n; block_size <<= 1) {
+                int items_per_block = (block_size + WORK_PER_ITEM - 1) / WORK_PER_ITEM + 1;
+                global_work_size = ((n + block_size - 1) / block_size) * items_per_block;
+                diag_binsearch.exec(gpu::WorkSize(workGroupSize, global_work_size),
+                                    input_gpu,split_a_gpu, split_b_gpu, n, block_size);
+                if(block_size < WORK_PER_ITEM) {
+                    items_per_block = (block_size + WORK_PER_ITEM - 1) / WORK_PER_ITEM;
+                    global_work_size = ((n + block_size - 1) / block_size) * items_per_block;
+                    merge.exec(gpu::WorkSize(WORK_PER_ITEM, global_work_size), input_gpu, output_gpu, split_a_gpu,
+                               split_b_gpu, n, block_size);
+                } else {
+                    items_per_block = (block_size + WORK_PER_ITEM - 1) / WORK_PER_ITEM;
+                    global_work_size = ((n + block_size - 1) / block_size) * items_per_block * WORK_PER_ITEM;
+                    merge_smart.exec(gpu::WorkSize(WORK_PER_ITEM, global_work_size), input_gpu, output_gpu, split_a_gpu,
+                                     split_b_gpu, n, block_size);
+                }
+                std::swap(input_gpu, output_gpu);
+            }
+            t.nextLap();
         }
-        t.nextLap();
-    }
-    std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-    std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
 
-    input_gpu.readN(as.data(), n);
+        input_gpu.readN(gpu_sorted.data(), n);
+    }
 
     // Проверяем корректность результатов
     for (int i = 0; i < n; ++i) {
-        EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
+        //std::cout << gpu_sorted1[i] << " " << gpu_sorted2[i] << "\n";
+        EXPECT_THE_SAME(cpu_sorted[i], gpu_sorted[i], "GPU results should be equal to CPU results!");
     }
     return 0;
 }

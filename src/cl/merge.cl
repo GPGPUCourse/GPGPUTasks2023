@@ -57,8 +57,6 @@ __kernel void merge(__global const float *input,
     float block_a[WORK_PER_ITEM];
     float block_b[WORK_PER_ITEM];
 
-    //printf("%d %d\n", la, ra);
-
     for(int i = la; i < ra; i++)
         block_a[i - la] = input[i];
     for(int i = lb; i < rb; i++)
@@ -82,5 +80,66 @@ __kernel void merge(__global const float *input,
     while(j < rb - lb) {
         output[target_index + i + j] = block_b[j];
         ++j;
+    }
+}
+
+__kernel void merge_smart(__global const float *input,
+                    __global float *output,
+                    __global const int *split_a,
+                    __global const int *split_b,
+                    unsigned int n,
+                    unsigned int block_size)
+{
+    int index = get_global_id(0);
+    int items_per_block = (block_size + WORK_PER_ITEM - 1) / WORK_PER_ITEM;
+    int block_index = get_group_id(0) / items_per_block;
+    int work_index = get_group_id(0) % items_per_block;
+    int i = get_local_id(0);
+
+    int target_index = block_index * block_size + work_index * WORK_PER_ITEM;
+
+    int index_in_split_array = block_index * (items_per_block + 1) + work_index;
+    int la = split_a[index_in_split_array];
+    int ra = split_a[index_in_split_array + 1];
+    int lb = split_b[index_in_split_array];
+    int rb = split_b[index_in_split_array + 1];
+
+    __local float block_a[WORK_PER_ITEM];
+    __local float block_b[WORK_PER_ITEM];
+
+    if(target_index + i < n && i < block_size) {
+        if(i < ra - la)
+            block_a[i] = input[la + i];
+        else {
+            int j = i - (ra - la);
+            block_b[j] = input[lb + j];
+        }
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    if(target_index + i >= n || i >= block_size) return;
+
+    if(i < ra - la) {
+            int l = 0, r = rb - lb;
+            while(l < r) {
+                int mid = (l + r) / 2;
+                if(block_b[mid] > block_a[i])
+                    r = mid;
+                else
+                    l = mid + 1;
+            }
+            output[target_index + i + r] = block_a[i];
+    }
+    else {
+            int j = i - (ra - la);
+            int l = 0, r = ra - la;
+            while(l < r) {
+                int mid = (l + r) / 2;
+                if(block_a[mid] >= block_b[j])
+                    r = mid;
+                else
+                    l = mid + 1;
+            }
+            output[target_index + j + r] = block_b[j];
     }
 }
