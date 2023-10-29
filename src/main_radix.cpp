@@ -30,8 +30,8 @@ int main(int argc, char **argv) {
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 1;
-    unsigned int n = 1024 * 1024;
+    int benchmarkingIters = 10;
+    unsigned int n = 32 * 1024 * 1024;
     std::vector<unsigned int> as(n, 0);
     std::vector<unsigned int> debug(n, 0);
     FastRandom r(n);
@@ -55,7 +55,6 @@ int main(int argc, char **argv) {
     const unsigned int digits_number = 4;
     const unsigned int bits_number = 2;
     const unsigned int bits_in_uint = sizeof(unsigned int) * 8;
-    std::cout << "bits_in_uint: " << bits_in_uint << '\n';
     const unsigned int work_group_size = 32;
     const unsigned int global_work_size = n;
     const unsigned int work_groups_number = n / work_group_size + 1;
@@ -91,7 +90,6 @@ int main(int argc, char **argv) {
             for (int bits_offset = 0; bits_offset <= bits_in_uint; bits_offset += bits_number) {
                 counters_gpu.writeN(zeros.data(), counters_size);
                 prefix_sums_gpu.writeN(zeros.data(), counters_size);
-                // as_sorted_gpu.writeN(zeros.data(), n);
                 radix_count.exec(gpu::WorkSize(work_group_size, global_work_size), as_gpu, n, counters_gpu,
                                  work_groups_number, bits_offset);
                 for (unsigned int cur_block_size = 1; cur_block_size <= work_groups_number; cur_block_size <<= 1) {
@@ -113,29 +111,6 @@ int main(int argc, char **argv) {
     }
 
     for (int i = 0; i < n; ++i) {
-        if (as[i] != cpu_sorted[i]) {
-            std::cout << as[i] << std::endl;
-            for (int w = 0; w < 32; w++) {
-                std::cout << as[i + w] << " ";
-            }
-            std::cout << "\n";
-            for (int w = 0; w < 32; w++) {
-                std::cout << cpu_sorted[i + w] << " ";
-            }
-            std::cout << "\n";
-            std::cout << "\n";
-            std::cout << "\n";
-            for (int j = 0; j < n; ++j) {
-                if (as[j] != 0) {
-                    std::cout << j << '\n';
-                    for (int e = j; e < j + 32; ++e) {
-                        std::cout << as[e] << " ";
-                    }
-                    std::cout << '\n';
-                    break;
-                }
-            }
-        }
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
 
