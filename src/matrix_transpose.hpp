@@ -6,6 +6,8 @@
 
 #include <libutils/misc.h>
 
+#include <algorithm>
+
 class Transpose {
 private:
     ocl::Kernel matrix_transpose_kernel_;
@@ -19,7 +21,7 @@ public:
     }
 
     template<typename T>
-    void transpose(size_t K, size_t M, const T& as_gpu, T& bs_gpu)
+    void transpose(unsigned int K, unsigned int M, const T& as_gpu, T& bs_gpu)
     {
         unsigned int work_group_size_K = std::min(K, work_group_size);
         unsigned int work_group_size_M = std::min(M, work_group_size);

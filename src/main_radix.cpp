@@ -93,8 +93,6 @@ int main(int argc, char **argv) {
         auto workGroupSize = 128;
         auto workSize = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
 
-//        print_data(cpu_sorted, n, "cpu sorted", workGroupSize);
-
         size_t counter_rows = workSize / workGroupSize;
         size_t counter_size = border * counter_rows;
         cs_gpu.resizeN(counter_size + 1);
@@ -104,28 +102,21 @@ int main(int argc, char **argv) {
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
 
-//            print_gpu(as_gpu, n, "init", workGroupSize);
             t.restart(); // Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
             for (int i = 0; i < (sizeof(unsigned int) * 8) / width; ++i) {
                 merge_sort.merge_sort(n, as_gpu, bs_gpu, width * i, border - 1, workGroupSize);
-//                print_gpu(as_gpu, n, "sorted", workGroupSize);
                 count.exec(gpu::WorkSize(workGroupSize, workSize),
                            as_gpu, cs_gpu, i);
-//                print_gpu(cs_gpu, counter_size, "counted", border);
 
                 transpose.transpose(border, counter_rows, cs_gpu, cs_gpu_t);
-//                print_gpu(cs_gpu_t, counter_size, "transposed", counter_rows);
 
                 prefix.prefix_sum(counter_size, cs_gpu);
-//                print_gpu(cs_gpu, counter_size, "prefix", border);
 
                 prefix.prefix_sum(counter_size, cs_gpu_t);
-//                print_gpu(cs_gpu_t, counter_size, "prefix t", counter_rows);
 
                 radix.exec(gpu::WorkSize(workGroupSize, workSize),
                            as_gpu, i, cs_gpu, cs_gpu_t, res);
-//                print_gpu(res, n, "res", workGroupSize);
 
                 as_gpu.swap(res);
             }

@@ -6,6 +6,8 @@
 
 #include <libutils/misc.h>
 
+#include <algorithm>
+
 class MergeSort {
 private:
     ocl::Kernel merge_sort_kernel_;
@@ -18,13 +20,15 @@ public:
     }
 
     template<typename T>
-    void merge_sort(size_t n, T& as_gpu, T& bs_gpu, unsigned int shift, unsigned int mask, size_t border = 0)
+    void merge_sort(unsigned int n, T& as_gpu, T& bs_gpu, unsigned int shift, unsigned int mask, size_t border = 0)
     {
         if (border == 0) {
             border = n;
         }
-        unsigned int workGroupSize = std::min(n, 128U);
-        unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
+
+        unsigned int workGroupSize = 128;
+        workGroupSize = std::min(n, workGroupSize);
+        const unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
 
         for (unsigned int w = 1; w < border; w <<= 1) {
             merge_sort_kernel_.exec(gpu::WorkSize(workGroupSize, global_work_size),

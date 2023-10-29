@@ -6,6 +6,8 @@
 
 #include <libutils/misc.h>
 
+#include <algorithm>
+
 class PrefixSum {
 private:
     ocl::Kernel prefix_sum_scan_;
@@ -39,7 +41,7 @@ public:
     }
 
     template<typename T>
-    void prefix_sum(size_t n, T& as_gpu)
+    void prefix_sum(unsigned int n, T& as_gpu)
     // as_gpu.resizeN(n + 1);
     // as_gpu.writeN(as.data(), n + 1); // нужно занулить последний элемент для многократного исполнения ядра
     // as_gpu.readN(res.data(), n, 1);
