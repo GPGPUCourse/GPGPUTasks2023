@@ -1,6 +1,6 @@
 #define DIGITS_NUMBER 4
 
-__kernel void radix_count(__global unsigned int *as, const unsigned int n, __global unsigned int *counters,
+__kernel void radix_count(const __global unsigned int *as, const unsigned int n, __global unsigned int *counters,
                           const unsigned int working_groups_number, const unsigned int mask_offset) {
     const unsigned int i = get_global_id(0);
     if (i >= n) {
@@ -9,8 +9,6 @@ __kernel void radix_count(__global unsigned int *as, const unsigned int n, __glo
     const unsigned int local_i = get_local_id(0);
     const unsigned int mask = DIGITS_NUMBER - 1;
     __local unsigned int local_counters[DIGITS_NUMBER];
-    // if (i < 64)
-    //     printf("%d, %d, %d, %d\n", i, mask_offset, as[i], (as[i] >> mask_offset) & mask);
     if (local_i < DIGITS_NUMBER) {
         local_counters[local_i] = 0;
     }
@@ -55,7 +53,7 @@ __kernel void radix_prefix_sum_reduce(__global unsigned int *counters, const uns
 }
 
 __kernel void radix_sort(const __global unsigned int *as, __global unsigned int *as_sorted_dst, const unsigned int n,
-                         __global unsigned int *prefix_sums, const unsigned int working_groups_number,
+                         const __global unsigned int *prefix_sums, const unsigned int working_groups_number,
                          const unsigned int mask_offset) {
     const unsigned int i = get_global_id(0);
     if (i >= n) {

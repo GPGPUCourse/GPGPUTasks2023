@@ -55,6 +55,7 @@ int main(int argc, char **argv) {
     const unsigned int digits_number = 4;
     const unsigned int bits_number = 2;
     const unsigned int bits_in_uint = sizeof(unsigned int) * 8;
+    std::cout << "bits_in_uint: "<< bits_in_uint << '\n';
     const unsigned int work_group_size = 32;
     const unsigned int global_work_size = n;
     const unsigned int work_groups_number = n / work_group_size + 1;
@@ -102,7 +103,7 @@ int main(int argc, char **argv) {
                 }
                 radix_sort.exec(gpu::WorkSize(work_group_size, global_work_size), as_gpu, as_sorted_gpu, n,
                                 prefix_sums_gpu, work_groups_number, bits_offset);
-                std::swap(as_sorted_gpu, as_gpu);
+                as_sorted_gpu.swap(as_gpu);
             }
             t.nextLap();
         }
