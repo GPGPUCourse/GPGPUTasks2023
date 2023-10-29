@@ -83,7 +83,6 @@ int main(int argc, char **argv) {
 
             unsigned int workGroupSize = 128;
             unsigned int global_work_size = (global_block_size + workGroupSize - 1) / workGroupSize * workGroupSize;
-            unsigned int total_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
 
             for (unsigned int current_bit = 0; current_bit < 32; current_bit++) {
                 counters_pref_gpu.writeN(counters_pref.data(), global_block_size);
@@ -97,8 +96,7 @@ int main(int argc, char **argv) {
                     prefix_sum.exec(gpu::WorkSize(workGroupSize, global_work_size), counters_gpu, counters_pref_gpu, global_block_size, block_size);
                 }
 
-                radix.exec(gpu::WorkSize(workGroupSize, total_work_size), counters_pref_gpu, as_gpu, bs_gpu,
-                           current_bit, n);
+                radix.exec(gpu::WorkSize(workGroupSize, (n + workGroupSize - 1) / workGroupSize * workGroupSize), counters_pref_gpu, as_gpu, bs_gpu, current_bit, n);
                 as_gpu.swap(bs_gpu);
             }
 
