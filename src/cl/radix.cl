@@ -55,5 +55,24 @@ __kernel void radix_prefix_sum_reduce(__global unsigned int *counters, const uns
 __kernel void radix_sort(const __global unsigned int *as, __global unsigned int *as_sorted_dst, const unsigned int n,
                          const __global unsigned int *prefix_sums, const unsigned int working_groups_number,
                          const unsigned int mask_offset) {
-    return;
+    const unsigned int i = get_global_id(0);
+    if (i >= n) {
+        return;
+    }
+    const unsigned int mask = DIGITS_NUMBER - 1;
+    const unsigned int bits_value = (as[i] >> mask_offset) & mask;
+    unsigned int dst_i = 0;
+    for (unsigned int p = 0; p < bits_value; ++p) {
+        dst_i += prefix_sums[(p + 1) * working_groups_number - 1];
+    }
+    if (get_group_id(0) > 0) {
+        dst_i += prefix_sums[bits_value * working_groups_number + get_group_id(0) - 1];
+    }
+    const unsigned int wg_size = get_local_size(0);
+    for (unsigned int p = i - (i % wg_size); p < i; ++p) {
+        if (((as[p] >> mask_offset) & mask) == bits_value) {
+            dst_i++;
+        }
+    }
+    as_sorted_dst[i] = as[i];
 }
