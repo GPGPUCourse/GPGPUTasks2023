@@ -143,25 +143,24 @@ uint binsearch_le(uint x, __local const uint *arr, uint len, uint shift) {
 }
 
 void merge_pass(__local const uint *src, __local uint *dst, uint sorted_block_len, uint src_id, uint shift) {
-    uint len = WORK_GROUP_SIZE;
+    const uint len = WORK_GROUP_SIZE;
     if (src_id >= len) {
         return;
     }
 
-    uint own_block = src_id / sorted_block_len;
-    uint sib_block = own_block ^ 1;// *sib*ling
+    const uint own_block = src_id / sorted_block_len;
+    const uint sib_block = own_block ^ 1;// *sib*ling
 
-    uint own_block_start = own_block * sorted_block_len;
-    uint sib_block_start = sib_block * sorted_block_len;
+    const uint own_block_start = own_block * sorted_block_len;
+    const uint sib_block_start = sib_block * sorted_block_len;
 
-    //uint own_block_end = min(len, own_block_start + sorted_block_len);
-    uint sib_block_end = min(len, sib_block_start + sorted_block_len);
-    uint sib_block_len = sib_block_end - sib_block_start;
+    const uint sib_block_end = min(len, sib_block_start + sorted_block_len);
+    const uint sib_block_len = sib_block_end - sib_block_start;
     __local const uint *sib_block_src = src + sib_block_start;
 
     uint dst_id = src_id - own_block % 2 * sorted_block_len;
-    uint x = src[src_id];
-    bool is_left = own_block % 2 == 0;
+    const uint x = src[src_id];
+    const bool is_left = own_block % 2 == 0;
     if (is_left) {
         dst_id += binsearch_lt(x, sib_block_src, sib_block_len, shift);
     } else {
@@ -177,8 +176,6 @@ __kernel void radix_reorder(__global const uint *src, __global uint *dst, __glob
     __local uint loc_val2[WORK_GROUP_SIZE];
     __local uint loc_off1[RADIX_BASE];
     __local uint loc_off2[RADIX_BASE];
-    __local uint buf1[RADIX_BASE * WORK_GROUP_SIZE];
-    __local uint buf2[RADIX_BASE * WORK_GROUP_SIZE];
     const uint gid = get_global_id(0);
     const uint lid = get_local_id(0);
     const uint wid = get_group_id(0);
@@ -200,49 +197,46 @@ __kernel void radix_reorder(__global const uint *src, __global uint *dst, __glob
         loc_val_src = loc_val_dst;
         loc_val_dst = tmp;
     }
-
-    for (uint key = 0; key < RADIX_BASE; ++key) {
-        buf1[key * WORK_GROUP_SIZE + lid] = 0;
-    }
     barrier(CLK_LOCAL_MEM_FENCE);
 
     const uint n_work_groups = (len + WORK_GROUP_SIZE - 1) / WORK_GROUP_SIZE;
 
     const uint my_x = loc_val_src[lid];
     const uint my_key = (my_x >> shift) & RADIX_MASK;
-    if (lid != 0) {
-        const uint prev_x = loc_val_src[lid - 1];
-        const uint prev_key = (prev_x >> shift) & RADIX_MASK;
-        if (prev_key > my_key) {
-            printf("[ERROR]: ordering\n");
-        }
-    }
-    const uint my_off_lid = my_key * WORK_GROUP_SIZE + lid;
-    if (gid < len) {
-        buf1[my_off_lid] = 1;
-    }
     const uint src_off_gid = my_key * n_work_groups + wid;
     const uint dst_off_wg = offsets[src_off_gid];
+    atomic_add(&loc_off1[my_key], 1);
 
-    __local uint *loc_off_src = buf1;
-    __local uint *loc_off_dst = buf2;
+    __local uint *loc_off_src = loc_off1;
+    __local uint *loc_off_dst = loc_off2;
     for (uint step = 1; step < WORK_GROUP_SIZE; step *= 2) {
         barrier(CLK_LOCAL_MEM_FENCE);
-        for (uint key = 0; key < RADIX_BASE; ++key) {
-            const uint off_lid = key * WORK_GROUP_SIZE + lid;
-            uint x = loc_off_src[off_lid];
-            if (lid >= step) {
-                x += loc_off_src[off_lid - step];
+
+        for (uint off = 0; off < RADIX_BASE; off += WORK_GROUP_SIZE) {
+            const uint flat = off + lid;
+            if (flat < RADIX_BASE) {
+                uint x = loc_off_src[flat];
+                if (flat >= step) {
+                    x += loc_off_src[flat - step];
+                }
+                loc_off_dst[flat] = x;
             }
-            loc_off_dst[off_lid] = x;
         }
+
         __local uint *tmp = loc_off_src;
         loc_off_src = loc_off_dst;
         loc_off_dst = tmp;
     }
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    const uint dst_off_lid = lid == 0 ? 0 : loc_off_src[my_off_lid - 1];
+    const uint loc_key_beg = my_key == 0 ? 0 : loc_off_src[my_key - 1];
+    const uint dst_off_lid = lid - loc_key_beg;
+    {
+        const uint loc_key_end = loc_off_src[my_key];
+        if (loc_key_beg > lid || lid >= loc_key_end) {
+            printf("[ERROR]: %u <= %u < %u, key=%u\n", loc_key_beg, lid, loc_key_end, my_key);
+        }
+    }
     const uint dst_off_gid = dst_off_wg + dst_off_lid;
     if (gid < len) {
         // if (dst_off_gid >= len) {
