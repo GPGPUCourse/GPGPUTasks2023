@@ -30,8 +30,8 @@ int main(int argc, char **argv) {
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 1;
-    unsigned int n = 1024 * 1024;
+    int benchmarkingIters = 10;
+    unsigned int n = 32 * 1024 * 1024;
     std::vector<unsigned int> as(n, 0);
     std::vector<unsigned int> debug(n, 0);
     FastRandom r(n);
@@ -84,7 +84,6 @@ int main(int argc, char **argv) {
         radix_sort.compile();
 
         timer t;
-        std::cout << "DEBUG 1\n";
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
             t.restart();
@@ -93,23 +92,17 @@ int main(int argc, char **argv) {
                 prefix_sums_gpu.writeN(zeros.data(), counters_size);
                 as_sorted_gpu.writeN(zeros.data(), n);
                 
-                std::cout << "DEBUG 2\n";
                 radix_count.exec(gpu::WorkSize(work_group_size, global_work_size), as_gpu, n, counters_gpu,
                                  work_groups_number, bits_offset);
                 for (unsigned int cur_block_size = 1; cur_block_size <= work_groups_number; cur_block_size <<= 1) {
-                    std::cout << "DEBUG 3\n";
                     radix_prefix_sum.exec(gpu::WorkSize(work_group_size, work_groups_number), counters_gpu,
                                           prefix_sums_gpu, work_groups_number, cur_block_size);
-                    std::cout << "DEBUG 4\n";
                     radix_prefix_sum_reduce.exec(gpu::WorkSize(work_group_size, work_groups_number / cur_block_size),
                                                  counters_gpu, work_groups_number, cur_block_size);
                 }
-                std::cout << "DEBUG 5\n";
                 radix_sort.exec(gpu::WorkSize(work_group_size, global_work_size), as_gpu, as_sorted_gpu, n,
                                 prefix_sums_gpu, work_groups_number, bits_offset);
-                std::cout << "DEBUG 6\n";
                 std::swap(as_sorted_gpu, as_gpu);
-                std::cout << "DEBUG 7\n";
             }
             t.nextLap();
         }
