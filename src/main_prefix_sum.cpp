@@ -83,8 +83,9 @@ int main(int argc, char **argv)
 
 		{
 			std::vector<unsigned int> res(n, 0);
-			gpu::gpu_mem_32u as_gpu, res_gpu;
+			gpu::gpu_mem_32u as_gpu, bs_gpu, res_gpu;
 			as_gpu.resizeN(n);
+			bs_gpu.resizeN(n);
 			res_gpu.resizeN(n);
 
 			ocl::Kernel compress(prefix_sum_kernel, prefix_sum_kernel_length, "compress");
@@ -102,11 +103,11 @@ int main(int argc, char **argv)
 
 				t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
-				unsigned m = n, depth = 0, compress_coef = 2;
-				for (; m > 0; m /= 2, ++depth, compress_coef *= 2) {
+				unsigned m = n, depth = 0, compress_coef = 2, n_compressed = n;
+				for (; m > 0; m /= 2, ++depth, compress_coef *= 2, n_compressed = (n_compressed + 1) / 2) {
 					prefix_sum.exec(gpu::WorkSize(work_group_size, global_work_size), as_gpu, res_gpu, n, depth, compress_coef);
-					// compress_coef *= 2;
-					compress.exec(gpu::WorkSize(work_group_size, global_work_size), as_gpu, n, compress_coef);
+					compress.exec(gpu::WorkSize(work_group_size, global_work_size), as_gpu, bs_gpu, n_compressed);
+					as_gpu.swap(bs_gpu);
 				}
 				t.nextLap();
 			}
@@ -114,7 +115,6 @@ int main(int argc, char **argv)
 			std::cout << "GPU: " << (static_cast<float>(n) / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
 
 			res_gpu.readN(res.data(), n);
-
 			// Проверяем корректность результатов
 			for (int i = 0; i < n; ++i) {
 				EXPECT_THE_SAME(res[i], reference_result[i], "GPU results should be equal to CPU results!");
