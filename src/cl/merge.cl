@@ -4,10 +4,9 @@
 
 #line 6
 
-#define WORK_PER_THREAD 2
-#define WORKGROUP_SIZE 128
+#define WORKGROUP_SIZE 16
 
-#define DEBUG_GID 32
+#define DEBUG_GID 33
 
 unsigned int find_local_merge_path(const __local float *array,
 							 const unsigned int start0,
@@ -95,8 +94,19 @@ void sort_local(__local float *localIn,
 				const unsigned int right_size,
 				const unsigned int sort_size) {
 	unsigned int interval[4];
-	find_partition_local(localIn, interval, min(left_size, sort_size), min(right_size, sort_size), sort_size);
+	if (get_local_size(0) == sort_size) {
+		find_partition_local(localIn, interval, left_size, right_size, sort_size);
+	} else {
+		find_partition_local(localIn, interval, min(left_size, sort_size), min(right_size, sort_size), sort_size);
+	}
 
+	if (get_global_id(0) == DEBUG_GID) {
+		printf("g (%d, %d)\n", left_size, right_size);
+	}
+
+	if (get_global_id(0) == DEBUG_GID) {
+		printf("g aftr [%d, %d]-[%d, %d]\n", interval[0], interval[1], interval[2], interval[3]);
+	}
 	merge_local(localIn, localOut, interval);
 	barrier(CLK_LOCAL_MEM_FENCE);
 }
@@ -118,14 +128,6 @@ __kernel void merge_small(__global float *array,
 	if (idx < n)
 		localArr[cur_list][lid] = array[idx];
 	unsigned int size1 = min(workSize, (int)n - chunk_num * workSize * 2);
-	printf("g size1: %u=min(%u, %u)=%i ... %u %u %u\n",
-		   size1,
-		   workSize,
-		   n - chunk_num * workSize * 2,
-		   min(workSize, n - chunk_num * workSize * 2),
-		   n,
-		   chunk_num,
-		   workSize);
 	int size2 = 0;
 	if (size1 + chunk_num * workSize * 2 < n)
 	{
@@ -137,7 +139,6 @@ __kernel void merge_small(__global float *array,
 	barrier(CLK_LOCAL_MEM_FENCE);
 
 	for (unsigned int sort_size = 1; sort_size <= workSize; sort_size <<= 1) {
-		printf("g size1: %u, size2: %u (wS: %d, dfdsf: %d)\n", size1, size2, workSize, n - chunk_num * workSize * 2);
 		sort_local(localArr[cur_list], localArr[1 - cur_list], size1, size2, sort_size);
 		cur_list = 1 - cur_list;
 	}
@@ -156,7 +157,6 @@ __kernel void merge_small(__global float *array,
 }
 
 // find first item in interval that is less than or equal to *element*.
-
 unsigned int find_merge_path(const __global float *array,
 					 const unsigned int start0,
 					 const unsigned int count0,
@@ -185,14 +185,23 @@ __kernel void find_partitions(const __global float *array,
 	// intervals: all starts[0], all ends[0], all starts[1], all ends[1].
 	const unsigned int gid = get_global_id(0);
 	const unsigned int workGroups = get_global_size(0);
-	const unsigned int partitions = sortedSize * 2 / get_local_size(0);
+	const unsigned int partitions = sortedSize / get_local_size(0);
 	const unsigned int global_offset = min(n, (gid / partitions) * sortedSize * 2);
 	const unsigned int workGroupSize = get_local_size(0);
 
 	unsigned int pid = gid % partitions;
 	unsigned int l, r, m;
-	unsigned int diag1 = pid * workGroupSize;
-	unsigned int diag2 = (pid + 1) * workGroupSize;
+	unsigned int diag1 = pid * (workGroupSize * 2);
+	unsigned int diag2 = (pid + 1) * (workGroupSize * 2);
+
+//	const unsigned int lid = get_local_id(0);
+//	interval[0] = (lid / sortedSize) * sortedSize * 2;
+//	interval[1] = interval[0] + leftSize;
+//	interval[2] = interval[1];
+//	interval[3] = interval[2] + rightSize;
+//
+//	unsigned int diag = (lid % sortedSize) * 2;
+
 
 	unsigned int interval[4];
 
@@ -201,8 +210,9 @@ __kernel void find_partitions(const __global float *array,
 	interval[2] = interval[1];
 	interval[3] = interval[2] + sortedSize;
 
-////	if (get_global_id(0) == DEBUG_GID)
-////		printf("g%d diags: %d, %d\n", DEBUG_GID, diag, diag + 2);
+//	if (get_global_id(0) == DEBUG_GID)
+//		printf("g%d before %d [%u, %u]-[%u, %u]; %d, %d\n", DEBUG_GID, sortedSize, interval[0], interval[1], interval[2], interval[3], diag1, diag2);
+
 	int idx_start = find_merge_path(array,
 										  interval[0],
 										  interval[1] - interval[0],
@@ -231,45 +241,98 @@ __kernel void merge(const __global float *array,
 					const __global unsigned int *intervals,
 					const unsigned int n) {
 	const unsigned int gid = get_global_id(0);
+	const unsigned int group_id = get_group_id(0);
 	const unsigned int workGroups = get_global_size(0);
-
-	unsigned int starts[2] = {intervals[gid], intervals[gid + workGroups * 2]};
-	unsigned int ends[2] = {intervals[gid] + workGroups * 1, intervals[gid + workGroups * 3]};
-
 
 	const unsigned int lid = get_local_id(0);
 	const unsigned int workSize = get_local_size(0);
-	const unsigned int chunk_num = get_group_id(0);
+	const int a = n / workSize;
+	if (workSize > a)
+		return;
+
+	unsigned int starts[2] = {intervals[group_id], intervals[group_id + workGroups * 2]};
+	unsigned int ends[2] = {intervals[group_id + workGroups * 1], intervals[group_id + workGroups * 3]};
+
 
 	__local float localArr[2][WORKGROUP_SIZE * 2];
 
 	int cur_list = 0;
 
 	unsigned int idx = starts[0] + lid;
-	if (idx < ends[0])
-		localArr[cur_list][lid] = array[idx];
-
-	idx = starts[1] + lid;
-	if (idx < ends[1])
-		localArr[cur_list][lid + ends[0] - starts[0]] = array[idx];
+	unsigned int l_idx = lid;
+//	if (get_global_id(0) == DEBUG_GID) {
+//		printf("g idx0: %d\n", idx);
+//	}
+	while (idx < ends[0]) {
+//		if (get_group_id(0) == 2)
+//			printf("%d ", idx);
+		localArr[cur_list][l_idx] = array[idx];
+		l_idx += workSize;
+		idx += workSize;
+//		if (get_global_id(0) == DEBUG_GID) {
+//			printf("g idx0: %d\n", idx);
+//		}
+	}
+//	if (get_global_id(0) == DEBUG_GID) {
+//		printf("\n");
+//	}
 
 	barrier(CLK_LOCAL_MEM_FENCE);
+//	if (get_global_id(0) == DEBUG_GID) {
+//		printf("g 1 [%d, %d] - [%d, %d]\n", starts[0], ends[0], starts[1], ends[1]);
+//		for (int i = 0; i < ends[0] - starts[0] + ends[1] - starts[1]; ++i) {
+//			printf("%f ", localArr[0][i]);
+//		}
+//		printf("\n");
+//	}
+	barrier(CLK_LOCAL_MEM_FENCE);
+	idx = starts[1] + lid;
+	l_idx = lid;
+//	if (get_global_id(0) == DEBUG_GID) {
+//		printf("g idx1: %d; array[idx]=%f\n", idx, array[idx]);
+//	}
+	while (idx < ends[1]) {
+		localArr[cur_list][lid + (ends[0] - starts[0])] = array[idx];
+		idx += workSize;
+		l_idx += workSize;
+	}
 
+	barrier(CLK_LOCAL_MEM_FENCE);
+	if (get_global_id(0) == DEBUG_GID) {
+		printf("g 2 [%d, %d] - [%d, %d]\n", starts[0], ends[0], starts[1], ends[1]);
+		for (int i = 0; i < ends[0] - starts[0] + ends[1] - starts[1]; ++i) {
+			printf("%f ", localArr[0][i]);
+		}
+		printf("\n");
+	}
+	barrier(CLK_LOCAL_MEM_FENCE);
 	sort_local(localArr[cur_list], localArr[1 - cur_list], ends[0] - starts[0], ends[1] - starts[1], workSize);
 	cur_list = 1 - cur_list;
+//	if (get_global_id(0) == DEBUG_GID) {
+//		printf("g [%d, %d] - [%d, %d]\n", starts[0], ends[0], starts[1], ends[1]);
+//		for (int i = 0; i < ends[0] - starts[0] + ends[1] - starts[1]; ++i) {
+//			printf("%f ", localArr[cur_list][i]);
+//		}
+//		printf("\n");
+//	}
 
 	// input into array
-	idx = gid + chunk_num * workSize * 2;
+	idx = lid + group_id * workSize * 2;
+//	if (get_global_id(0) == DEBUG_GID) {
+//		printf("g%d to: %d\n", DEBUG_GID, idx);
+//	}
 	if (idx < n)
 		buffer[idx] = localArr[cur_list][lid];
-	int max_idx = chunk_num * workSize * 2 + workSize;
+	int max_idx = group_id * workSize * 2 + workSize;
 	if (max_idx < n)
 	{
 		idx += workSize;
 		if (idx < n)
 			buffer[idx] = localArr[cur_list][lid + workSize];
+//		if (get_global_id(0) == DEBUG_GID) {
+//			printf("g%d to1: %d\n", DEBUG_GID, idx);
+//		}
 	}
-
 
 //
 //	__global float *buf_place = buffer + insertion_index;

@@ -58,7 +58,7 @@ int main(int argc, char **argv) {
     as_gpu.resizeN(n);
     bs_gpu.resizeN(n);
 	unsigned int workGroupSize = 16;
-	unsigned int partitionsWorkSize = (n + workGroupSize - 1) / workGroupSize;
+	unsigned int partitionsWorkSize = (n + workGroupSize - 1) / (workGroupSize * 2);
 	intervals_gpu.resizeN(partitionsWorkSize * 4); // i'm too lazy to count all of it
 #define WORK_PER_THREAD 2
     {
@@ -71,10 +71,10 @@ int main(int argc, char **argv) {
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
-			for (int i = 0; i < 32; ++i) {
-				std::cout << as[i] << " ";
-			}
-			std::cout << ";\n";
+//			for (int i = 0; i < workGroupSize * 2; ++i) {
+//				std::cout << as[i] << " ";
+//			}
+//			std::cout << ";\n";
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфера данных
             unsigned int global_work_size = (n + (workGroupSize * 2) - 1) / (workGroupSize * 2) * workGroupSize;
 			merge_small.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, n);
@@ -86,25 +86,25 @@ int main(int argc, char **argv) {
 			}
 			std::cout << std::endl;
 			std::cout << std::endl;
-			std::cout << std::endl;
 			for (int sort_size = workGroupSize * 2; sort_size <= n / 2; sort_size <<= 1)
+//			for (int sort_size = workGroupSize * 2; sort_size <= workGroupSize * 2; sort_size <<= 1)
 			{
 				find_partitions.exec(gpu::WorkSize(workGroupSize, partitionsWorkSize), as_gpu, intervals_gpu, n, sort_size);
-//				std::vector<unsigned int> parts(partitionsWorkSize * 4);
-//				intervals_gpu.readN(parts.data(), partitionsWorkSize * 4);
-//				for (int i = 0; i < partitionsWorkSize * 4; ++i) {
-//					std::cout << parts[i] << " ";
-//					if (i % partitionsWorkSize == partitionsWorkSize - 1)
-//						std::cout << ";\n";
-//				}
-//				std::cout << std::endl;
+				std::vector<unsigned int> parts(partitionsWorkSize * 4);
+				intervals_gpu.readN(parts.data(), partitionsWorkSize * 4);
+				for (int i = 0; i < partitionsWorkSize * 4; ++i) {
+					std::cout << parts[i] << " ";
+					if (i % partitionsWorkSize == partitionsWorkSize - 1)
+						std::cout << ";\n";
+				}
+				std::cout << std::endl;
 				merge.exec(gpu::WorkSize(workGroupSize, partitionsWorkSize), as_gpu, bs_gpu, intervals_gpu, n);
 				std::swap(as_gpu, bs_gpu);
 
-				bs_gpu.readN(as.data(), sort_size * 2);
+				as_gpu.readN(as.data(), sort_size * 2);
 				for (int i = 0; i < sort_size * 2; ++i) {
 					std::cout << as[i] << " ";
-					if (i % sort_size == sort_size - 1)
+					if (i % workGroupSize == workGroupSize - 1)
 						std::cout << ";\n";
 				}
 				std::cout << std::endl;
@@ -115,6 +115,11 @@ int main(int argc, char **argv) {
         std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
 		as_gpu.readN(as.data(), n);
     }
+	for (int i = 0; i < n; ++i) {
+		std::cout << as[i] << " ";
+		if (i % workGroupSize == workGroupSize - 1)
+			std::cout << ";\n";
+	}
     // Проверяем корректность результатов
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
