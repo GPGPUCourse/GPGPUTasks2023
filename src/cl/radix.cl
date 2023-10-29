@@ -74,5 +74,8 @@ __kernel void radix_sort(const __global unsigned int *as, __global unsigned int 
             dst_i++;
         }
     }
-    as_sorted_dst[i] = as[i];
+    if (dst_i >= n) {
+        return;
+    }
+    as_sorted_dst[dst_i] = as[i];
 }
