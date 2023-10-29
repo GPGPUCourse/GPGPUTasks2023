@@ -112,6 +112,201 @@ __kernel void count(__global const unsigned int *array,
 }
 
 
+unsigned int find_local_merge_path(const __local float *array,
+								   const unsigned int start0,
+								   const unsigned int count0,
+								   const unsigned int start1,
+								   const unsigned int count1,
+								   const unsigned int diag,
+								   const unsigned int bit_offset) {
+	unsigned int l = max(0, (int)diag - (int)count1);
+	unsigned int r = min(diag, count0);
+	unsigned int m;
+	while (l < r) {
+		m = (l + r) >> 1;
+		if (get_radix_value(array[start0 + m], bit_offset) < get_radix_value(array[start1 + diag - 1 - m], bit_offset)) {
+			l = m + 1;
+		} else {
+			r = m;
+		}
+	}
+	return l;
+}
+
+void find_partition_local(const __local float *array,
+						  unsigned int interval[4],
+						  const unsigned int leftSize,
+						  const unsigned int rightSize,
+						  const unsigned int sortedSize,
+						  const unsigned int bit_offset) {
+	// interval:
+	//   [0] - start of left
+	//   [1] - end of left
+	//   [2] - start of right
+	//   [3] - end of right
+	const unsigned int lid = get_local_id(0);
+	interval[0] = (lid / sortedSize) * sortedSize * 2;
+	interval[1] = interval[0] + leftSize;
+	interval[2] = interval[1];
+	interval[3] = interval[2] + rightSize;
+//	if (get_global_id(0) == DEBUG_GID)
+//		printf("g%d before %d [%u, %u]-[%u, %u]\n", DEBUG_GID, sortedSize, interval[0], interval[1], interval[2], interval[3]);
+
+	unsigned int diag = (lid % sortedSize) * 2;
+//	if (get_global_id(0) == DEBUG_GID)
+//		printf("g%d diags: %d, %d\n", DEBUG_GID, diag, diag + 2);
+	int idx_start = find_local_merge_path(array,
+										  interval[0],
+										  interval[1] - interval[0],
+										  interval[2],
+										  interval[3] - interval[2],
+										  diag, bit_offset);
+	int idx_end = find_local_merge_path(array,
+										interval[0],
+										interval[1] - interval[0],
+										interval[2],
+										interval[3] - interval[2],
+										diag + 2, bit_offset);
+	interval[1] = min(interval[1], interval[0] + idx_end);
+	interval[3] = min(interval[3], interval[2] + (diag + 2) - idx_end);
+	interval[0] = interval[0] + idx_start;
+	interval[2] = interval[2] + diag - idx_start;
+}
+
+void merge_local(const __local float *array,
+				 __local float *out,
+				 unsigned int interval[4],
+				 const unsigned int bit_offset) {
+	const unsigned int lid = get_local_id(0);
+	unsigned int insertion_index = lid * 2;
+//	if (get_global_id(0) == DEBUG_GID)
+//		printf("g%d  index: %d\n", DEBUG_GID, insertion_index);
+
+	__local float *out_place = out + insertion_index;
+	while (interval[0] < interval[1]) {
+		if (interval[2] >= interval[3]) {
+			*(out_place++) = array[interval[0]++];
+		} else {
+			*(out_place++) = get_radix_value(array[interval[0]], bit_offset) < get_radix_value(array[interval[2]], bit_offset) ? array[interval[0]++] : array[interval[2]++];
+		}
+	}
+	while (interval[2] < interval[3]) {
+		*(out_place++) = array[interval[2]++];
+	}
+}
+
+void sort_local(__local float *localIn,
+				__local float *localOut,
+				const unsigned int left_size,
+				const unsigned int right_size,
+				const unsigned int sort_size,
+				const unsigned int bit_offset) {
+	unsigned int interval[4];
+	if (get_local_size(0) == sort_size) {
+		find_partition_local(localIn, interval, left_size, right_size, sort_size, bit_offset);
+	} else {
+		find_partition_local(localIn, interval, min(left_size, sort_size), min(right_size, sort_size), sort_size, bit_offset);
+	}
+
+	merge_local(localIn, localOut, interval, bit_offset);
+	barrier(CLK_LOCAL_MEM_FENCE);
+}
+
+void merge_small(__global unsigned int *array,
+				 __local unsigned int localArr[2][WORKGROUP_SIZE * 2],
+				 int *cur_list,
+				 const unsigned int n,
+				 const int bit_offset) {
+	const unsigned int lid = get_local_id(0);
+	const unsigned int workSize = get_local_size(0);
+	const unsigned int chunk_num = get_group_id(0);
+
+	*cur_list = 0;
+
+	unsigned int idx = lid + chunk_num * workSize * 2;
+	if (idx < n)
+		localArr[*cur_list][lid] = array[idx];
+	unsigned int size1 = min(workSize, (int)n - chunk_num * workSize * 2);
+	int size2 = 0;
+	if (size1 + chunk_num * workSize * 2 < n)
+	{
+		idx += workSize;
+		if (idx < n)
+			localArr[*cur_list][lid + workSize] = array[idx];
+		size2 = min(workSize, n - chunk_num * workSize * 2 - size1);
+	}
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	if (lid + chunk_num * WORKGROUP_SIZE == 0) {
+		printf("g!");
+		for (int i = 0; i < size1 + size2; ++i) {
+			printf("%d ", get_radix_value(localArr[*cur_list][i], bit_offset));
+		}
+		printf("\n");
+	}
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	printf("%d (%d, %d) \n",lid + chunk_num * WORKGROUP_SIZE, size1, size2);
+
+	for (unsigned int sort_size = 1; sort_size < workSize; sort_size <<= 1) {
+		sort_local(localArr[*cur_list], localArr[1 - *cur_list], size1, size2, sort_size, bit_offset);
+		*cur_list = 1 - *cur_list;
+	}
+
+	if (lid + chunk_num * WORKGROUP_SIZE == 0) {
+		printf("g!");
+		for (int i = 0; i < size1 + size2; ++i) {
+			printf("%d ", get_radix_value(localArr[*cur_list][i], bit_offset));
+		}
+		printf("\n");
+	}
+	barrier(CLK_LOCAL_MEM_FENCE);
+
+	// input into array
+//	idx = lid + chunk_num * workSize * 2;
+//	if (idx < n)
+//		array[idx] = localArr[cur_list][lid];
+//	int max_idx = chunk_num * workSize * 2 + workSize;
+//	if (max_idx < n)
+//	{
+//		idx += workSize;
+//		if (idx < n)
+//			array[idx] = localArr[cur_list][lid + workSize];
+//	}
+}
+
+void count_cur_value(__global unsigned int *as,
+					 __local unsigned int chunk_arr[2][WORKGROUP_SIZE * 2],
+					 const int n,
+					 const int bit_offset) {
+	const unsigned int lid = get_local_id(0);
+	const unsigned int bins_num = 1 << RADIX_BITS;
+	const unsigned int chunk = get_group_id(0);
+	const unsigned int chunk_size = WORKGROUP_SIZE;
+//	printf("%d\n", chunk * chunk_size + 0);
+//	printf("%d\n", chunk * chunk_size + 0);
+	int cur_bin = lid;
+	int count = 0;
+	if (cur_bin < bins_num) {
+		for (int i = 0; i < chunk_size; ++i) {
+//			if (lid == 0) {
+//				printf("%d\n", chunk * chunk_size + i);
+//				printf("%d\n", chunk * chunk_size + i);
+//				printf("%d\n", chunk * chunk_size + i);
+//				printf("%d\n", chunk * chunk_size + i);
+//			}
+			if (chunk * chunk_size + i >= n)
+				break;
+			if (lid == 0)
+				chunk_arr[1][i] = as[chunk * chunk_size + i];
+			unsigned int cur_val = get_radix_value(chunk_arr[1][i], bit_offset);
+			if (cur_val == cur_bin) {
+				chunk_arr[0][i] = count++;
+			}
+		}
+	}
+}
+
 __kernel void radix(__global unsigned int *as,
 					__global const unsigned int *buffer,
 					const int n,
@@ -124,13 +319,19 @@ __kernel void radix(__global unsigned int *as,
 	unsigned int chunks_num = (n + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
 
 	// sort every chunk locally
-	__local unsigned int chunk_arr[WORKGROUP_SIZE];
+	__local unsigned int chunk_arr[2][WORKGROUP_SIZE];
+	int cur_list;
 	// TODO
-
+//	merge_small(as, chunk_arr, &cur_list, n, bit_offset);
+	count_cur_value(as, chunk_arr, n, bit_offset);
 	barrier(CLK_LOCAL_MEM_FENCE);
+//	printf("%d ", lid + chunk * chunk_size);
 	// index of item = prefix for item + (index within chunk - sum of (items of lesser value within chunk))
-	const unsigned int local_item_index = lid;
-	const unsigned int item_value = get_radix_value(chunk_arr[local_item_index], bit_offset);
+
+//	const unsigned int local_item_index = lid;
+	const unsigned int local_item_index = chunk_arr[0][lid];
+//	const unsigned int item_value = get_radix_value(chunk_arr[1][local_item_index], bit_offset);
+	const unsigned int item_value = get_radix_value(chunk_arr[1][lid], bit_offset);
 
 	unsigned int lesser_values_within_chunk = 0;
 	for (int i = 0; i < item_value; ++i) {
@@ -138,7 +339,7 @@ __kernel void radix(__global unsigned int *as,
 	}
 
 	const unsigned int item_index = ((chunk == 0 && item_value == 0 && lid == 0) ? 0 : buffer[item_value * chunks_num + chunk - 1])
-									+ local_item_index
-									- (lesser_values_within_chunk);
-	as[item_index] = chunk_arr[local_item_index];
+									+ local_item_index;
+//									- (lesser_values_within_chunk);
+	as[item_index] = chunk_arr[cur_list][lid];
 }

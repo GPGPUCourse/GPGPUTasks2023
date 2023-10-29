@@ -30,7 +30,6 @@ static std::string get_defines() {
 	str << "-D " << "RADIX_BITS=" << RADIX_BITS << " ";
 	str << "-D " << "WORKGROUP_SIZE=" << WORKGROUP_SIZE << " ";
 	str << "-D " << "WORK_PER_THREAD=" << WORK_PER_THREAD << " ";
-	str << "-D " << "WITH_LOCAL_SORT=" << WITH_LOCAL_SORT << " ";
 	str << "-D " << "TRANSPOSE_WORKGROUP_SIZE=" << TRANSPOSE_WORKGROUP_SIZE << " ";
 	return str.str();
 }
@@ -172,14 +171,14 @@ int main(int argc, char **argv) {
 											 (numChunks + TRANSPOSE_WORKGROUP_SIZE - 1) / TRANSPOSE_WORKGROUP_SIZE * TRANSPOSE_WORKGROUP_SIZE), buffer_gpu, buffer_copy_gpu, binsPerChunk, numChunks);
 				std::swap(buffer_gpu, buffer_copy_gpu);
 
-				buffer_gpu.readN(as.data(), binsPerChunk * numChunks);
-				for (int i = 0; i < binsPerChunk; ++i) {
-					for (int j = 0; j < numChunks; ++j) {
-						std::cout << as[i * numChunks + j] << " ";
-					}
-					std::cout << std::endl;
-				}
-				std::cout << std::endl;
+//				buffer_gpu.readN(as.data(), binsPerChunk * numChunks);
+//				for (int i = 0; i < binsPerChunk; ++i) {
+//					for (int j = 0; j < numChunks; ++j) {
+//						std::cout << as[i * numChunks + j] << " ";
+//					}
+//					std::cout << std::endl;
+//				}
+//				std::cout << std::endl;
 				// prefix sum (aka scan) on bins
 				scanSingleton::getInstance().scan(buffer_gpu, n);
 
