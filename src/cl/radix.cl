@@ -5,24 +5,22 @@
 
 
 __kernel void count(__global unsigned int *as, __global unsigned int *counts, unsigned int level, unsigned int n) {
-    int i_g = get_global_id(0), i_l = get_local_id(0);
-    int group_number = get_group_id(0);
-    __local int local_counts[COUNT_NUMBER][WORK_GROUP_SIZE / COUNT_NUMBER];
-
-    local_counts[i_l % COUNT_NUMBER][i_l] = 0;
+    unsigned int i_g = get_global_id(0), i_l = get_local_id(0);
+    unsigned int group_number = get_group_id(0);
+    __local unsigned int local_counts[COUNT_NUMBER][WORK_GROUP_SIZE / COUNT_NUMBER];
 
     if (i_g < n) {
         local_counts[i_l % COUNT_NUMBER][i_l / COUNT_NUMBER] = 0;
-        for (int i = 0; i < WORK_PER_THREAD; ++i) {
-            unsigned int value = as[i_g - i_l + i_l / COUNT_NUMBER * COUNT_NUMBER + i];
-            value = (value >> (level * BIT_PER_LEVEL)) & (COUNT_NUMBER - 1);
-            local_counts[i_l % COUNT_NUMBER][i_l / COUNT_NUMBER] += (int)(value == (i_l % COUNT_NUMBER));
+        for (unsigned int i = 0; i < COUNT_NUMBER; ++i) {
+            unsigned int value = as[i_g - i_l % COUNT_NUMBER + i];
+            value = ((value >> (level * BIT_PER_LEVEL)) & (unsigned int)(COUNT_NUMBER - 1));
+            local_counts[i_l % COUNT_NUMBER][i_l / COUNT_NUMBER] += (unsigned int)(value == (i_l % COUNT_NUMBER));
         }
 
         barrier(CLK_LOCAL_MEM_FENCE);
 
         if (i_l / COUNT_NUMBER == 0) {
-            for (int i = 1; i < WORK_GROUP_SIZE / WORK_PER_THREAD; ++i) {
+            for (int i = 1; i < COUNT_NUMBER; ++i) {
                 local_counts[i_l % COUNT_NUMBER][0] += local_counts[i_l % COUNT_NUMBER][i];
             }
             counts[group_number * COUNT_NUMBER + i_l % COUNT_NUMBER] = local_counts[i_l % COUNT_NUMBER][0];
