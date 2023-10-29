@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
     const unsigned int digits_number = 4;
     const unsigned int bits_number = 2;
     const unsigned int bits_in_uint = sizeof(unsigned int) * 8;
-    std::cout << "bits_in_uint: "<< bits_in_uint << '\n';
+    std::cout << "bits_in_uint: " << bits_in_uint << '\n';
     const unsigned int work_group_size = 32;
     const unsigned int global_work_size = n;
     const unsigned int work_groups_number = n / work_group_size + 1;
@@ -124,6 +124,17 @@ int main(int argc, char **argv) {
                 std::cout << cpu_sorted[i + w] << " ";
             }
             std::cout << "\n";
+            std::cout << "\n";
+            std::cout << "\n";
+            for (int j = 0; j < n; ++j) {
+                if (as[j] != 0) {
+                    for (int e = j; e < 32; ++e) {
+                        std::cout << as[e] << " ";
+                    }
+                    std::cout << '\n';
+                    break;
+                }
+            }
         }
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
