@@ -102,16 +102,105 @@ __kernel void radix_count(__global const uint *arr, __global uint *dst, uint len
     }
 }
 
+uint binsearch_lt(uint x, __local const uint *arr, uint len, uint shift) {
+    uint key = (arr[0] >> shift) & RADIX_MASK;
+    x = (x >> shift) & RADIX_MASK;
+    if (key >= x) {
+        return 0;
+    }
+    uint l = 0;
+    uint r = len;
+    while (l + 1 < r) {
+        uint m = l + (r - l) / 2;
+        key = (arr[m] >> shift) & RADIX_MASK;
+        if (key < x) {
+            l = m;
+        } else {
+            r = m;
+        }
+    }
+    return r;
+}
+
+uint binsearch_le(uint x, __local const uint *arr, uint len, uint shift) {
+    uint key = (arr[0] >> shift) & RADIX_MASK;
+    x = (x >> shift) & RADIX_MASK;
+    if (key > x) {
+        return 0;
+    }
+    uint l = 0;
+    uint r = len;
+    while (l + 1 < r) {
+        uint m = l + (r - l) / 2;
+        key = (arr[m] >> shift) & RADIX_MASK;
+        if (key <= x) {
+            l = m;
+        } else {
+            r = m;
+        }
+    }
+    return r;
+}
+
+void merge_pass(__local const uint *src, __local uint *dst, uint sorted_block_len, uint src_id, uint shift) {
+    uint len = WORK_GROUP_SIZE;
+    if (src_id >= len) {
+        return;
+    }
+
+    uint own_block = src_id / sorted_block_len;
+    uint sib_block = own_block ^ 1;// *sib*ling
+
+    uint own_block_start = own_block * sorted_block_len;
+    uint sib_block_start = sib_block * sorted_block_len;
+
+    //uint own_block_end = min(len, own_block_start + sorted_block_len);
+    uint sib_block_end = min(len, sib_block_start + sorted_block_len);
+    uint sib_block_len = sib_block_end - sib_block_start;
+    __local const uint *sib_block_src = src + sib_block_start;
+
+    uint dst_id = src_id - own_block % 2 * sorted_block_len;
+    uint x = src[src_id];
+    bool is_left = own_block % 2 == 0;
+    if (is_left) {
+        dst_id += binsearch_lt(x, sib_block_src, sib_block_len, shift);
+    } else {
+        dst_id += binsearch_le(x, sib_block_src, sib_block_len, shift);
+    }
+
+    dst[dst_id] = x;
+}
+
 __kernel void radix_reorder(__global const uint *src, __global uint *dst, __global const uint *offsets, uint len,
                             uint shift) {
-    __local uint data[WORK_GROUP_SIZE];
+    __local uint loc_val1[WORK_GROUP_SIZE];
+    __local uint loc_val2[WORK_GROUP_SIZE];
+    __local uint loc_off1[RADIX_BASE];
+    __local uint loc_off2[RADIX_BASE];
     __local uint buf1[RADIX_BASE * WORK_GROUP_SIZE];
     __local uint buf2[RADIX_BASE * WORK_GROUP_SIZE];
     const uint gid = get_global_id(0);
     const uint lid = get_local_id(0);
     const uint wid = get_group_id(0);
 
-    data[lid] = gid < len ? src[gid] : RADIX_MASK;
+    loc_val1[lid] = gid < len ? src[gid] : UINT_MAX;
+    for (uint off = 0; off < RADIX_BASE; off += WORK_GROUP_SIZE) {
+        uint flat = off + lid;
+        if (flat < RADIX_BASE) {
+            loc_off1[flat] = 0;
+        }
+    }
+
+    __local uint *loc_val_src = loc_val1;
+    __local uint *loc_val_dst = loc_val2;
+    for (uint sorted = 1; sorted < WORK_GROUP_SIZE; sorted *= 2) {
+        barrier(CLK_LOCAL_MEM_FENCE);
+        merge_pass(loc_val_src, loc_val_dst, sorted, lid, shift);
+        __local uint *tmp = loc_val_src;
+        loc_val_src = loc_val_dst;
+        loc_val_dst = tmp;
+    }
+
     for (uint key = 0; key < RADIX_BASE; ++key) {
         buf1[key * WORK_GROUP_SIZE + lid] = 0;
     }
@@ -119,8 +208,15 @@ __kernel void radix_reorder(__global const uint *src, __global uint *dst, __glob
 
     const uint n_work_groups = (len + WORK_GROUP_SIZE - 1) / WORK_GROUP_SIZE;
 
-    const uint my_x = data[lid];
+    const uint my_x = loc_val_src[lid];
     const uint my_key = (my_x >> shift) & RADIX_MASK;
+    if (lid != 0) {
+        const uint prev_x = loc_val_src[lid - 1];
+        const uint prev_key = (prev_x >> shift) & RADIX_MASK;
+        if (prev_key > my_key) {
+            printf("[ERROR]: ordering\n");
+        }
+    }
     const uint my_off_lid = my_key * WORK_GROUP_SIZE + lid;
     if (gid < len) {
         buf1[my_off_lid] = 1;
