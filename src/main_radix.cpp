@@ -113,18 +113,6 @@ int main(int argc, char **argv) {
     }
 
     for (int i = 0; i < n; ++i) {
-        if (as[i] != cpu_sorted[i]) {
-            std::cout << i << '\n';
-            for (int w = 0; w < 32; ++w) {
-                std::cout << as[i + w - 1] << ' ';
-            }
-            std::cout << '\n';
-            for (int w = 0; w < 32; ++w) {
-                std::cout << cpu_sorted[i + w - 1] << ' ';
-            }
-            std::cout << '\n';
-        }
-
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
 
