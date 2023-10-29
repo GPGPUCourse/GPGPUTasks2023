@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
     const unsigned int bits_in_uint = sizeof(unsigned int) * 8;
     const unsigned int work_group_size = 32;
     const unsigned int global_work_size = n;
-    const unsigned int work_groups_number = n / work_group_size + (n % work_group_size == 0 ? 0 : 1);
+    const unsigned int work_groups_number = n / work_group_size + 1;
     const unsigned int counters_size = work_groups_number * digits_number;
 
     const std::vector<unsigned int> zeros(n, 0);
@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
             for (int bits_offset = 0; bits_offset <= bits_in_uint; bits_offset += bits_number) {
                 counters_gpu.writeN(zeros.data(), counters_size);
                 prefix_sums_gpu.writeN(zeros.data(), counters_size);
-                as_sorted_gpu.writeN(zeros.data(), n);
+                // as_sorted_gpu.writeN(zeros.data(), n);
 
                 radix_count.exec(gpu::WorkSize(work_group_size, global_work_size), as_gpu, n, counters_gpu,
                                  work_groups_number, bits_offset);
