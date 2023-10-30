@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
 
     int benchmarkingIters = 10;
     unsigned int n = 32 * 1024 * 1024;
-    //unsigned int n = 10;
+
     std::vector<float> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -59,13 +59,15 @@ int main(int argc, char **argv) {
         ocl::Kernel bitonic(bitonic_kernel, bitonic_kernel_length, "bitonic");
         bitonic.compile();
 
-        const unsigned int workGroupSize = 64;
+        const unsigned int workGroupSize = 32;
         const unsigned int global_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
-            bitonic.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, n);
+            for(int a = 2; a < (n << 1); a <<= 1)
+                for (int b = (a >> 1); b >= 1; b >>= 1)
+                    bitonic.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, a, b);
             t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
@@ -78,6 +80,5 @@ int main(int argc, char **argv) {
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
-
     return 0;
 }
