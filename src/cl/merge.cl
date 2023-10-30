@@ -83,7 +83,11 @@ __kernel void merge(__global const float *input,
     }
 }
 
-__kernel void merge_smart(__global const float *input,
+inline bool comp(float e1, float e2, bool weak) {
+    return weak ? e1 < e2 : e1 <= e2;
+}
+
+__kernel void merge_smart(const __global const float *input,
                     __global float *output,
                     __global const int *split_a,
                     __global const int *split_b,
@@ -107,39 +111,60 @@ __kernel void merge_smart(__global const float *input,
     __local float block_a[WORK_PER_ITEM];
     __local float block_b[WORK_PER_ITEM];
 
+    bool from_right_side = (i >= ra - la);
+
     if(target_index + i < n && i < block_size) {
-        if(i < ra - la)
-            block_a[i] = input[la + i];
-        else {
-            int j = i - (ra - la);
-            block_b[j] = input[lb + j];
-        }
+        __local float *block = (block_a + i) + from_right_side * ((block_b + (i - (ra - la))) - (block_a + i));
+        *block = *((input + la + i) + from_right_side * ((input + lb + (i - (ra - la))) - (input + la + i)));
     }
     barrier(CLK_LOCAL_MEM_FENCE);
 
     if(target_index + i >= n || i >= block_size) return;
 
-    if(i < ra - la) {
-            int l = 0, r = rb - lb;
-            while(l < r) {
-                int mid = (l + r) / 2;
-                if(block_b[mid] > block_a[i])
-                    r = mid;
-                else
-                    l = mid + 1;
-            }
-            output[target_index + i + r] = block_a[i];
+    int l = 0, r = (rb - lb) + from_right_side * ((ra - la) - (rb - lb));
+    float my_value = *((block_a + i) + from_right_side * ((block_b + (i - (ra - la))) - (block_a + i)));
+    __local float *another_block = block_a + (!from_right_side) * (block_b - block_a);
+
+    while(l < r) {
+        int mid = (l + r) / 2;
+        if(comp(my_value, *(another_block + mid), from_right_side))
+            r = mid;
+        else
+            l = mid + 1;
     }
-    else {
-            int j = i - (ra - la);
-            int l = 0, r = ra - la;
-            while(l < r) {
-                int mid = (l + r) / 2;
-                if(block_a[mid] >= block_b[j])
-                    r = mid;
-                else
-                    l = mid + 1;
-            }
-            output[target_index + j + r] = block_b[j];
+
+    __global float *output_ptr = (output + target_index + i + r) + from_right_side *
+        ((output + target_index + (i - (ra - la)) + r) - (output + target_index + i + r));
+    *output_ptr = my_value;
+}
+
+__kernel void merge_naive(const __global float *input,
+                        __global float *output,
+                        unsigned int n,
+                        unsigned int block_size) {
+    const int i = get_global_id(0);
+
+    if(i >= n) return;
+
+    int block_index = i / block_size;
+    int index_inside_block = i % block_size;
+    bool from_left_side = (index_inside_block < (block_size / 2));
+    float my_value = input[i];
+
+    int ind = block_index * block_size + from_left_side * (block_size / 2);
+    __global float *another_block = input + ind;
+
+    int l = 0, r = l + min(block_size / 2, n - ind);
+
+    while(l < r) {
+        int mid = (l + r) / 2;
+        if(comp(my_value, *(another_block + mid), from_left_side))
+            r = mid;
+        else
+            l = mid + 1;
     }
+
+    __global float *output_ptr = output + block_index * block_size + index_inside_block + r
+        - (!from_left_side) * (block_size / 2);
+    *output_ptr = my_value;
 }

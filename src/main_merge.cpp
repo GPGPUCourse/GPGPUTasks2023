@@ -77,8 +77,12 @@ int main(int argc, char **argv) {
                           "-DWORK_PER_ITEM=" + std::to_string(WORK_PER_ITEM));
         merge.compile();
 
-        ocl::Kernel merge_smart(merge_kernel, merge_kernel_length, "merge_smart",
+        ocl::Kernel merge_naive(merge_kernel, merge_kernel_length, "merge_naive",
                           "-DWORK_PER_ITEM=" + std::to_string(WORK_PER_ITEM));
+        merge_naive.compile();
+
+        ocl::Kernel merge_smart(merge_kernel, merge_kernel_length, "merge_smart",
+                                "-DWORK_PER_ITEM=" + std::to_string(WORK_PER_ITEM));
         merge_smart.compile();
 
         unsigned int workGroupSize = 64;
@@ -89,16 +93,14 @@ int main(int argc, char **argv) {
         timer t;
         for (int i = 0; i < benchmarkingIters; i++) {
             for (int block_size = 2; block_size / 2 < n; block_size <<= 1) {
-                int items_per_block = (block_size + WORK_PER_ITEM - 1) / WORK_PER_ITEM + 1;
-                global_work_size = ((n + block_size - 1) / block_size) * items_per_block;
-                diag_binsearch.exec(gpu::WorkSize(workGroupSize, global_work_size),
-                                    input_gpu,split_a_gpu, split_b_gpu, n, block_size);
                 if(block_size < WORK_PER_ITEM) {
-                    items_per_block = (block_size + WORK_PER_ITEM - 1) / WORK_PER_ITEM;
-                    global_work_size = ((n + block_size - 1) / block_size) * items_per_block;
-                    merge.exec(gpu::WorkSize(WORK_PER_ITEM, global_work_size), input_gpu, output_gpu, split_a_gpu,
-                               split_b_gpu, n, block_size);
+                    global_work_size = ((n + block_size - 1) / block_size) * block_size;
+                    merge_naive.exec(gpu::WorkSize(workGroupSize, global_work_size), input_gpu, output_gpu, n, block_size);
                 } else {
+                    int items_per_block = (block_size + WORK_PER_ITEM - 1) / WORK_PER_ITEM + 1;
+                    global_work_size = ((n + block_size - 1) / block_size) * items_per_block;
+                    diag_binsearch.exec(gpu::WorkSize(workGroupSize, global_work_size),
+                                        input_gpu,split_a_gpu, split_b_gpu, n, block_size);
                     items_per_block = (block_size + WORK_PER_ITEM - 1) / WORK_PER_ITEM;
                     global_work_size = ((n + block_size - 1) / block_size) * items_per_block * WORK_PER_ITEM;
                     merge_smart.exec(gpu::WorkSize(WORK_PER_ITEM, global_work_size), input_gpu, output_gpu, split_a_gpu,
