@@ -1,1 +1,0 @@
-/usr/bin/c++  -fopenmp -rdynamic CMakeFiles/matrix_multiplication.dir/src/main_matrix_multiplication.cpp.o -o matrix_multiplication  libs/clew/liblibclew.a libs/gpu/liblibgpu.a libs/utils/liblibutils.a libs/gpu/liblibgpu.a libs/utils/liblibutils.a libs/clew/liblibclew.a -ldl 

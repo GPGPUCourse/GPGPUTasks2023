@@ -1,1 +1,0 @@
-/usr/bin/c++  -fopenmp -rdynamic CMakeFiles/merge.dir/src/main_merge.cpp.o -o merge  libs/clew/liblibclew.a libs/gpu/liblibgpu.a libs/utils/liblibutils.a libs/gpu/liblibgpu.a libs/utils/liblibutils.a libs/clew/liblibclew.a -ldl 
