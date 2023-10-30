@@ -27,7 +27,7 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 
-const unsigned groupSize = 16;
+const unsigned groupSize = 256;
 const unsigned nbits = 2;
 
 typedef gpu::gpu_mem_32u buffer;
@@ -88,15 +88,17 @@ void prefix_sum(buffer output, buffer input, unsigned n) {
     }
 }
 
-void merge_sort(buffer &output, buffer &input, unsigned n, unsigned shift) {
+void merge_sort(buffer &output, buffer input, unsigned n, unsigned shift) {
     static auto mergeKernel = createMergeSortKernel();
+    static auto copy = buffer::createN(n);
+    input.copyToN(copy, n);
 
     for (unsigned size = 1; size < groupSize; size *= 2) {
-        mergeKernel.exec(WorkSize(groupSize, n), output, input, size, shift);
-        output.swap(input);
+        mergeKernel.exec(WorkSize(groupSize, n), output, copy, size, shift);
+        output.swap(copy);
     }
     // no need to check for log(n) this time ;)
-    output.swap(input);
+    output.swap(copy);
 }
 
 void radix(buffer output, buffer input, unsigned n, buffer offsets, unsigned rows, unsigned shift) {
@@ -216,6 +218,15 @@ int main(int argc, char **argv) {
     std::vector<unsigned> control2(n, 0);
     sorted.readN(control2.data(), n);
 
+    for (int i = 0; i < n; ++i) {
+        if (std::find(control2.begin(), control2.end(), as[i]) == control2.end()) {
+            throw std::exception();
+        }
+//        for (int j = 0; j < n; ++j) {
+//            if (input[i] == control2[j]) bre
+//        }
+    }
+
     auto aggregated = buffer::createN(tableSize);
     transpose(aggregated, aggregated_t, tableCols, tableRows);
 
@@ -235,7 +246,6 @@ int main(int argc, char **argv) {
         }
     }
 
-    const unsigned shift = 0;
     const unsigned rows = tableRows;
 
     auto output1 = buffer::createN(n);
@@ -245,7 +255,35 @@ int main(int argc, char **argv) {
 //    radix.exec(WorkSize(groupSize, n), output1, input, n, aggregated_t, rows, shift);
     output1.readN(output.data(), n);
 
-    auto control3 = a;
+
+    unsigned shift = 2;
+    counters.writeN(zeros.data(), tableSize);
+    aggregated_t.writeN(zeros.data(), tableSize);
+    output1.swap(input);
+
+    count(counters, input, n, shift);
+    transpose(counters_t, counters, tableRows, tableCols);
+    prefix_sum(aggregated_t, counters_t, tableSize);
+    merge_sort(sorted, input, n, shift);
+    transpose(aggregated, aggregated_t, tableCols, tableRows);
+    radix(output1, sorted, n, aggregated, tableRows, shift);
+
+    shift = 4;
+    counters.writeN(zeros.data(), tableSize);
+    aggregated_t.writeN(zeros.data(), tableSize);
+    output1.swap(input);
+
+    count(counters, input, n, shift);
+    transpose(counters_t, counters, tableRows, tableCols);
+    prefix_sum(aggregated_t, counters_t, tableSize);
+    merge_sort(sorted, input, n, shift);
+    transpose(aggregated, aggregated_t, tableCols, tableRows);
+    radix(output1, sorted, n, aggregated, tableRows, shift);
+
+    output1.readN(output.data(), n);
+
+
+    auto control3 = as;
 
 //    for (int id = 0; id < n; ++id) {
 //        unsigned lid = id % groupSize;
@@ -275,6 +313,12 @@ int main(int argc, char **argv) {
 
     std::stable_sort(control3.begin(), control3.end(), [](unsigned x, unsigned y) {
         return (x & 0x3) < (y & 0x3);
+    });
+    std::stable_sort(control3.begin(), control3.end(), [](unsigned x, unsigned y) {
+        return (x >> 2 & 0x3) < (y >> 2 & 0x3);
+    });
+    std::stable_sort(control3.begin(), control3.end(), [](unsigned x, unsigned y) {
+        return (x >> 4 & 0x3) < (y >> 4 & 0x3);
     });
 
 //    output.readN(result2.data(), n);

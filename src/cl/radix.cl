@@ -91,10 +91,10 @@ kernel void merge(global unsigned *result, global const unsigned *a, unsigned si
     int resultStart, j;
     if (group % 2) {
         resultStart = (group - 1) * size;
-        j = bsearch(GetKey(a[id], shift), a + (group - 1) * size, size, shift);
+        j = bsearch2(GetKey(a[id], shift), a + (group - 1) * size, size, shift);
     } else {
         resultStart = group * size;
-        j = bsearch2(GetKey(a[id], shift), a + (group + 1) * size, size, shift);
+        j = bsearch(GetKey(a[id], shift), a + (group + 1) * size, size, shift);
     }
 
     result[resultStart + (id - group * size) + j] = a[id];
