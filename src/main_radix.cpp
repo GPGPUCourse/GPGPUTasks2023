@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <vector>
 
+static const unsigned int workGroupSize = 128;
 
 template<typename T>
 void raiseFail(const T &a, const T &b, std::string message, std::string filename, int line) {
@@ -21,6 +22,37 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 }
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
+
+void radix_sort(std::vector<unsigned int> &as, int n_pow) {
+    int n = 1 << n_pow;
+    gpu::gpu_mem_32u as_gpu;
+    as_gpu.resizeN(n);
+
+    ocl::Kernel count(radix_kernel, radix_kernel_length, "count");
+    count.compile();
+    ocl::Kernel reorder(radix_kernel, radix_kernel_length, "reorder");
+    reorder.compile();
+    ocl::Kernel prefix_sum_reduce(radix_kernel, radix_kernel_length, "prefix_sum_reduce");
+    prefix_sum_reduce.compile();
+    ocl::Kernel prefix_sum_write(radix_kernel, radix_kernel_length, "prefix_sum_write");
+    prefix_sum_write.compile();
+}
+
+
+void prefix_sum(std::vector<unsigned int> &as, gpu::gpu_mem_32u &dest, int n_pow, ocl::Kernel &prefix_sum_reduce,
+                ocl::Kernel &prefix_sum_write) {
+    int n = 1 << n_pow;
+
+    gpu::gpu_mem_32u src;
+    src.resize(n);
+    src.writeN(as.data(), n);
+
+    for (int p = 0; p <= n_pow; ++p) {
+        const unsigned int workGroupSize = 128;
+        prefix_sum_reduce.exec(gpu::WorkSize(n < workGroupSize ? n : workGroupSize, n), src, p);
+        prefix_sum_write.exec(gpu::WorkSize(n < workGroupSize ? n : workGroupSize, n), src, dest, p);
+    }
+}
 
 
 int main(int argc, char **argv) {
