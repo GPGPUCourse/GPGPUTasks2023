@@ -39,8 +39,8 @@ int main(int argc, char **argv) {
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 1;
-    unsigned int n = 512;
+    int benchmarkingIters = 10;
+    unsigned int n = 32 * 1024 * 1024;
     std::vector<unsigned int> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -57,12 +57,12 @@ int main(int argc, char **argv) {
             t.nextLap();
         }
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "CPU: " << (static_cast<double>(n) / 1000. / 1000.) / t.lapAvg() << " millions/s" << std::endl;
     }
 
     gpu::gpu_mem_32u as_gpu, res_gpu, counts_gpu, counts_t_gpu, prefix_res_gpu, prefix_bs_gpu;
     as_gpu.resizeN(n);
-    res_gpu.resize(n);
+    res_gpu.resizeN(n);
 
 
     {
@@ -73,7 +73,6 @@ int main(int argc, char **argv) {
 
         std::vector<unsigned int> prefix_res(prefix_n, 0);
         prefix_res_gpu.resizeN(prefix_n);
-        prefix_res_gpu.readN(prefix_res.data(), prefix_n);
 
         prefix_bs_gpu.resizeN(prefix_n);
 
@@ -93,59 +92,42 @@ int main(int argc, char **argv) {
         ocl::Kernel matrix_transpose_kernel(matrix_transpose, matrix_transpose_length, "matrix_transpose");
         matrix_transpose_kernel.compile();
 
-        unsigned int loops = 0, k = n;
-        while (k > 0) {
-            k = k >> BIT_PER_LEVEL;
-            ++loops;
-        }
-
-        loops = 1;  // DEBUG!!!
-
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
-
-
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
             
-            std::cerr << "Starting" << std::endl;
-            for (int level = 0; level < loops; ++level) {
+            for (int level = 0; level < 11; ++level) {
+                prefix_res_gpu.writeN(prefix_res.data(), prefix_n);
                 counter.exec(gpu::WorkSize(WORK_GROUP_SIZE_MAIN, global_work_size_main), as_gpu, counts_gpu, level, n);
-                std::cerr << "Got counts" << std::endl;
                 matrix_transpose_kernel.exec(gpu::WorkSize(WORK_GROUP_SIZE_TRANSPOSE, WORK_GROUP_SIZE_TRANSPOSE, global_work_size_1, global_work_size_0), 
                                              counts_gpu, counts_t_gpu, global_work_size_main / WORK_GROUP_SIZE_MAIN, COUNT_NUMBER);
-                std::cerr << "Transposed!" << std::endl;
                 unsigned int m = prefix_n, depth = 0, compress_coef = 2;
                 unsigned int n_compressed = prefix_n;
 				for (; m > 0; m /= 2, ++depth, compress_coef *= 2, n_compressed = (n_compressed + 1) / 2) {
 					prefix_sum.exec(gpu::WorkSize(WORK_GROUP_SIZE_PREFIX, global_work_size_prefix),
                                     counts_t_gpu, prefix_res_gpu, prefix_n, depth, compress_coef);
 					compress.exec(gpu::WorkSize(WORK_GROUP_SIZE_PREFIX, global_work_size_prefix), counts_t_gpu, prefix_bs_gpu, n_compressed);
-                    break;
 					counts_t_gpu.swap(prefix_bs_gpu);
 				}
-                std::cerr << "Got prefix sum!!" << std::endl;
-                // radix.exec(gpu::WorkSize(WORK_GROUP_SIZE_MAIN, global_work_size_main), as_gpu, res_gpu, prefix_res_gpu, level, n);
-                // std::cerr << "!!!" << std::endl;
-                // res_gpu.swap(as_gpu);
+                radix.exec(gpu::WorkSize(WORK_GROUP_SIZE_MAIN, global_work_size_main), as_gpu, res_gpu, prefix_res_gpu, level, n);
+                res_gpu.swap(as_gpu);
             }
+            t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "GPU: " << (static_cast<double>(n) / 1000. / 1000.) / t.lapAvg() << " millions/s" << std::endl;
 
-        // res_gpu.readN(as.data(), n);
-        std::cerr << "CP 1" << std::endl;
-        std::vector<unsigned int> cnt(prefix_n, 0);
-        std::cerr << "CP 2" << std::endl;
-        prefix_res_gpu.readN(cnt.data(), prefix_n);
-
-        std::cerr << "Got data" << std::endl;
-        for (int j = 0; j < global_work_size_main / WORK_GROUP_SIZE_MAIN; ++j) {
-            for (int i = 0; i < COUNT_NUMBER; ++i) {
-                std::cerr << cnt[j * COUNT_NUMBER + i] << " ";
-            }
-            std::cout << std::endl;
-        }
+        as_gpu.readN(as.data(), n);
+        // std::vector<unsigned int> cnt(prefix_n, 0);
+        // prefix_res_gpu.readN(cnt.data(), prefix_n);
+        // for (size_t i = 0; i < n; ++i) {
+        //     // if (i % 8 == 0) {
+        //     //     std::cerr << std::endl;
+        //     // }
+        //     std::cerr << as[i] << " ";
+        // }
+        // std::cout << std::endl;
     }
 
     // Проверяем корректность результатов
