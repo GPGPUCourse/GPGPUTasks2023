@@ -68,8 +68,7 @@ set(CMAKE_MAKEFILE_PRODUCTS
 
 # Dependency information for all targets:
 set(CMAKE_DEPEND_INFO_FILES
-  "CMakeFiles/matrix_transpose.dir/DependInfo.cmake"
-  "CMakeFiles/matrix_multiplication.dir/DependInfo.cmake"
+  "CMakeFiles/radix.dir/DependInfo.cmake"
   "libs/clew/CMakeFiles/libclew.dir/DependInfo.cmake"
   "libs/gpu/CMakeFiles/libgpu.dir/DependInfo.cmake"
   "libs/gpu/CMakeFiles/hexdumparray.dir/DependInfo.cmake"

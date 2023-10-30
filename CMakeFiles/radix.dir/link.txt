@@ -1,0 +1,1 @@
+/usr/bin/c++  -fopenmp -rdynamic CMakeFiles/radix.dir/src/main_radix.cpp.o -o radix  libs/clew/liblibclew.a libs/gpu/liblibgpu.a libs/utils/liblibutils.a libs/gpu/liblibgpu.a libs/utils/liblibutils.a libs/clew/liblibclew.a -ldl 

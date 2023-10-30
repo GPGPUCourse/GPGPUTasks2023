@@ -117,30 +117,17 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named matrix_transpose
+# Target rules for targets named radix
 
 # Build rule for target.
-matrix_transpose: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 matrix_transpose
-.PHONY : matrix_transpose
+radix: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 radix
+.PHONY : radix
 
 # fast build rule for target.
-matrix_transpose/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_transpose.dir/build.make CMakeFiles/matrix_transpose.dir/build
-.PHONY : matrix_transpose/fast
-
-#=============================================================================
-# Target rules for targets named matrix_multiplication
-
-# Build rule for target.
-matrix_multiplication: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 matrix_multiplication
-.PHONY : matrix_multiplication
-
-# fast build rule for target.
-matrix_multiplication/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_multiplication.dir/build.make CMakeFiles/matrix_multiplication.dir/build
-.PHONY : matrix_multiplication/fast
+radix/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/radix.dir/build.make CMakeFiles/radix.dir/build
+.PHONY : radix/fast
 
 #=============================================================================
 # Target rules for targets named libclew
@@ -207,53 +194,29 @@ libutils/fast:
 	$(MAKE) $(MAKESILENT) -f libs/utils/CMakeFiles/libutils.dir/build.make libs/utils/CMakeFiles/libutils.dir/build
 .PHONY : libutils/fast
 
-src/main_matrix_multiplication.o: src/main_matrix_multiplication.cpp.o
-.PHONY : src/main_matrix_multiplication.o
+src/main_radix.o: src/main_radix.cpp.o
+.PHONY : src/main_radix.o
 
 # target to build an object file
-src/main_matrix_multiplication.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_multiplication.dir/build.make CMakeFiles/matrix_multiplication.dir/src/main_matrix_multiplication.cpp.o
-.PHONY : src/main_matrix_multiplication.cpp.o
+src/main_radix.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/radix.dir/build.make CMakeFiles/radix.dir/src/main_radix.cpp.o
+.PHONY : src/main_radix.cpp.o
 
-src/main_matrix_multiplication.i: src/main_matrix_multiplication.cpp.i
-.PHONY : src/main_matrix_multiplication.i
-
-# target to preprocess a source file
-src/main_matrix_multiplication.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_multiplication.dir/build.make CMakeFiles/matrix_multiplication.dir/src/main_matrix_multiplication.cpp.i
-.PHONY : src/main_matrix_multiplication.cpp.i
-
-src/main_matrix_multiplication.s: src/main_matrix_multiplication.cpp.s
-.PHONY : src/main_matrix_multiplication.s
-
-# target to generate assembly for a file
-src/main_matrix_multiplication.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_multiplication.dir/build.make CMakeFiles/matrix_multiplication.dir/src/main_matrix_multiplication.cpp.s
-.PHONY : src/main_matrix_multiplication.cpp.s
-
-src/main_matrix_transpose.o: src/main_matrix_transpose.cpp.o
-.PHONY : src/main_matrix_transpose.o
-
-# target to build an object file
-src/main_matrix_transpose.cpp.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_transpose.dir/build.make CMakeFiles/matrix_transpose.dir/src/main_matrix_transpose.cpp.o
-.PHONY : src/main_matrix_transpose.cpp.o
-
-src/main_matrix_transpose.i: src/main_matrix_transpose.cpp.i
-.PHONY : src/main_matrix_transpose.i
+src/main_radix.i: src/main_radix.cpp.i
+.PHONY : src/main_radix.i
 
 # target to preprocess a source file
-src/main_matrix_transpose.cpp.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_transpose.dir/build.make CMakeFiles/matrix_transpose.dir/src/main_matrix_transpose.cpp.i
-.PHONY : src/main_matrix_transpose.cpp.i
+src/main_radix.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/radix.dir/build.make CMakeFiles/radix.dir/src/main_radix.cpp.i
+.PHONY : src/main_radix.cpp.i
 
-src/main_matrix_transpose.s: src/main_matrix_transpose.cpp.s
-.PHONY : src/main_matrix_transpose.s
+src/main_radix.s: src/main_radix.cpp.s
+.PHONY : src/main_radix.s
 
 # target to generate assembly for a file
-src/main_matrix_transpose.cpp.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_transpose.dir/build.make CMakeFiles/matrix_transpose.dir/src/main_matrix_transpose.cpp.s
-.PHONY : src/main_matrix_transpose.cpp.s
+src/main_radix.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/radix.dir/build.make CMakeFiles/radix.dir/src/main_radix.cpp.s
+.PHONY : src/main_radix.cpp.s
 
 # Help Target
 help:
@@ -268,14 +231,10 @@ help:
 	@echo "... libgpu"
 	@echo "... libimages"
 	@echo "... libutils"
-	@echo "... matrix_multiplication"
-	@echo "... matrix_transpose"
-	@echo "... src/main_matrix_multiplication.o"
-	@echo "... src/main_matrix_multiplication.i"
-	@echo "... src/main_matrix_multiplication.s"
-	@echo "... src/main_matrix_transpose.o"
-	@echo "... src/main_matrix_transpose.i"
-	@echo "... src/main_matrix_transpose.s"
+	@echo "... radix"
+	@echo "... src/main_radix.o"
+	@echo "... src/main_radix.i"
+	@echo "... src/main_radix.s"
 .PHONY : help
 
 

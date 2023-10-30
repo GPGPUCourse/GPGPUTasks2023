@@ -1,5 +1,4 @@
-/home/ilia/GPGPUTasks2023/CMakeFiles/matrix_transpose.dir
-/home/ilia/GPGPUTasks2023/CMakeFiles/matrix_multiplication.dir
+/home/ilia/GPGPUTasks2023/CMakeFiles/radix.dir
 /home/ilia/GPGPUTasks2023/CMakeFiles/edit_cache.dir
 /home/ilia/GPGPUTasks2023/CMakeFiles/rebuild_cache.dir
 /home/ilia/GPGPUTasks2023/libs/CMakeFiles/edit_cache.dir

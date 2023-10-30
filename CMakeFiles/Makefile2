@@ -63,8 +63,7 @@ CMAKE_BINARY_DIR = /home/ilia/GPGPUTasks2023
 # Directory level rules for the build root directory
 
 # The main recursive "all" target.
-all: CMakeFiles/matrix_transpose.dir/all
-all: CMakeFiles/matrix_multiplication.dir/all
+all: CMakeFiles/radix.dir/all
 all: libs/all
 .PHONY : all
 
@@ -73,8 +72,7 @@ preinstall: libs/preinstall
 .PHONY : preinstall
 
 # The main recursive "clean" target.
-clean: CMakeFiles/matrix_transpose.dir/clean
-clean: CMakeFiles/matrix_multiplication.dir/clean
+clean: CMakeFiles/radix.dir/clean
 clean: libs/clean
 .PHONY : clean
 
@@ -165,60 +163,32 @@ libs/utils/clean: libs/utils/CMakeFiles/libutils.dir/clean
 .PHONY : libs/utils/clean
 
 #=============================================================================
-# Target rules for target CMakeFiles/matrix_transpose.dir
+# Target rules for target CMakeFiles/radix.dir
 
 # All Build rule for target.
-CMakeFiles/matrix_transpose.dir/all: libs/clew/CMakeFiles/libclew.dir/all
-CMakeFiles/matrix_transpose.dir/all: libs/gpu/CMakeFiles/libgpu.dir/all
-CMakeFiles/matrix_transpose.dir/all: libs/gpu/CMakeFiles/hexdumparray.dir/all
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_transpose.dir/build.make CMakeFiles/matrix_transpose.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_transpose.dir/build.make CMakeFiles/matrix_transpose.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/ilia/GPGPUTasks2023/CMakeFiles --progress-num=25,26,27 "Built target matrix_transpose"
-.PHONY : CMakeFiles/matrix_transpose.dir/all
+CMakeFiles/radix.dir/all: libs/clew/CMakeFiles/libclew.dir/all
+CMakeFiles/radix.dir/all: libs/gpu/CMakeFiles/libgpu.dir/all
+CMakeFiles/radix.dir/all: libs/gpu/CMakeFiles/hexdumparray.dir/all
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/radix.dir/build.make CMakeFiles/radix.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/radix.dir/build.make CMakeFiles/radix.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/ilia/GPGPUTasks2023/CMakeFiles --progress-num=22,23,24 "Built target radix"
+.PHONY : CMakeFiles/radix.dir/all
 
 # Build rule for subdir invocation for target.
-CMakeFiles/matrix_transpose.dir/rule: cmake_check_build_system
+CMakeFiles/radix.dir/rule: cmake_check_build_system
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/ilia/GPGPUTasks2023/CMakeFiles 22
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/matrix_transpose.dir/all
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/radix.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/ilia/GPGPUTasks2023/CMakeFiles 0
-.PHONY : CMakeFiles/matrix_transpose.dir/rule
+.PHONY : CMakeFiles/radix.dir/rule
 
 # Convenience name for target.
-matrix_transpose: CMakeFiles/matrix_transpose.dir/rule
-.PHONY : matrix_transpose
+radix: CMakeFiles/radix.dir/rule
+.PHONY : radix
 
 # clean rule for target.
-CMakeFiles/matrix_transpose.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_transpose.dir/build.make CMakeFiles/matrix_transpose.dir/clean
-.PHONY : CMakeFiles/matrix_transpose.dir/clean
-
-#=============================================================================
-# Target rules for target CMakeFiles/matrix_multiplication.dir
-
-# All Build rule for target.
-CMakeFiles/matrix_multiplication.dir/all: libs/clew/CMakeFiles/libclew.dir/all
-CMakeFiles/matrix_multiplication.dir/all: libs/gpu/CMakeFiles/libgpu.dir/all
-CMakeFiles/matrix_multiplication.dir/all: libs/gpu/CMakeFiles/hexdumparray.dir/all
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_multiplication.dir/build.make CMakeFiles/matrix_multiplication.dir/depend
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_multiplication.dir/build.make CMakeFiles/matrix_multiplication.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/ilia/GPGPUTasks2023/CMakeFiles --progress-num=22,23,24 "Built target matrix_multiplication"
-.PHONY : CMakeFiles/matrix_multiplication.dir/all
-
-# Build rule for subdir invocation for target.
-CMakeFiles/matrix_multiplication.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/ilia/GPGPUTasks2023/CMakeFiles 22
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/matrix_multiplication.dir/all
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/ilia/GPGPUTasks2023/CMakeFiles 0
-.PHONY : CMakeFiles/matrix_multiplication.dir/rule
-
-# Convenience name for target.
-matrix_multiplication: CMakeFiles/matrix_multiplication.dir/rule
-.PHONY : matrix_multiplication
-
-# clean rule for target.
-CMakeFiles/matrix_multiplication.dir/clean:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/matrix_multiplication.dir/build.make CMakeFiles/matrix_multiplication.dir/clean
-.PHONY : CMakeFiles/matrix_multiplication.dir/clean
+CMakeFiles/radix.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/radix.dir/build.make CMakeFiles/radix.dir/clean
+.PHONY : CMakeFiles/radix.dir/clean
 
 #=============================================================================
 # Target rules for target libs/clew/CMakeFiles/libclew.dir
