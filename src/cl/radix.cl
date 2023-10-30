@@ -54,65 +54,6 @@ __kernel void radix
     bs[index] = as[global_id];
 }
 
-__kernel void small_merge_sort(__global unsigned int *a,
-                               __global unsigned int *b,
-                               unsigned int shift) {
-    int local_id = get_local_id(0);
-    int local_size = get_local_size(0);
-    int group_id = get_group_id(0);
-    int begin = group_id * local_size;
-    __global unsigned int *src = a + begin;
-    __global unsigned int *dst = b + begin;
-    int counter = 0;
-    int mask = ((1 << BITS_AMOUNT) - 1) << shift;
-    for (int block = 1; block <= local_size / 2; block <<= 1, ++counter) {
-        unsigned int value = src[local_id];
-        int k = local_id / (2 * block);
-        int i = local_id % (2 * block);
-        int j;
-        if (i < block) {
-            int l0 = k * (2 * block) + block - 1;
-            int left = l0;
-            int right = (k + 1) * (2 * block);
-            if (left > local_size)
-                left = local_size;
-            if (right > local_size)
-                right = local_size;
-            while (right - left > 1) {
-                int middle = (left + right) / 2;
-                if ((src[middle] & mask) < (value & mask)) {
-                    left = middle;
-                } else {
-                    right = middle;
-                }
-            }
-            j = i + (left - l0);
-        } else {
-            int l0 = k * (2 * block) - 1;
-            int left = l0;
-            int right = k * (2 * block) + block;
-            while (right - left > 1) {
-                int middle = (left + right) / 2;
-                if ((src[middle] & mask) <= (value & mask)) {
-                    left = middle;
-                } else {
-                    right = middle;
-                }
-            }
-            j = (i - block) + (left - l0);
-        }
-        dst[k * (2 * block) + j] = value;
-        __global unsigned int *tmp = src;
-        src = dst;
-        dst = tmp;
-
-        barrier(CLK_LOCAL_MEM_FENCE);
-    }
-    if (counter % 2 == 0) {
-        b[local_id] = a[local_id];
-    }
-}
-
 // Naive realisation
 __kernel void counters
 (
@@ -120,7 +61,6 @@ __kernel void counters
     , __global unsigned int *counters
     , const unsigned int offset
     , const unsigned int n
-    , const unsigned int workgroup_amount
 )
 {
     unsigned int global_id = get_global_id(0);
@@ -144,7 +84,6 @@ __kernel void prefixes
         )
 {
     unsigned int global_id = get_global_id(0);
-    unsigned int workgroup_id = get_group_id(0);
 
     if (global_id >= n) {
         return;
@@ -229,3 +168,63 @@ __kernel void copy(__global unsigned int *source, __global unsigned int *target,
 
     target[global_id] = source[global_id];
 }
+
+#define INFINITY 4294967295
+
+#define GET(a, n, i) ((i) < n ? a[(i)] : INFINITY)
+
+#define BIN_SEARCH(a, left_index, right_index, target, left_part)                       \
+    unsigned int cur_left = left_index;                                                 \
+    unsigned int cur_right = right_index;                                               \
+    while (cur_right > cur_left) {                                                      \
+        if ((left_part && ((GET(a, n, (cur_left + cur_right) / 2) >> offset) % NUMBERS_AMOUNT == target))            \
+        || (GET(a, n, (cur_left + cur_right) / 2) >> offset) % NUMBERS_AMOUNT > target) {                            \
+            cur_right = (cur_left + cur_right) / 2;                                     \
+        } else {                                                                        \
+            cur_left = (cur_left + cur_right) / 2 + 1;                                  \
+        }                                                                               \
+    }                                                                                   \
+    unsigned int result = cur_left;
+
+
+__kernel void merge_sort
+(
+      __global unsigned int *a
+    , __global unsigned int *b
+    , const unsigned int n
+    , const unsigned int offset
+) {
+    const int global_id = get_global_id(0);
+    __global unsigned int *source = a;
+    __global unsigned int *dst = b;
+
+    for (int merge_size = 1; merge_size <= WORKGROUP_SIZE; merge_size *= 2) {
+        unsigned int left = global_id / merge_size * merge_size;
+        unsigned int right = left + merge_size < n ? left + merge_size : n;
+        unsigned int center_of_array = (left + right) / 2;
+
+        if (global_id >= n)
+        {
+            return;
+        }
+
+        if (global_id < center_of_array)
+        {
+            BIN_SEARCH(source, center_of_array, right, ((source[global_id] >> offset) % NUMBERS_AMOUNT), true)
+            dst[global_id - left + result - merge_size / 2] = source[global_id];
+        }
+        else
+        {
+            BIN_SEARCH(source, left, center_of_array, ((source[global_id] >> offset) % NUMBERS_AMOUNT), false)
+            dst[global_id - center_of_array + result] = source[global_id];
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+        __global unsigned int *tmp = source;
+        source = dst;
+        dst = tmp;
+    }
+
+    b[global_id] = source[global_id];
+}
+
