@@ -22,6 +22,11 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 
+#define BITS_AMOUNT 4
+#define SIZE_OF_ELEMENT 32
+#define WORKGROUP_SIZE 512
+#define NUMBERS_AMOUNT (1 << BITS_AMOUNT)
+
 
 int main(int argc, char **argv) {
     gpu::Device device = gpu::chooseGPUDevice(argc, argv);
@@ -51,11 +56,31 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
 
+    unsigned int workgroup_amount = (n + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
+
     gpu::gpu_mem_32u as_gpu;
     as_gpu.resizeN(n);
 
+    gpu::gpu_mem_32u bs_gpu;
+    as_gpu.resizeN(n);
+
+    gpu::gpu_mem_32u counters_gpu;
+    as_gpu.resizeN(workgroup_amount * NUMBERS_AMOUNT);
+
+    gpu::gpu_mem_32u prefixes_gpu;
+    as_gpu.resizeN(workgroup_amount * NUMBERS_AMOUNT);
+
     {
         ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix");
+        radix.compile();
+
+        ocl::Kernel bubble_sort(radix_kernel, radix_kernel_length, "radix");
+        radix.compile();
+
+        ocl::Kernel counters(radix_kernel, radix_kernel_length, "radix");
+        radix.compile();
+
+        ocl::Kernel prefixes(radix_kernel, radix_kernel_length, "radix");
         radix.compile();
 
         timer t;
@@ -63,7 +88,10 @@ int main(int argc, char **argv) {
             as_gpu.writeN(as.data(), n);
 
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
+            for (int i = 0; SIZE_OF_ELEMENT / BITS_AMOUNT; ++i)
+            {
 
+            }
             // TODO
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;

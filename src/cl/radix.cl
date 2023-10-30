@@ -85,14 +85,45 @@ __kernel void local_bubble_sort (
     }
 }
 
+// Naive realisation
 __kernel void counters
 (
       __global const unsigned int *as
     , __global unsigned int *counters
     , const unsigned int offset
     , const unsigned int n
+    , const unsigned int workgroup_amount
 )
 {
     unsigned int global_id = get_global_id(0);
+    unsigned int workgroup_id = get_group_id(0);
 
+    if (global_id > n) {
+        return;
+    }
+    unsigned char bits = (as[global_id] >> offset) % NUMBERS_AMOUNT;
+
+    atomic_add(counters + (workgroup_id * workgroup_amount + bits));
+}
+
+// Naive realisation
+__kernel void prefixes
+        (
+                  __global const unsigned int *counters
+                , __global unsigned int *prefixes
+                , const unsigned int n
+                , const unsigned int workgroup_amount
+        )
+{
+    unsigned int global_id = get_global_id(0);
+    unsigned int workgroup_id = get_group_id(0);
+
+    if (global_id != 0) {
+        return;
+    }
+
+    prefixes[0] = counters[0];
+    for (int i = 1; i < n; ++i) {
+        prefixes[i] = prefixes[i-1] + counters[i];
+    }
 }
