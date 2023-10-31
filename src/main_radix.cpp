@@ -89,11 +89,10 @@ int main(int argc, char **argv) {
                 counters.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, counters_gpu, current_bit, n / 128);
                 counters_pref_gpu.writeN(counters_pref.data(), global_block_size);
 
-                prefix_sum.exec(gpu::WorkSize(workGroupSize, global_work_size), counters_gpu, counters_pref_gpu, global_block_size, 1);
-                for (unsigned int block_size = 2; block_size <= global_block_size; block_size *= 2) {
-                    reduce.exec(gpu::WorkSize(workGroupSize, global_work_size), counters_gpu, counters_res_gpu, global_block_size / block_size);
-                    counters_gpu.swap(counters_res_gpu);
+                for (unsigned int block_size = 1; block_size <= global_block_size; block_size *= 2) {
                     prefix_sum.exec(gpu::WorkSize(workGroupSize, global_work_size), counters_gpu, counters_pref_gpu, global_block_size, block_size);
+                    reduce.exec(gpu::WorkSize(workGroupSize, global_work_size), counters_gpu, counters_res_gpu, global_block_size / (block_size * 2));
+                    counters_gpu.swap(counters_res_gpu);
                 }
 
                 radix.exec(gpu::WorkSize(workGroupSize, total_work_size), counters_pref_gpu, as_gpu, bs_gpu,
