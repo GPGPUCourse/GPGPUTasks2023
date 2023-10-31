@@ -25,7 +25,7 @@ void sort_inside_block(__local unsigned int *part, __local unsigned int *number_
     unsigned int part_copy[128];
     for (unsigned int i = 0; i < 128; ++i)
         part_copy[i] = part[i];
-        
+
     unsigned int current_one = 128 - *number_of_zeros;
     unsigned int current_zero = 0;
 
@@ -49,7 +49,7 @@ __kernel void radix(__global const unsigned int *prefix_cnt, __global unsigned i
 
     if (id < n) {
         part[id_inside_block] = as[id];
-        
+
         barrier(CLK_LOCAL_MEM_FENCE);
 
         if (!(id % 128)) {
