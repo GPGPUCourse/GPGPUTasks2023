@@ -51,6 +51,11 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
 
+    std::vector<unsigned int> cnts(n / 128, 0);
+    std::vector<unsigned int> cnts_res(n / 128, 0);
+    std::vector<unsigned int> cnts_pref(n / 128, 0);
+    std::vector<unsigned int> bs(n, 0);
+
     {
         gpu::gpu_mem_32u as_gpu, bs_gpu, counters_gpu, counters_pref_gpu, counters_res_gpu;
         as_gpu.resizeN(n);
@@ -106,10 +111,16 @@ int main(int argc, char **argv) {
         std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
 
         as_gpu.readN(as.data(), n);
+        counters_gpu.readN(cnts.data(), global_block_size);
+        counters_pref_gpu.readN(cnts_res.data(), global_block_size);
+        counters_res_gpu.readN(cnts_pref.data(), global_block_size);
+        bs_gpu.readN(bs.data(), n);
     }
 
     // Проверяем корректность результатов
     for (int i = 0; i < n; ++i) {
+        std::cout << as[i] << " " << cnts[i] << " " << cnts_res[i] << " " << cnts_pref[i] << " " << bs[i] << " "
+                  << cpu_sorted[i] << std::endl;
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
 
