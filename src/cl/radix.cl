@@ -1,6 +1,6 @@
 #define Nbits 2u
 #define Ncols (1u << Nbits)
-#define Mask ((1u << Nbits) - 1)
+#define Mask ((1u << Nbits) - 1u)
 #define GetKey(value, shift) (((value) >> (shift)) & Mask)
 
 kernel void count(global unsigned *result, global const unsigned *a, unsigned shift) {
@@ -11,58 +11,29 @@ kernel void count(global unsigned *result, global const unsigned *a, unsigned sh
 
 kernel void reduce(global unsigned *a, unsigned k) {
     unsigned id = get_global_id(0);
-    unsigned base = (1 << k) * id;
-    a[base] += a[base + (1 << k - 1)];
+    unsigned base = (1u << k) * id;
+    a[base] += a[base + (1u << k - 1)];
 }
-// k = 1
-// 2^k = 2
-// 2^k * id -> 0 2 4 6 8 10
-// 0 + 1, 2 + 3, 4 + 5
-// k = 2, 2^k = 4, 0 4 8 12
-// 0 + 2, 4 + 6, 8 + 10
-// k = 3 0 8 16 24
-// 0 + 4, 8 + 12, 16 + 20
-// k = log n
-// 2^k = n
-// n * id -> 0
-// 0 + n / 2
-
 kernel void pick(global unsigned *result, global const unsigned *a, unsigned k) {
     unsigned id = get_global_id(0) + 1;
     // get the cell if we need it
-    if (id >> k & 1)
+    if (id >> k & 1u)
         result[id - 1] += a[id >> k + 1 << k + 1];
 }
-// 0 1 2 3 4 5 6 7 8
-// 1 2 3 4 5 6 7 8 9
-// 3 = 2^1 + 2^0
-// 0 -> 0 1 2 3 4
-// 1 -> 0 2 4 6 8
-// 2 -> 0 4 8 12 16
-// 3 -> 0 8 16 24 32
-// 4 ->                       0 (k = 2)
-// 5 -> 4 (k = 0),            0 (k = 2)
-// 6 ->            4 (k = 1), 0 (k = 2) 100
-// 7 -> 6 (k = 0), 4 (k = 1), 0 (k = 2) 111
-// 8 ->                       0 (k = 3)
-// log n -> 0
-// 00010 -> 1
-// 00010
-// 00010 -> 2
 
-#define gsize 4
+#define gsize 4u
 kernel void transpose(global unsigned* result, global const unsigned* a, unsigned n, unsigned m) {
-    int x = get_global_id(0);
-    int y = get_global_id(1);
-    int lx = get_local_id(0);
-    int ly = get_local_id(1);
+    unsigned x = get_global_id(0);
+    unsigned y = get_global_id(1);
+    unsigned lx = get_local_id(0);
+    unsigned ly = get_local_id(1);
 
-    local float buffer[gsize][gsize + 1]; // +1 for banking
+    local unsigned buffer[gsize][gsize + 1]; // +1 for banking
     buffer[ly][lx] = a[y * m + x];
 
     barrier(CLK_LOCAL_MEM_FENCE);
-    int writeY = x - lx + ly;
-    int writeX = y - ly + lx;
+    unsigned writeY = x - lx + ly;
+    unsigned writeX = y - ly + lx;
     result[writeY * n + writeX] = buffer[lx][ly];
 }
 
