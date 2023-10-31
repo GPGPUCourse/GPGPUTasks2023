@@ -83,24 +83,30 @@ int main(int argc, char **argv)
 
 		{
         // TODO: implement on OpenCL
-        gpu::gpu_mem_32u as_gpu;
-        as_gpu.resizeN(n);
-        as_gpu.writeN(as.data(), n);
+        const unsigned groupSize = 256;
+        std::vector<unsigned int> result(n, 0);
+        std::vector<unsigned int> zeros(n, 0);
 
-        ocl::Kernel prefix(prefix_sum_kernel, prefix_sum_kernel_length, "prefix");
+        ocl::Kernel pick(prefix_sum_kernel, prefix_sum_kernel_length, "pick");
         ocl::Kernel reduce(prefix_sum_kernel, prefix_sum_kernel_length, "reduce");
-        prefix.compile();
+        pick.compile();
         reduce.compile();
 
-        std::vector<unsigned int> result(n, 0);
-        gpu::gpu_mem_32u result_gpu;
+        gpu::gpu_mem_32u as_gpu, reduce_result, result_gpu;
+        as_gpu.resizeN(n);
+        reduce_result.resizeN(n);
         result_gpu.resizeN(n);
-        result_gpu.writeN(result.data(), n);
 
-        for (unsigned k = 0; (1u << k) <= n; ++k) {
-            reduce.exec(gpu::WorkSize(256, n), as_gpu, k);
-            prefix.exec(gpu::WorkSize(256, n), as_gpu, result_gpu, k);
+        as_gpu.writeN(as.data(), n);
+        result_gpu.writeN(zeros.data(), n);
+
+        pick.exec(gpu::WorkSize(groupSize, n), result_gpu, as_gpu, 0u);
+        for (unsigned k = 1u; 1u << k <= n; ++k) {
+            reduce.exec(gpu::WorkSize(std::max(1u, groupSize >> k), n >> k), reduce_result, as_gpu, k);
+            std::swap(reduce_result, as_gpu);
+            pick.exec(gpu::WorkSize(groupSize, n), result_gpu, as_gpu, k);
         }
+
         result_gpu.readN(result.data(), n);
         for (int i = 0; i < n; ++i) {
             EXPECT_THE_SAME(reference_result[i], result[i], "GPU result should be equal to CPU!");
@@ -109,11 +115,14 @@ int main(int argc, char **argv)
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
+            result_gpu.writeN(zeros.data(), n);
 
             t.restart();
-            for (unsigned k = 0; (1u << k) <= n; ++k) {
-                reduce.exec(gpu::WorkSize(256, n), as_gpu, k);
-                prefix.exec(gpu::WorkSize(256, n), as_gpu, result_gpu, k);
+            pick.exec(gpu::WorkSize(groupSize, n), result_gpu, as_gpu, 0u);
+            for (unsigned k = 1u; 1u << k <= n; ++k) {
+                reduce.exec(gpu::WorkSize(std::max(1u, groupSize >> k), n >> k), reduce_result, as_gpu, k);
+                std::swap(reduce_result, as_gpu);
+                pick.exec(gpu::WorkSize(groupSize, n), result_gpu, as_gpu, k);
             }
             t.nextLap();
         }
