@@ -22,6 +22,12 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 int main(int argc, char **argv)
 {
+    gpu::Device device = gpu::chooseGPUDevice(argc, argv);
+
+    gpu::Context context;
+    context.init(device.device_id_opencl);
+    context.activate();
+
 	int benchmarkingIters = 10;
 	unsigned int max_n = (1 << 24);
 
@@ -77,7 +83,41 @@ int main(int argc, char **argv)
 		}
 
 		{
-			// TODO: implement on OpenCL
+            gpu::gpu_mem_32u as_gpu, bs_gpu;
+            as_gpu.resizeN(n);
+            std::vector<unsigned int> zeroes(n);
+            bs_gpu.resizeN(n);
+
+            std::vector<unsigned int> result(n);
+            {
+                ocl::Kernel update_blocks(prefix_sum_kernel, prefix_sum_kernel_length, "update_blocks");
+                update_blocks.compile();
+                ocl::Kernel prefix_sum(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_sum");
+                prefix_sum.compile();
+                const unsigned int workGroupSize = 128;
+                timer t;
+                for (int iter = 0; iter < benchmarkingIters; ++iter) {
+                    as_gpu.writeN(zeroes.data(), n);
+                    bs_gpu.writeN(as.data(), n);
+                    t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
+                    prefix_sum.exec(gpu::WorkSize(workGroupSize, n),as_gpu, bs_gpu, 1, n);
+                    for(unsigned int block_size = 2; block_size <= n; block_size <<= 1) {
+                        unsigned int blocks_count = n / block_size;
+                        unsigned int global_work_size = ((blocks_count + workGroupSize - 1) / workGroupSize) * workGroupSize;
+                        update_blocks.exec(gpu::WorkSize(workGroupSize, global_work_size), bs_gpu, block_size, n);
+                        prefix_sum.exec(gpu::WorkSize(workGroupSize, n),as_gpu, bs_gpu, block_size, n);
+                    }
+                    t.nextLap();
+                }
+                std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+                std::cout << "GPU: " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
+
+                as_gpu.readN(result.data(), n);
+            }
+
+            for (int i = 0; i < n; ++i) {
+                EXPECT_THE_SAME(reference_result[i], result[i], "CPU result should be consistent!");
+            }
 		}
 	}
 }
