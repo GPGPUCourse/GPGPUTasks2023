@@ -50,14 +50,14 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
-    
+
     {
         gpu::gpu_mem_32u as_gpu, bs_gpu, counters_gpu, counters_pref_gpu, counters_res_gpu;
         as_gpu.resizeN(n);
         bs_gpu.resizeN(n);
 
         unsigned int global_block_size = n / 128;
-        
+
         counters_gpu.resizeN(global_block_size);
         counters_pref_gpu.resizeN(global_block_size);
         counters_res_gpu.resizeN(global_block_size);
@@ -117,3 +117,4 @@ int main(int argc, char **argv) {
 
     return 0;
 }
+
