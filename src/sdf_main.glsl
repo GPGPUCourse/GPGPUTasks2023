@@ -1,3 +1,4 @@
+#define PI 3.14159265359
 
 // sphere with center in (0, 0, 0)
 float sdSphere(vec3 p, float r)
@@ -57,6 +58,13 @@ vec3 rotateX(vec3 p, float a)
   return vec3(p.x, ca * p.y - sa * p.z, sa * p.y + ca * p.z);
 }
 
+vec3 rotateY(vec3 p, float a)
+{
+  float sa = sin(a);
+  float ca = cos(a);
+  return vec3(ca * p.x + sa * p.z, p.y, -sa * p.x + ca * p.z);
+}
+
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
 vec4 sdBody(vec3 p)
@@ -75,7 +83,9 @@ vec4 sdEye(vec3 p)
 
     vec3 a = p - vec3(0.0, 0.6, -0.5);
     
-    float d = sdSphere(a, 0.2);   
+    float d = sdSphere(a, 0.2); 
+    
+    a = rotateY(a, PI * sin(iTime) / 32.0);
 
     if (sqrt(a.x * a.x + a.y * a.y) < 0.05) {
         col = vec3(0.0, 0.0, 0.0);
@@ -102,8 +112,6 @@ vec4 sdLeg(vec3 p)
     
     return vec4(d, col);
 }
-
-#define PI 3.14159265359
 
 vec4 sdHand(vec3 p)
 {
@@ -151,6 +159,7 @@ vec4 sdMonster(vec3 p)
     vec4 hand = sdHand(p);
     
     if (hand.x < res.x) {
+        hand.x = smin(hand.x, res.x, 0.01);
         res = hand;
     }
     
