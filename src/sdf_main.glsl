@@ -18,6 +18,13 @@ float sdEgg(vec3 p, vec3 c, float r)
     return (p.y > c.y) ? sdSphereElongated(a, 3.0, r) : sdSphere(a, r);
 }
 
+float sdCapsule( vec3 p, vec3 a, vec3 b, float r )
+{
+  vec3 pa = p - a, ba = b - a;
+  float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+  return length( pa - ba*h ) - r;
+}
+
 float smin( float a, float b, float k )
 {
     float h = max( k-abs(a-b), 0.0 )/k;
@@ -73,6 +80,23 @@ vec4 sdEye(vec3 p)
     return vec4(d, col);
 }
 
+vec4 sdLeg(vec3 p)
+{
+    vec3 col = vec3(0.0, 1.0, 0.0);
+    
+    vec3 a = vec3(-0.1, 0.0, -0.68);
+    if (p.x > 0.0) {
+        a = vec3(0.1, 0.0, -0.68);
+    }
+     
+     
+    float d = sdCapsule(p - a, 
+                        vec3(0.0, -0.035, 0.0), 
+                        vec3(0.0, 0.1, 0.0), 0.05);
+    
+    return vec4(d, col);
+}
+
 vec4 sdMonster(vec3 p)
 {
     // при рисовании сложного объекта из нескольких SDF, удобно на верхнем уровне 
@@ -85,6 +109,12 @@ vec4 sdMonster(vec3 p)
 
     if (eye.x < res.x) {
         res = eye;
+    }
+    
+    vec4 leg = sdLeg(p);
+    
+    if (leg.x < res.x) {
+        res = leg;
     }
     
     return res;
