@@ -119,7 +119,7 @@ vec4 sdHand(vec3 p)
         return vec4(d, col);
     } else {
         vec3 a = vec3(-0.33, 0.4, -0.68);
-        vec3 b = rotateX(vec3(-0.1, -0.1, 0.0), (- PI + PI * lazycos(iTime)) / 2.0);        
+        vec3 b = rotateX(vec3(-0.1, -0.1, 0.0), (- PI + PI * lazycos(iTime * 2.0)) / 2.0);        
         float d = sdCapsule(p - a, 
                             vec3(b), 
                             vec3(0.0, 0.0, 0.0), 0.04);
