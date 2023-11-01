@@ -26,5 +26,6 @@ add_executable(bitonic src/main_bitonic.cpp src/cl/bitonic_cl.h
 target_link_libraries(bitonic libclew libgpu libutils)
 
 convertIntoHeader(src/cl/prefix_sum.cl src/cl/prefix_sum_cl.h prefix_sum_kernel)
-add_executable(prefix_sum src/main_prefix_sum.cpp src/cl/prefix_sum_cl.h)
+add_executable(prefix_sum src/main_prefix_sum.cpp src/cl/prefix_sum_cl.h
+        src/cl/prefix_sum.cl)
 target_link_libraries(prefix_sum libclew libgpu libutils)
