@@ -37,13 +37,6 @@ float sdPlane(vec3 p)
     return p.y;
 }
 
-vec3 rotateX(vec3 p, float a)
-{
-  float sa = sin(a);
-  float ca = cos(a);
-  return vec3(p.x, ca * p.y - sa * p.z, sa * p.y + ca * p.z);
-}
-
 // косинус который пропускает некоторые периоды, удобно чтобы махать ручкой не все время
 float lazycos(float angle)
 {
@@ -57,13 +50,19 @@ float lazycos(float angle)
     return 1.0;
 }
 
+vec3 rotateX(vec3 p, float a)
+{
+  float sa = sin(a);
+  float ca = cos(a);
+  return vec3(p.x, ca * p.y - sa * p.z, sa * p.y + ca * p.z);
+}
+
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
 vec4 sdBody(vec3 p)
 {
     float d = 1e10;
 
-    // TODO
     d = sdEgg((p - vec3(0.0, 0.35, -0.7)), vec3(0.0, 0.0, 0.0), 0.35);
     
     // return distance and color
@@ -104,6 +103,8 @@ vec4 sdLeg(vec3 p)
     return vec4(d, col);
 }
 
+#define PI 3.14159265359
+
 vec4 sdHand(vec3 p)
 {
     vec3 col = vec3(0.0, 1.0, 0.0);
@@ -118,7 +119,7 @@ vec4 sdHand(vec3 p)
         return vec4(d, col);
     } else {
         vec3 a = vec3(-0.33, 0.4, -0.68);
-        vec3 b = rotateX(vec3(-0.1, -0.1, 0.0), iTime);        
+        vec3 b = rotateX(vec3(-0.1, -0.1, 0.0), (- PI + PI * lazycos(iTime)) / 2.0);        
         float d = sdCapsule(p - a, 
                             vec3(b), 
                             vec3(0.0, 0.0, 0.0), 0.04);
