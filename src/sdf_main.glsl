@@ -5,6 +5,25 @@ float sdSphere(vec3 p, float r)
     return length(p) - r;
 }
 
+// sphere with center in (0, 0, 0)
+float sdSphereElongated(vec3 p, float k, float r)
+{
+    return sqrt(p.x * p.x + p.y * p.y / k + p.z * p.z)  - r;
+}
+
+// egg
+float sdEgg(vec3 p, vec3 c, float r)
+{
+    vec3 a = p - c;
+    return (p.y > c.y) ? sdSphereElongated(a, 3.0, r) : sdSphere(a, r);
+}
+
+float smin( float a, float b, float k )
+{
+    float h = max( k-abs(a-b), 0.0 )/k;
+    return min( a, b ) - h*h*k*(1.0/4.0);
+}
+
 // XZ plane
 float sdPlane(vec3 p)
 {
@@ -31,7 +50,7 @@ vec4 sdBody(vec3 p)
     float d = 1e10;
 
     // TODO
-    d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
+    d = sdEgg((p - vec3(0.0, 0.35, -0.7)), vec3(0.0, 0.0, 0.0), 0.35);
     
     // return distance and color
     return vec4(d, vec3(0.0, 1.0, 0.0));
@@ -39,10 +58,19 @@ vec4 sdBody(vec3 p)
 
 vec4 sdEye(vec3 p)
 {
+    vec3 col = vec3(1.0, 1.0, 1.0);
 
-    vec4 res = vec4(1e10, 0.0, 0.0, 0.0);
+    vec3 a = p - vec3(0.0, 0.6, -0.5);
     
-    return res;
+    float d = sdSphere(a, 0.2);   
+
+    if (sqrt(a.x * a.x + a.y * a.y) < 0.05) {
+        col = vec3(0.0, 0.0, 0.0);
+    } else if (sqrt(a.x * a.x + a.y * a.y) < 0.1) {
+        col.x = 0.0;
+    }
+    
+    return vec4(d, col);
 }
 
 vec4 sdMonster(vec3 p)
@@ -54,6 +82,7 @@ vec4 sdMonster(vec3 p)
     vec4 res = sdBody(p);
     
     vec4 eye = sdEye(p);
+
     if (eye.x < res.x) {
         res = eye;
     }
