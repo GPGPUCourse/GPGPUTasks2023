@@ -1,6 +1,7 @@
 const float M_PI  = radians(180.0); // 3.14159265359;
 const float M_2PI = radians(360.0); // 6.28318530718;
 const float EPS = 1e-3;
+const float INF = 1e10;
 
 // sphere with center in (0, 0, 0)
 float sdSphere(vec3 p, float r)
@@ -12,6 +13,44 @@ float sdSphere(vec3 p, float r)
 float sdPlaneXZ(vec3 p)
 {
     return p.y;
+}
+
+float sdCapsule(vec3 p, vec3 axis, float r)
+{
+    vec3 axisNorm = normalize(axis);
+    float axisLen = length(axis);
+    float toReduce = dot(p, axisNorm);
+    p -= clamp(toReduce, 0.0, axisLen) * axisNorm;
+    return length(p) - r;
+}
+
+float sdCapsuleLine(vec3 p, vec3 a, vec3 b, float r)
+{
+    vec3 ap = p - a;
+    vec3 ab = b - a;
+    return sdCapsule(ap, ab, r);
+}
+
+float sdRoundCone(vec3 p, vec3 axis, float ra, float rb)
+{
+    vec3 axisNorm = normalize(axis);
+    float axisLen = length(axis);
+    float sinA = (rb - ra) / axisLen;
+    float cosA = sqrt(1.0 - sinA * sinA);
+
+    float y = dot(p, axisNorm);
+    vec2 q = vec2(sqrt(dot(p, p) - y * y), y);
+    float k = dot(q, vec2(sinA, cosA));
+    if (k < 0.0) return length(q) - ra;
+    if (k > cosA * axisLen) return length(q - vec2(0.0, axisLen)) - rb;
+    return dot(q, vec2(cosA, -sinA)) - ra;
+}
+
+float sdRoundConeLine(vec3 p, vec3 a, vec3 b, float ra, float rb)
+{
+    vec3 ap = p - a;
+    vec3 ab = b - a;
+    return sdRoundCone(ap, ab, ra, rb);
 }
 
 // косинус который пропускает некоторые периоды, удобно чтобы махать ручкой не все время
@@ -27,27 +66,28 @@ float lazycos(float angle)
     return 1.0;
 }
 
-vec4 sdMin(vec4 sda, vec4 sdb)
+// min() for signed distance + color
+vec4 sdcCombine(vec4 sdca, vec4 sdcb)
 {
-    return sda.w < sdb.w ? sda : sdb;
+    return sdca.w < sdcb.w ? sdca : sdcb;
 }
 
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
-vec4 sdBody(vec3 p)
+vec4 sdcBody(vec3 p)
 {
-    float d = 1e10;
-
     // TODO
-    d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
+    //float d = sdSphere(p - vec3(0.0, 0.35, -0.7), 0.35);
+    //float d = sdCapsuleLine(p, vec3(-0.2, 0.35, -0.7), vec3(0.3, 0.40, -1.0), 0.2);
+    float d = sdRoundConeLine(p, vec3(-0.2, 0.35, -0.7), vec3(0.3, 0.40, -1.0), 0.1, 0.2);
 
     // return distance and color
-    return vec4(d, vec3(0, 1, 0));
+    return vec4(vec3(0, 1, 0), d);
 }
 
-vec4 sdEye(vec3 p)
+vec4 sdcEye(vec3 p)
 {
-    vec4 res = vec4(1e10, 0, 0, 0);
+    vec4 res = vec4(0, 0, 0, INF);
     return res;
 }
 
@@ -57,12 +97,8 @@ vec4 sdMonster(vec3 p)
     // модифицировать p, чтобы двигать объект как целое
     p -= vec3(0.0, 0.08, 0.0);
 
-    vec4 res = sdBody(p);
-
-    vec4 eye = sdEye(p);
-    if (eye.x < res.x) {
-        res = eye;
-    }
+    vec4 res = sdcBody(p);
+    res = sdcCombine(res, sdcEye(p));
 
     return res;
 }
@@ -71,8 +107,8 @@ vec4 sdMonster(vec3 p)
 vec4 sdTotal(vec3 p)
 {
     vec4 res;
-    res = sdMonster(p).yzwx;
-    res = sdMin(res, vec4(1, 0, 0, sdPlaneXZ(p)));
+    res = sdMonster(p);
+    res = sdcCombine(res, vec4(1, 0, 0, sdPlaneXZ(p)));
     return res;
 }
 
@@ -87,49 +123,49 @@ vec3 calcNormal(vec3 p) // for function f(p)
 }
 
 
-vec4 raycast(vec3 ray_origin, vec3 ray_direction)
+vec4 raycast(vec3 rayOrigin, vec3 rayDirection)
 {
-    // p = ray_origin + t * ray_direction;
+    // p = rayOrigin + t * rayDirection;
 
     float t = 0.0;
 
     for (int iter = 0; iter < 200; ++iter) {
-        vec4 res = sdTotal(ray_origin + t * ray_direction);
+        vec4 res = sdTotal(rayOrigin + t * rayDirection);
         t += res.w;
         if (res.w < EPS) {
             return vec4(res.xyz, t);
         }
     }
 
-    return vec4(vec3(0), 1e10);
+    return vec4(vec3(0), INF);
 }
 
 
-float shading(vec3 p, vec3 light_source, vec3 normal)
+float shading(vec3 p, vec3 lightSource, vec3 normal)
 {
-    vec3 light_dir = normalize(light_source - p);
-    float shading = dot(light_dir, normal);
+    vec3 lightDir = normalize(lightSource - p);
+    float shading = dot(lightDir, normal);
     return clamp(shading, 0.5, 1.0);
 }
 
 // phong model, see https://en.wikibooks.org/wiki/GLSL_Programming/GLUT/Specular_Highlights
-float specular(vec3 p, vec3 light_source, vec3 N, vec3 camera_center, float shinyness)
+float specular(vec3 p, vec3 lightSource, vec3 N, vec3 cameraCenter, float shinyness)
 {
-    vec3 L = normalize(p - light_source);
+    vec3 L = normalize(p - lightSource);
     vec3 R = reflect(L, N);
-    vec3 V = normalize(camera_center - p);
+    vec3 V = normalize(cameraCenter - p);
     return pow(max(dot(R, V), 0.0), shinyness);
 }
 
 
-float castShadow(vec3 p, vec3 light_source)
+float castShadow(vec3 p, vec3 lightSource)
 {
-    vec3 light_dir = p - light_source;
-    float target_dist = length(light_dir);
+    vec3 lightDir = p - lightSource;
+    float targetDist = length(lightDir);
 
-    float light_dist = raycast(light_source, normalize(light_dir)).w;
+    float lightDist = raycast(lightSource, normalize(lightDir)).w;
 
-    if (light_dist + 0.001 < target_dist) {
+    if (lightDist + 0.001 < targetDist) {
         return 0.5;
     }
 
@@ -142,22 +178,22 @@ void mainImage(out vec4 fragColor, vec2 fragCoord)
     vec2 uv = fragCoord/iResolution.y;
     vec2 wh = vec2(iResolution.x / iResolution.y, 1.0);
 
-    vec3 ray_origin = vec3(0.0, 0.5, 1.0);
-    vec3 ray_direction = normalize(vec3(uv - 0.5 * wh, -1.0));
+    vec3 rayOrigin = vec3(0.0, 0.5, 1.0);
+    vec3 rayDirection = normalize(vec3(uv - 0.5 * wh, -1.0));
 
-    vec4 res = raycast(ray_origin, ray_direction);
+    vec4 res = raycast(rayOrigin, rayDirection);
     vec3 col = res.xyz;
 
-    vec3 surface_point = ray_origin + res.w * ray_direction;
-    vec3 normal = calcNormal(surface_point);
+    vec3 surfacePoint = rayOrigin + res.w * rayDirection;
+    vec3 normal = calcNormal(surfacePoint);
 
-    vec3 light_source = vec3(1.0 + 2.5 * sin(iTime), 10.0, 10.0);
+    vec3 lightSource = vec3(1.0 + 2.5 * sin(iTime), 10.0, 10.0);
 
-    float shad = shading(surface_point, light_source, normal);
-    shad = min(shad, castShadow(surface_point, light_source));
+    float shad = shading(surfacePoint, lightSource, normal);
+    shad = min(shad, castShadow(surfacePoint, lightSource));
     col *= shad;
 
-    float spec = specular(surface_point, light_source, normal, ray_origin, 30.0);
+    float spec = specular(surfacePoint, lightSource, normal, rayOrigin, 30.0);
     col += vec3(1.0, 1.0, 1.0) * spec;
 
     // Output to screen
