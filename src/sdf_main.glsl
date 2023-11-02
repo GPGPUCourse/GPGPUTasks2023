@@ -3,6 +3,12 @@ const float M_2PI = radians(360.0); // 6.28318530718;
 const float EPS = 1e-3;
 const float INF = 1e10;
 
+float opSdSmoothUnion(float da, float db, float k)
+{
+    float h = clamp(0.5 + 0.5 * (db - da) / k, 0.0, 1.0);
+    return mix(db, da, h) - k * h * (1.0 - h);
+}
+
 // sphere with center in (0, 0, 0)
 float sdSphere(vec3 p, float r)
 {
@@ -67,19 +73,22 @@ float lazycos(float angle)
 }
 
 // min() for signed distance + color
-vec4 sdcCombine(vec4 sdca, vec4 sdcb)
+vec4 sdcCombine(vec4 a, vec4 b)
 {
-    return sdca.w < sdcb.w ? sdca : sdcb;
+    return a.w < b.w ? a : b;
 }
 
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
 vec4 sdcBody(vec3 p)
 {
-    // TODO
-    //float d = sdSphere(p - vec3(0.0, 0.35, -0.7), 0.35);
-    //float d = sdCapsuleLine(p, vec3(-0.2, 0.35, -0.7), vec3(0.3, 0.40, -1.0), 0.2);
-    float d = sdRoundConeLine(p, vec3(-0.2, 0.35, -0.7), vec3(0.3, 0.40, -1.0), 0.1, 0.2);
+    float sdTorsoBot = sdSphere(p - vec3(0.0, 0.4, 0.0), 0.3);
+    float sdTorsoTop = sdSphere(p - vec3(0.0, 0.7, 0.0), 0.2);
+    float d = opSdSmoothUnion(sdTorsoBot, sdTorsoTop, 0.3);
+
+    vec3 pMirrorX = vec3(abs(p.x), p.yz);
+    float sdLegs = sdCapsuleLine(pMirrorX, vec3(0.1, 0.04, 0.0), vec3(0.1, 0.5, 0.0), 0.05);
+    d = min(d, sdLegs);
 
     // return distance and color
     return vec4(vec3(0, 1, 0), d);
@@ -95,7 +104,7 @@ vec4 sdMonster(vec3 p)
 {
     // при рисовании сложного объекта из нескольких SDF, удобно на верхнем уровне
     // модифицировать p, чтобы двигать объект как целое
-    p -= vec3(0.0, 0.08, 0.0);
+    p += vec3(0.0, 0.0, 0.5);
 
     vec4 res = sdcBody(p);
     res = sdcCombine(res, sdcEye(p));
