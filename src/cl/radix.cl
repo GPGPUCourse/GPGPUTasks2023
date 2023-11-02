@@ -47,6 +47,7 @@ __kernel void radix(__global const unsigned int *prefix_cnt, __global unsigned i
     const unsigned int block_id = get_group_id(0);
     const unsigned int id_inside_block = get_local_id(0);
     
+    unsigned int number_of_zeros_total = n - prefix_cnt[n / 128 - 1];
     unsigned int number_of_ones_global;
     __local unsigned int number_of_zeros;
     __local unsigned int part[128];
@@ -68,7 +69,6 @@ __kernel void radix(__global const unsigned int *prefix_cnt, __global unsigned i
 
         unsigned int number_of_zeros_loc = 128 - number_of_zeros;
         unsigned int number_of_zeros_glob = block_id * 128 - number_of_ones_global;
-        unsigned int number_of_zeros_total = n - prefix_cnt[n / 128 - 1];
              
         unsigned int cur_zero_pos = number_of_zeros_glob + id_inside_block;
         unsigned int cur_one_pos = number_of_zeros_total + number_of_ones_global + id_inside_block - number_of_zeros_loc;
@@ -77,7 +77,7 @@ __kernel void radix(__global const unsigned int *prefix_cnt, __global unsigned i
 
         if (id_inside_block < number_of_zeros_loc)
             res[cur_zero_pos] = part[id_inside_block];
-//        else
-//            res[cur_one_pos] = part[id_inside_block];
+        else
+            res[cur_one_pos] = part[id_inside_block];
     }
 }
