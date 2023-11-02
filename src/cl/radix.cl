@@ -75,8 +75,8 @@ __kernel void radix(__global const unsigned int *prefix_cnt, __global unsigned i
 
         barrier(CLK_GLOBAL_MEM_FENCE);
 
-//        if (id_inside_block < number_of_zeros_loc)
-//            res[cur_zero_pos] = part[id_inside_block];
+        if (id_inside_block < number_of_zeros_loc)
+            res[cur_zero_pos] = part[id_inside_block];
 //        else
 //            res[cur_one_pos] = part[id_inside_block];
     }
