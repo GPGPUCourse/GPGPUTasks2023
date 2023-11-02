@@ -3,6 +3,18 @@ const float M_2PI = radians(360.0); // 6.28318530718;
 const float EPS = 1e-3;
 const float INF = 1e10;
 
+// min() for signed distance + color
+vec4 opSdcMin(vec4 a, vec4 b)
+{
+    return a.w < b.w ? a : b;
+}
+
+// Replace color on intersection
+vec4 opSdcReplaceColor(vec4 a, vec4 b)
+{
+    return vec4(a.w < b.w ? a.xyz : b.xyz, a.w);
+}
+
 float opSdSmoothUnion(float da, float db, float k)
 {
     float h = clamp(0.5 + 0.5 * (db - da) / k, 0.0, 1.0);
@@ -62,33 +74,52 @@ float sdRoundConeLine(vec3 p, vec3 a, vec3 b, float ra, float rb)
 // косинус который пропускает некоторые периоды, удобно чтобы махать ручкой не все время
 float lazycos(float angle)
 {
-    int nsleep = 10;
+    int nsleep = 6;
 
     int iperiod = int(angle / M_2PI) % nsleep;
-    if (iperiod < 3) {
+    if (iperiod < 2) {
         return cos(angle);
     }
 
     return 1.0;
 }
 
-// min() for signed distance + color
-vec4 sdcCombine(vec4 a, vec4 b)
-{
-    return a.w < b.w ? a : b;
-}
-
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
 vec4 sdcBody(vec3 p)
 {
+    float d = INF;
     float sdTorsoBot = sdSphere(p - vec3(0.0, 0.4, 0.0), 0.3);
     float sdTorsoTop = sdSphere(p - vec3(0.0, 0.7, 0.0), 0.2);
-    float d = opSdSmoothUnion(sdTorsoBot, sdTorsoTop, 0.3);
+    float sdTorso = opSdSmoothUnion(sdTorsoBot, sdTorsoTop, 0.3);
+    //d = min(d, sdTorso);
+    d = sdTorso;
 
     vec3 pMirrorX = vec3(abs(p.x), p.yz);
-    float sdLegs = sdCapsuleLine(pMirrorX, vec3(0.1, 0.04, 0.0), vec3(0.1, 0.5, 0.0), 0.05);
+    float sdLegs = sdCapsuleLine(
+        pMirrorX,
+        vec3(0.1, 0.04, 0.0),
+        vec3(0.1, 0.5, 0.0),
+        0.05
+    );
     d = min(d, sdLegs);
+
+    float sdLeftArm = sdCapsuleLine(
+        p,
+        vec3(0.1, 0.5, 0.1),
+        vec3(0.35, 0.35, 0.1),
+        0.05
+    );
+    d = min(d, sdLeftArm);
+
+    float cosA = lazycos(M_PI * iTime);
+    float sdRightArm = sdCapsuleLine(
+        p,
+        vec3(-0.1, 0.5, 0.1),
+        vec3(-0.35, mix(0.5, 0.65, cosA), 0.1),
+        0.05
+    );
+    d = min(d, sdRightArm);
 
     // return distance and color
     return vec4(vec3(0, 1, 0), d);
@@ -96,7 +127,14 @@ vec4 sdcBody(vec3 p)
 
 vec4 sdcEye(vec3 p)
 {
-    vec4 res = vec4(0, 0, 0, INF);
+    p -= vec3(0.0, 0.65, 0.2);
+    float d1 = sdSphere(p, 0.15);
+    p.z -= 0.15;
+    float d2 = sdSphere(p, 0.075);
+    float d3 = sdSphere(p, 0.04);
+    vec4 res = vec4(1.0, 1.0, 1.0, d1);
+    res = opSdcReplaceColor(res, vec4(0.0, 1.0, 1.0, d2));
+    res = opSdcReplaceColor(res, vec4(0.0, 0.0, 0.0, d3));
     return res;
 }
 
@@ -107,7 +145,7 @@ vec4 sdMonster(vec3 p)
     p += vec3(0.0, 0.0, 0.5);
 
     vec4 res = sdcBody(p);
-    res = sdcCombine(res, sdcEye(p));
+    res = opSdcMin(res, sdcEye(p));
 
     return res;
 }
@@ -117,7 +155,7 @@ vec4 sdTotal(vec3 p)
 {
     vec4 res;
     res = sdMonster(p);
-    res = sdcCombine(res, vec4(1, 0, 0, sdPlaneXZ(p)));
+    res = opSdcMin(res, vec4(1, 0, 0, sdPlaneXZ(p)));
     return res;
 }
 
@@ -184,7 +222,7 @@ float castShadow(vec3 p, vec3 lightSource)
 
 void mainImage(out vec4 fragColor, vec2 fragCoord)
 {
-    vec2 uv = fragCoord/iResolution.y;
+    vec2 uv = fragCoord / iResolution.y;
     vec2 wh = vec2(iResolution.x / iResolution.y, 1.0);
 
     vec3 rayOrigin = vec3(0.0, 0.5, 1.0);
