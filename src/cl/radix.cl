@@ -50,9 +50,9 @@ __kernel void radix(__global const unsigned int *prefix_cnt, __global unsigned i
     unsigned int number_of_ones_global;
     __local unsigned int number_of_zeros;
     __local unsigned int part[128];
-   
-   
-   if (id < n) {
+
+
+    if (id < n) {
         part[id_inside_block] = as[id];
 
         barrier(CLK_LOCAL_MEM_FENCE);
@@ -75,9 +75,9 @@ __kernel void radix(__global const unsigned int *prefix_cnt, __global unsigned i
 
         barrier(CLK_GLOBAL_MEM_FENCE);
 
-        if (id_inside_block < number_of_zeros_loc)
-            res[cur_zero_pos] = part[id_inside_block];
-        else
-            res[cur_one_pos] = part[id_inside_block];
+//        if (id_inside_block < number_of_zeros_loc)
+//            res[cur_zero_pos] = part[id_inside_block];
+//        else
+//            res[cur_one_pos] = part[id_inside_block];
     }
 }
