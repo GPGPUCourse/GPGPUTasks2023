@@ -28,26 +28,53 @@ float lazycos(float angle)
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
 vec4 sdBody(vec3 p)
 {
-    float d = 1e10;
+    vec3 point = p - vec3(0.0, 0.45, -0.7);
+    if (point.y > 0.0) {
+        point = point * vec3(1.0, 0.55, 1.0);
+    }
 
-    // TODO
-    d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
-    
     // return distance and color
-    return vec4(d, vec3(0.0, 1.0, 0.0));
+    return vec4(sdSphere(point, 0.35), vec3(0.0, 1.0, 0.0));
 }
 
 vec4 sdEye(vec3 p)
 {
+    vec3 point = p - vec3(0.0, 0.7, -0.45);
 
-    vec4 res = vec4(1e10, 0.0, 0.0, 0.0);
-    
-    return res;
+    float dist = sdSphere(point, 0.15);
+
+    float radius = length(vec3(point.x, point.y, 0.0));
+    if (radius > 0.07) {
+        return vec4(dist, 1.0, 1.0, 1.0);
+    } else if (radius > 0.04) {
+        return vec4(dist, 0.0, 0.0, 1.0);
+    } else {
+        return vec4(dist, 0.0, 0.0, 0.0);
+    }
+}
+
+vec4 sdLegs(vec3 p, float x)
+{
+    vec3 point = (p - vec3(x, 0.0, -0.90)) * vec3(1.2, 0.95, 1.3);
+    float dist = sdSphere(point, 0.15);
+
+    return vec4(dist, 0.1, 0.9, 0.0);
+}
+
+vec4 sdArms(vec3 p, vec3 a, vec3 b, float r)
+{
+  vec3 pa = p - a, ba = b - a;
+  float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+  float res = length( pa - ba*h ) - r;
+  return vec4(res, 0.5, 0.9, 0.3);
 }
 
 vec4 sdMonster(vec3 p)
 {
-    // при рисовании сложного объекта из нескольких SDF, удобно на верхнем уровне 
+    float time = iTime;
+    float shift = 0.23 * sin(time);
+
+    // при рисовании сложного объекта из нескольких SDF, удобно на верхнем уровне
     // модифицировать p, чтобы двигать объект как целое
     p -= vec3(0.0, 0.08, 0.0);
     
@@ -57,7 +84,35 @@ vec4 sdMonster(vec3 p)
     if (eye.x < res.x) {
         res = eye;
     }
-    
+
+    vec4 legR = sdLegs(p, min(-0.2, shift));
+    if (legR.x < res.x) {
+        res = legR;
+    }
+
+    vec4 legL = sdLegs(p, max(0.2, shift));
+    if (legL.x < res.x) {
+        res = legL;
+    }
+
+    vec3 armOut = vec3(0.05, 0.13 + 0.1 * lazycos(3.0 * time), 0.15);
+    vec3 armIn = vec3(-0.15, 0.03, -0.07);
+    vec4 armL = sdArms(p - vec3(0.35, 0.3, -0.55),
+        armOut,
+        armIn,
+        0.06);
+    if (armL.x < res.x) {
+        res = armL;
+    }
+
+    vec4 armR = sdArms(p - vec3(-0.35, 0.3, -0.55),
+        armOut * vec3(-1.0, 1.0 + 0.5 * sin(2.0 * time), 1.0),
+        armIn * vec3(-1.0, 1.0, 1.0),
+        0.06);
+    if (armR.x < res.x) {
+        res = armR;
+    }
+
     return res;
 }
 
