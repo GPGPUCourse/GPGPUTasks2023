@@ -86,23 +86,15 @@ int main(int argc, char **argv) {
             unsigned int total_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
 
             for (unsigned int current_bit = 0; current_bit < 32; current_bit++) {
-                std::cout << "1: " << current_bit << std::endl;
                 counters.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, counters_gpu, current_bit, n / 128);
                 counters_pref_gpu.writeN(counters_pref.data(), global_block_size);
-                std::cout << "2: " << current_bit << std::endl;
                 for (unsigned int block_size = 1; block_size <= global_block_size; block_size *= 2) {
-                    std::cout << "2.1: " << current_bit << " " << block_size << std::endl;
                     prefix_sum.exec(gpu::WorkSize(workGroupSize, global_work_size), counters_gpu, counters_pref_gpu, global_block_size, block_size);
-                    std::cout << "3: " << current_bit << " " << block_size << std::endl;
                     reduce.exec(gpu::WorkSize(workGroupSize, global_work_size), counters_gpu, counters_res_gpu, global_block_size / (block_size * 2));
-                    std::cout << "4: " << current_bit << " " << block_size << std::endl;
                     counters_gpu.swap(counters_res_gpu);
                 }
 
-                std::cout << "5: " << current_bit << std::endl;
-                radix.exec(gpu::WorkSize(workGroupSize, total_work_size), counters_pref_gpu, as_gpu, bs_gpu,
-                           current_bit, n);
-                std::cout << "6: " << current_bit << std::endl;
+                radix.exec(gpu::WorkSize(workGroupSize, total_work_size), counters_pref_gpu, as_gpu, bs_gpu, current_bit, n);
                 as_gpu.swap(bs_gpu);
             }
 
