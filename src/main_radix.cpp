@@ -100,12 +100,6 @@ int main(int argc, char **argv) {
             std::vector<unsigned int> cntt(M * K);
 
             for (unsigned int bit_shift = 0; bit_shift < 32; bit_shift += bit_step) {
-                /*as_gpu.readN(as.data(), n);
-                for (int i = 0; i < n; ++i)
-                    std::cout << as[i] << ' ';
-                std::cout << std::endl;
-                std::cout << std::endl;*/
-
                 {
                     radix_count.exec(gpu::WorkSize(workgroup_size, gpu::divup(n, workgroup_size) * workgroup_size), 
                         as_gpu, cnt_gpu, bit_shift);
@@ -139,20 +133,6 @@ int main(int argc, char **argv) {
                         as_gpu, bs_gpu, cnt_gpu_t, bit_shift, K);
                     bs_gpu.copyToN(as_gpu, n);
                 }
-
-                /*as_gpu.readN(as.data(), n);
-                cnt_gpu.readN(cnt.data(), M * K);
-                cnt_gpu_t.readN(cntt.data(), M * K);
-                for (int i = 0; i < n; ++i)
-                    std::cout << as[i] << ' ';
-                std::cout << std::endl;
-                for (int i = 0; i < M * K; ++i)
-                    std::cout << cnt[i] << ' ';
-                std::cout << std::endl;
-                for (int i = 0; i < M * K; ++i)
-                    std::cout << cntt[i] << ' ';
-                std::cout << std::endl;
-                std::cout << std::endl;*/
             }
 
             t.nextLap();
