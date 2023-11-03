@@ -7,6 +7,7 @@
 // Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
 #include "cl/radix_cl.h"
 
+#include <climits>
 #include <iostream>
 #include <stdexcept>
 #include <vector>
@@ -33,22 +34,62 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 
-void prefix_sum(gpu::gpu_mem_32u &src, gpu::gpu_mem_32u &dest, int n_pow, ocl::Kernel &prefix_sum_reduce,
+void prefix_sum(gpu::gpu_mem_32u &src, int n_pow, ocl::Kernel &prefix_sum_reduce,
                 ocl::Kernel &prefix_sum_write) {
     int n = 1 << n_pow;
 
-    for (int p = 0; p <= n_pow; ++p) {
+    ocl::Kernel prefix_sum_naive(radix_kernel, radix_kernel_length, "psum_naive");
+    prefix_sum_naive.compile();
+
+    for (int m = 1; m < n; m <<= 1) {
         const unsigned int workGroupSize = 128;
-        prefix_sum_reduce.exec(gpu::WorkSize(n < workGroupSize ? n : workGroupSize, n), src, p);
-        prefix_sum_write.exec(gpu::WorkSize(n < workGroupSize ? n : workGroupSize, n), src, dest, p);
+        // prefix_sum_reduce.exec(gpu::WorkSize(n < workGroupSize ? n : workGroupSize, n), src, p);
+        // std::cout << "prefix_sum_reduce-" << p << std::endl;
+        // prefix_sum_write.exec(gpu::WorkSize(n < workGroupSize ? n : workGroupSize, n), src, dest, p);
+        // std::cout << "prefix_sum_write-" << p << std::endl;
+        prefix_sum_naive.exec(gpu::WorkSize(workGroupSize, n >> 1), src, m);
     }
+}
+
+void debug(const size_t size, const std::string &name, const gpu::gpu_mem_32u &mem) {
+    std::vector<unsigned int> test(size, 0);
+    mem.readN(test.data(), size);
+    std::cout << name << std::endl;
+    for (size_t i = 0; i < test.size(); i++) {
+        std::cout << test[i] << ", " << std::flush;
+    }
+    std::cout << std::endl;
+    return;
+}
+
+void debug(const size_t size, const std::string &name, const gpu::gpu_mem_32u &mem, uint32_t cols) {
+    std::vector<unsigned int> test(size, 0);
+    mem.readN(test.data(), size);
+    std::cout << name << std::endl;
+    for (size_t i = 0; i < test.size(); ) {
+        for (size_t j = 0; j < cols; ++j, ++i) {
+            std::cout << test[i] << ", ";
+        }
+
+        std::cout << std::endl;
+    }
+    return;
+}
+
+void debug(const size_t size, const std::string &name, const std::vector<unsigned int> &test) {
+    std::cout << name << std::endl;
+    for (size_t i = 0; i < test.size(); i++) {
+        std::cout << test[i] << ", " << std::flush;
+    }
+    std::cout << std::endl;
+    return;
 }
 
 void radix_sort(std::vector<unsigned int> &as, std::vector<unsigned int> &bs, timer &t, int n_pow) {
     int n = 1 << n_pow;
 
-    int wgscnt = n / WG_SIZE;
-    int cntsz = wgscnt * WG_SIZE;
+    int wgscnt = (n + WG_SIZE - 1) / WG_SIZE;
+    int cntsz = wgscnt * POWER_OF_BITS;
 
     ocl::Kernel count(radix_kernel, radix_kernel_length, "count");
     count.compile();
@@ -81,26 +122,41 @@ void radix_sort(std::vector<unsigned int> &as, std::vector<unsigned int> &bs, ti
 
     t.restart();
     for (uint32_t i = 0; i < NUM_ITERS; i++) {
+        // reset.exec(gpu::WorkSize(WG_SIZE, n), bs_gpu);// TODO: this is solely for debug purposes
+        // debug(n, "as", as);
         // first step - count
         reset.exec(gpu::WorkSize(WG_SIZE, cntsz), counts);
         count.exec(gpu::WorkSize(WG_SIZE, n), as_gpu, counts, i);
+        // std::cout << "count" << std::endl;
+        // debug(cntsz, "counts", counts);
 
         // second step - transpose
-        matrix_transpose.exec(gpu::WorkSize(WG_SIZE, cntsz), counts, buf, wgscnt, POWER_OF_BITS);
+        matrix_transpose.exec(gpu::WorkSize(16, 16, POWER_OF_BITS, wgscnt), counts, buf, wgscnt, POWER_OF_BITS);
+        // debug(cntsz, "counts", counts, POWER_OF_BITS);
+        // debug(cntsz, "buf", buf, wgscnt);
+        // std::cout << "matrix_transpose" << std::endl;
+        // debug(cntsz, "buf", buf);
 
         // third step - prefix sums
-        reset.exec(gpu::WorkSize(WG_SIZE, cntsz), psums);
-        prefix_sum(buf, psums, ilog2(cntsz), prefix_sum_reduce, prefix_sum_write);
+        // reset.exec(gpu::WorkSize(WG_SIZE, cntsz), psums);
+        // debug(cntsz, "buf", buf, wgscnt);
+        prefix_sum(buf, ilog2(cntsz), prefix_sum_reduce, prefix_sum_write);
+        // std::cout << "prefix_sum" << std::endl;
+        // debug(cntsz, "buf", buf, wgscnt);
 
         // final step - reorder
-        reorder.exec(gpu::WorkSize(WG_SIZE, n), as_gpu, bs_gpu, psums, wgscnt, i);
+        reorder.exec(gpu::WorkSize(WG_SIZE, n), as_gpu, bs_gpu, buf, counts, wgscnt, i);
+        // std::cout << "reorder" << std::endl;
+        // debug(n, "bs_gpu", bs_gpu);
 
         // all over again
         std::swap(as_gpu, bs_gpu);
+        // std::cout << "----------------------------------------------------------------------------------------"
+        //           << std::endl;
     }
     t.nextLap();
-
-    as_gpu.writeN(bs.data(), n);
+    // std::cout << "finish" << std::endl;
+    as_gpu.readN(bs.data(), n);
 }
 
 
@@ -112,7 +168,7 @@ int main(int argc, char **argv) {
     context.activate();
 
     int benchmarkingIters = 10;
-    unsigned int n_pow = 25;
+    unsigned int n_pow = 10 + 10 + 5;
     unsigned int n = 1 << n_pow;
     std::vector<unsigned int> as(n, 0);
     std::vector<unsigned int> bs(n, 0);

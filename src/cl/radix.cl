@@ -13,7 +13,9 @@
 
 __kernel void reset(__global _uint *as) {
     int gid = get_global_id(0);
-    as[gid] = 0;
+    if (gid < get_global_size(0)) {
+        as[gid] = 0;
+    }
 }
 
 __kernel void count(__global _uint *as, __global _uint *cnts, _uint iternum) {
@@ -25,23 +27,22 @@ __kernel void count(__global _uint *as, __global _uint *cnts, _uint iternum) {
 
     // someone will succeed in writing zero. no code divergence!
     local_cnt[lid % POWER_OF_BITS] = 0;
-
+    barrier(CLK_LOCAL_MEM_FENCE);
     _uint num = as[gid];
 
     _uint part = GET_PART(num, iternum);
 
     atomic_inc(&local_cnt[part]);
-
     barrier(CLK_LOCAL_MEM_FENCE);
 
     // no way to evade code divergence here... sad.
     if (!(lid < POWER_OF_BITS))
         return;
 
-    atomic_add(&cnts[(POWER_OF_BITS * wid) + lid], local_cnt[lid]);
+    cnts[(POWER_OF_BITS * wid) + lid] = local_cnt[lid];
 }
 
-__kernel void reorder(__global _uint *as, __global _uint *bs, __global _uint *psum_cnts, _uint wgscnt, _uint iternum) {
+__kernel void reorder(__global _uint *as, __global _uint *bs, __global _uint *psum_cnts, __global _uint *cnts, _uint wgscnt, _uint iternum) {
     _uint gid = get_global_id(0);
     _uint lid = get_local_id(0);
     _uint wid = get_group_id(0);
@@ -53,7 +54,7 @@ __kernel void reorder(__global _uint *as, __global _uint *bs, __global _uint *ps
     // let's save our group's prefix sums
     __local _uint local_psum_cnt[POWER_OF_BITS];
     if (lid < POWER_OF_BITS)
-        local_psum_cnt[lid] = psum_cnts[wgscnt * lid];
+        local_psum_cnt[lid] = psum_cnts[wgscnt * lid + wid];
 
     barrier(CLK_LOCAL_MEM_FENCE);
 
@@ -70,9 +71,15 @@ __kernel void reorder(__global _uint *as, __global _uint *bs, __global _uint *ps
         loc_res_ind += (iless && iparteq) ? 1 : 0;
     }
 
-    _uint res_index = loc_res_ind + local_psum_cnt[part];
-
+    _uint res_index = loc_res_ind + local_psum_cnt[part] - cnts[wid * POWER_OF_BITS + part];
     bs[res_index] = num;// finally
+}
+
+__kernel void psum_naive(__global _uint *reduce_lst, const int power) {
+    const int gid = get_global_id(0);
+
+    const int ind = (gid / power) * 2 * power + (gid % power) + power;
+    reduce_lst[ind] += reduce_lst[ind / power * power - 1];
 }
 
 __kernel void prefix_sum_reduce(__global _uint *reduce_lst, const int power) {
@@ -96,38 +103,12 @@ __kernel void prefix_sum_write(__global _uint *reduce_lst, __global _uint *resul
     result[gid] += need_this_power ? reduce_lst[needed_ind] : 0;
 }
 
-__kernel void matrix_transpose(__global const float *mat, __global float *mat_tr, int nrow, int ncol) {
-    const int local_col = get_local_id(0);
-    const int local_row = get_local_id(1);
-
-    const int local_ncol = get_local_size(0);
-    const int local_nrow = get_local_size(1);
-
-    const int local_ind = (local_row * local_ncol) + local_col;
-
+__kernel void matrix_transpose(__global const _uint *mat, __global _uint *mat_tr, int nrow, int ncol) {
     const int col = get_global_id(0);
     const int row = get_global_id(1);
 
-    __local float local_mat[TILE_ROWS][TILE_COLS];
+    if (row >= nrow || col >= ncol)
+        return;
 
-    const int tile_col = local_ind % TILE_COLS;
-    const int tile_row = local_ind / TILE_COLS;
-
-    const int ind = (row * ncol) + col;
-
-    local_mat[tile_row][tile_col] = mat[ind];
-
-    barrier(CLK_LOCAL_MEM_FENCE);
-
-    const int local_ind_tr = (local_col * local_ncol) + local_row;
-
-    const int tile_col_tr = local_ind_tr % TILE_COLS;
-    const int tile_row_tr = local_ind_tr / TILE_COLS;
-
-    const int base_col = get_group_id(1) * local_nrow;
-    const int base_row = get_group_id(0) * local_ncol;
-
-    const int ind_tr = ((base_row + local_row) * ncol) + (base_col + local_col);
-
-    mat_tr[ind_tr] = local_mat[tile_row_tr][tile_col_tr];
+    mat_tr[(col * nrow) + row] = mat[(row * ncol) + col];
 }
