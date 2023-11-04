@@ -5,6 +5,46 @@ float sdSphere(vec3 p, float r)
     return length(p) - r;
 }
 
+
+float sdVerticalCapsule( vec3 p, float h, float r )
+{
+  p.y -= clamp( p.y, 0.0, h );
+  return length( p ) - r;
+}
+
+float sdCapsule( vec3 p, vec3 a, vec3 b, float r )
+{
+  vec3 pa = p - a, ba = b - a;
+  float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+  return length( pa - ba*h ) - r;
+}
+
+
+float dot2(in vec3 v ) { return dot(v,v); }
+float sdRoundCone( vec3 p, vec3 a, vec3 b, float r1, float r2 )
+{
+  // sampling independent computations (only depend on shape)
+  vec3  ba = b - a;
+  float l2 = dot(ba,ba);
+  float rr = r1 - r2;
+  float a2 = l2 - rr*rr;
+  float il2 = 1.0/l2;
+    
+  // sampling dependant computations
+  vec3 pa = p - a;
+  float y = dot(pa,ba);
+  float z = y - l2;
+  float x2 = dot2( pa*l2 - ba*y );
+  float y2 = y*y*l2;
+  float z2 = z*z*l2;
+
+  // single square root!
+  float k = sign(rr)*rr*rr*x2;
+  if( sign(z)*a2*z2>k ) return  sqrt(x2 + z2)        *il2 - r2;
+  if( sign(y)*a2*y2<k ) return  sqrt(x2 + y2)        *il2 - r1;
+                        return (sqrt(x2*a2*il2)+y*rr)*il2 - r1;
+}
+
 // XZ plane
 float sdPlane(vec3 p)
 {
@@ -14,7 +54,7 @@ float sdPlane(vec3 p)
 // косинус который пропускает некоторые периоды, удобно чтобы махать ручкой не все время
 float lazycos(float angle)
 {
-    int nsleep = 10;
+    int nsleep = 2;
     
     int iperiod = int(angle / 6.28318530718) % nsleep;
     if (iperiod < 3) {
@@ -24,23 +64,101 @@ float lazycos(float angle)
     return 1.0;
 }
 
+float koef() 
+{
+    return abs(lazycos(iTime));
+}
+
+float rkoef() 
+{
+    return 1. - koef();
+}
+
+float smin( float a, float b, float k )
+{
+    float h = max( k-abs(a-b), 0.0 )/k;
+    return min( a, b ) - h*h*k*(1.0/4.0);
+}
+
+mat3 rotate_mat(float theta) 
+{
+   return mat3(vec3(cos(theta), -sin(theta), 0),
+               vec3(sin(theta), cos(theta), 0),
+               vec3(0, 0, 1));
+}
+
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
 vec4 sdBody(vec3 p)
 {
-    float d = 1e10;
-
-    // TODO
-    d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
+    float body = sdRoundCone(p, 
+        vec3(0.,1.0,-1.), 
+        vec3(0.,0.5,-1.), 
+        0.2, 0.45 - 0.25*koef()
+    );
+    
+    float lleg = sdVerticalCapsule(p - vec3(0.1, 0., -1.0), 0.5, 0.03);
+    float rleg = sdVerticalCapsule(p - vec3(-0.1, 0., -1.0), 0.5, 0.03);
+    
+    vec3 lelbow = vec3(-0.63,0.7,-1.) + vec3(0.1*rkoef(), -0.3*rkoef(), 0.);    
+    float l1hand = sdRoundCone(p, 
+        vec3(-0.37,0.7,-1.), 
+        lelbow, 
+        0.1 + 0.06*koef(), 0.05
+    );
+    float l2hand = sdRoundCone(p, 
+        lelbow, 
+        lelbow + rotate_mat(3.5*(-1.+koef())) * vec3(0.05,0.27,0.), 
+        0.04 + 0.07*koef(), 0.03 
+    );
+    
+    
+    vec3 relbow = vec3(0.63,0.7,-1.) + vec3(-0.1*rkoef(), -0.3*rkoef(), 0.);    
+    float r1hand = sdRoundCone(p, 
+        vec3(0.37,0.7,-1.), 
+        relbow, 
+        0.1 + 0.06*koef(), 0.05
+    );
+    float r2hand = sdRoundCone(p, 
+        relbow, 
+        relbow + rotate_mat(-3.5*(-1.+koef())) * vec3(-0.05,0.27,0.), 
+        0.04 + 0.07*koef(), 0.03 
+    );
+    
+    float d = body;
+    d = smin(d, lleg, 0.1);
+    d = smin(d, rleg, 0.1);
+    d = smin(d, l1hand, 0.1);
+    d = smin(d, l2hand, 0.07);
+    d = smin(d, r1hand, 0.1);
+    d = smin(d, r2hand, 0.07);
+    
     
     // return distance and color
     return vec4(d, vec3(0.0, 1.0, 0.0));
 }
 
+
 vec4 sdEye(vec3 p)
 {
-
-    vec4 res = vec4(1e10, 0.0, 0.0, 0.0);
+    vec4 res = vec4(1e10, 1.0, 1.0, 1.0);
+    
+    float now;
+    
+    now = sdSphere(p - vec3(0.0, 0.75, -0.4), 0.2-0.05*koef());
+    if (now < res.x) {
+        res = vec4(now, vec3(1.0, 1.0, 1.0));
+    }
+    
+    now = sdSphere(p - vec3(0.0, 0.75-0.01*koef(), -0.3), 0.13-0.03*koef());
+    if (now < res.x) {
+        res = vec4(now, vec3(0.0, 0.95, 1.0));
+    }
+    
+    now = sdSphere(p - vec3(0.0, 0.75-0.03*koef(), -0.2), 0.07-0.02*koef());
+    if (now < res.x) {
+        res = vec4(now, vec3(0.0, 0.0, 0.0));
+    }
     
     return res;
 }
