@@ -64,6 +64,60 @@ float sdRoundCone( vec3 p, float r1, float r2, float h )
   return dot(q, vec2(a,b) ) - r1;
 }
 
+mat3 rotmatX(float a)
+{
+    return mat3(
+        1.0, 0.0, 0.0,
+        0.0, cos(a), -sin(a),
+        0.0, sin(a), cos(a)
+    );
+}
+
+mat3 rotmatY(float a)
+{
+    return mat3(
+        cos(a), 0.0, sin(a),
+        0.0, 1.0, 0.0,
+        -sin(a), 0.0, cos(a)
+    );
+}
+
+mat3 rotmatZ(float a)
+{
+    return mat3(
+        cos(a), -sin(a), 0.0,
+        sin(a), cos(a), 0.0,
+        0.0, 0.0, 1.0
+    );
+}
+
+float sdArm(vec3 p, float s, bool anim)
+{
+    if (anim) {
+        float t = mod(iTime, 3.0);
+        if (t < 0.15) {
+            p *= rotmatZ(t * 2.5);
+            p *= rotmatY(t * 10.0);
+        } else if (t < 1.0) {
+            p *= rotmatZ(t * 2.5);
+            p *= rotmatY(1.5);
+        } else if (t < 1.8) {
+            p *= rotmatZ(5.0 - t * 2.5);
+            p *= rotmatY(1.5);
+        } else if (t < 2.0) {
+            p *= rotmatZ(5.0 - t * 2.5);
+            p *= rotmatY(19.5 - t * 10.0);
+        }
+    }
+
+    p.x *= 2.0;
+    p *= rotmatZ(-s * 0.5);
+
+
+    p.y += 0.12;
+    return sdRoundCone(p, 0.09, 0.08, 0.12);
+}
+
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
 vec4 sdBody(vec3 p)
@@ -71,20 +125,20 @@ vec4 sdBody(vec3 p)
     vec4 res = vec4(1e10, vec3(0.0, 0.0, 0.0));
 
     res = vec4(
-        sdRoundCone(p - vec3(0.0, 0.22, -0.65), 0.3, 0.26, 0.35),
+        sdRoundCone(p, 0.3, 0.26, 0.35),
         vec3(0.9, 0.8, 0.1)
     );
 
-    float lArm = sdRoundCone(p - vec3(-0.24, 0.26, -0.5), 0.09, 0.08, 0.08);
-    float rArm = sdRoundCone(p - vec3(0.24, 0.26, -0.5), 0.09, 0.08, 0.08);
+    float lArm = sdArm(p - vec3(-0.28, 0.16, 0.0), -1.0, true);
+    float rArm = sdArm(p - vec3(0.28, 0.16, 0.0), 1.0, false);
     float arms = min(lArm, rArm);
 
     if (arms < res.x) {
         res = vec4(arms, vec3(0.9, 0.8, 0.1));
     }
 
-    float lLeg = sdRoundCone(p - vec3(-0.15, -0.01, -0.6), 0.13, 0.12, 0.04);
-    float rLeg = sdRoundCone(p - vec3(0.15, -0.01, -0.6), 0.13, 0.12, 0.04);
+    float lLeg = sdRoundCone(p - vec3(-0.15, -0.21, 0.0), 0.13, 0.12, 0.04);
+    float rLeg = sdRoundCone(p - vec3(0.15, -0.21, 0.0), 0.13, 0.12, 0.04);
     float legs = min(lLeg, rLeg);
 
     if (legs < res.x) {
@@ -96,14 +150,13 @@ vec4 sdBody(vec3 p)
 
 vec4 sdEye(vec3 p, vec3 color)
 {
-    vec3 center = vec3(0.0, 0.55, -0.45);
     float radius = 0.1;
 
     float d = 1e10;
-    d = sdSphere((p - center), radius);
+    d = sdSphere(p, radius);
 
     vec3 focus = vec3(1.0 + 2.5*sin(iTime), 5.0, 10.0);
-    vec3 focus_dir = center + normalize(focus - center) * radius;
+    vec3 focus_dir = normalize(focus) * radius;
     float focus_dist = length(p - focus_dir);
 
     if (focus_dist < 0.01) {
@@ -136,13 +189,9 @@ vec4 sdEyes(vec3 p)
 
 vec4 sdMonster(vec3 p)
 {
-    // при рисовании сложного объекта из нескольких SDF, удобно на верхнем уровне
-    // модифицировать p, чтобы двигать объект как целое
-    p -= vec3(0.0, 0.08, 0.0);
-
     vec4 res = sdBody(p);
 
-    vec4 eye = sdEyes(p);
+    vec4 eye = sdEyes(p - vec3(0.0, 0.33, 0.2));
     if (eye.x < res.x) {
         res = eye;
     }
@@ -153,12 +202,22 @@ vec4 sdMonster(vec3 p)
 
 vec4 sdTotal(vec3 p)
 {
+    // при рисовании сложного объекта из нескольких SDF, удобно на верхнем уровне
+    // модифицировать p, чтобы двигать объект как целое
+    p -= vec3(0.0, 0.3, -0.65);
+
+    // p *= rotmatY(-0.6);
+    p *= rotmatY(iTime / 5.0);
+    p *= rotmatZ(0.1);
+
     vec4 res = sdMonster(p);
+
+    p += vec3(0.0, 0.3, -0.65);
 
     float dist = sdPlane(p);
     if (dist < res.x) {
         vec3 c = p + normalize(p) * dist;
-        res = vec4(dist, vec3(0.2, 0.8, 0.2) - noise(c.xz * 215.0 + vec2(1.1, 0.1) * sin(iTime)) * 0.8);
+        res = vec4(dist, vec3(0.2, 0.8, 0.2) - noise(c.xz * 215.0 + vec2(6.0 * sin(iTime), 2.0 * cos(iTime))) * 0.8);
     }
 
     return res;
