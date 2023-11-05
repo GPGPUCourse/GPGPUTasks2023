@@ -6,6 +6,9 @@
 
 // Этот файл будет сгенерирован автоматически в момент сборки - см. convertIntoHeader в CMakeLists.txt:18
 #include "cl/radix_cl.h"
+#include "cl/matrix_transpose_cl.h"
+#include "cl/prefix_sum_cl.h"
+#include "cl/merge_cl.h"
 
 #include <iostream>
 #include <stdexcept>
@@ -50,13 +53,28 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
-    /*
-    gpu::gpu_mem_32u as_gpu;
+    gpu::gpu_mem_32u as_gpu, cnts_gpu, cntst_gpu, pref_cnts_gpu, pref_cnt_gpu, res_gpu, res_sort_gpu;
     as_gpu.resizeN(n);
+    cnts_gpu.resizeN(n);
+    cntst_gpu.resizeN(n);
+    pref_cnts_gpu.resizeN(n);
+    pref_cnt_gpu.resizeN(n);
+    res_gpu.resizeN(n);
+    res_sort_gpu.resizeN(n);
 
     {
         ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix");
         radix.compile();
+        ocl::Kernel count(radix_kernel, radix_kernel_length, "get_counts");
+        count.compile();
+        ocl::Kernel transpose(matrix_transpose_kernel, matrix_transpose_kernel_length, "matrix_transpose");
+        transpose.compile();
+        ocl::Kernel prefix(prefix_sum_kernel, prefix_sum_kernel_length, "prefix");
+        prefix.compile();
+        ocl::Kernel prefix_row(prefix_sum_kernel, prefix_sum_kernel_length, "prefix_row");
+        prefix_row.compile();
+        ocl::Kernel merge(merge_kernel, merge_kernel_length, "merge");
+        merge.compile();
 
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
@@ -64,7 +82,31 @@ int main(int argc, char **argv) {
 
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
-            // TODO
+            for (int offset = 0; offset < 32; offset += 4) {
+                for (int block_size = 1; block_size < 128; block_size *= 2) {
+                    merge.exec(gpu::WorkSize(128, n), as_gpu, res_sort_gpu, block_size, offset);
+                    as_gpu.swap(res_sort_gpu);
+                }
+
+                count.exec(gpu::WorkSize(128, n), as_gpu, cnts_gpu, offset);
+
+                auto transpose_ws = gpu::WorkSize(16, 16, 16, n / 128);
+                transpose.exec(transpose_ws, cnts_gpu, cntst_gpu, n / 128, 16);
+
+                for (int off = 1; off < n; off *= 2) {
+                    prefix.exec(gpu::WorkSize(128, n), cntst_gpu, pref_cnts_gpu, off);
+                    cntst_gpu.swap(pref_cnts_gpu);
+                }
+                cntst_gpu.swap(pref_cnts_gpu);
+
+                prefix_row.exec(gpu::WorkSize(128, n), cnts_gpu, pref_cnt_gpu);
+
+                radix.exec(gpu::WorkSize(128, n), as_gpu, res_gpu, pref_cnt_gpu,
+                           pref_cnts_gpu, n, offset);
+
+                res_gpu.swap(as_gpu);
+            }
+            t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
@@ -76,6 +118,6 @@ int main(int argc, char **argv) {
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
-*/
+
     return 0;
 }
