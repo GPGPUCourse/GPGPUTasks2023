@@ -42,13 +42,13 @@ int main(int argc, char **argv) {
     std::vector<unsigned int> cpu_sorted;
     {
         timer t;
-    for (int iter = 0; iter < benchmarkingIters; ++iter) {
-    cpu_sorted = as;
-    std::sort(cpu_sorted.begin(), cpu_sorted.end());
-    t.nextLap();
-    }
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
+            cpu_sorted = as;
+            std::sort(cpu_sorted.begin(), cpu_sorted.end());
+            t.nextLap();
+        }
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-    std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
 
     const unsigned int digits_number = 4;
@@ -70,6 +70,9 @@ int main(int argc, char **argv) {
     prefix_sums_gpu.resizeN(counters_size);
 
     {
+        ocl::Kernel init(radix_kernel, radix_kernel_length, "init");
+        init.compile();
+
         ocl::Kernel radix_count(radix_kernel, radix_kernel_length, "radix_count");
         radix_count.compile();
 
@@ -87,15 +90,17 @@ int main(int argc, char **argv) {
             as_gpu.writeN(as.data(), n);
             t.restart();
             for (int bits_offset = 0; bits_offset <= bits_in_uint; bits_offset += bits_number) {
-                prefix_sums_gpu.writeN(zeros.data(), counters_size);
                 radix_count.exec(gpu::WorkSize(work_group_size, n + work_group_size), as_gpu, n, counters_gpu,
                                  work_groups_number, bits_offset);
+
+                init.exec(gpu::WorkSize(work_group_size, counters_size), prefix_sums_gpu, counters_size, 0);
                 unsigned int cur_block_size = 1;
                 for (; cur_block_size <= work_groups_number / 2; cur_block_size <<= 1) {
                     radix_prefix_sum.exec(gpu::WorkSize(work_group_size, work_groups_number), counters_gpu,
                                           prefix_sums_gpu, work_groups_number, cur_block_size);
-                    radix_prefix_sum_reduce.exec(gpu::WorkSize(work_group_size, work_groups_number / cur_block_size / 2),
-                                                 counters_gpu, work_groups_number, cur_block_size);
+                    radix_prefix_sum_reduce.exec(
+                            gpu::WorkSize(work_group_size, work_groups_number / cur_block_size / 2), counters_gpu,
+                            work_groups_number, cur_block_size);
                 }
                 radix_prefix_sum.exec(gpu::WorkSize(work_group_size, work_groups_number), counters_gpu, prefix_sums_gpu,
                                       work_groups_number, cur_block_size);

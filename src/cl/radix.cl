@@ -81,3 +81,10 @@ __kernel void radix_sort(const __global unsigned int *as, __global unsigned int 
     }
     as_sorted_dst[dst_i] = as[i];
 }
+
+__kernel void init(__global unsigned int *as, const unsigned int n, const unsigned int val) {
+    const unsigned int i = get_global_id(0);
+    if (i < n) {
+        as[i] = val;
+    }
+}
