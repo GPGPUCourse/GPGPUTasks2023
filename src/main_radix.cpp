@@ -40,16 +40,16 @@ int main(int argc, char **argv) {
     std::cout << "Data generated for n=" << n << "!" << std::endl;
 
     std::vector<unsigned int> cpu_sorted;
-    {
-        timer t;
-        for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            cpu_sorted = as;
-            std::sort(cpu_sorted.begin(), cpu_sorted.end());
-            t.nextLap();
-        }
-        std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
-    }
+    // {
+    //     timer t;
+    //     for (int iter = 0; iter < benchmarkingIters; ++iter) {
+    //         cpu_sorted = as;
+    //         std::sort(cpu_sorted.begin(), cpu_sorted.end());
+    //         t.nextLap();
+    //     }
+    //     std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+    //     std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+    // }
 
     const unsigned int digits_number = 4;
     const unsigned int bits_number = 2;
@@ -94,7 +94,7 @@ int main(int argc, char **argv) {
                 for (; cur_block_size <= work_groups_number / 2; cur_block_size <<= 1) {
                     radix_prefix_sum.exec(gpu::WorkSize(work_group_size, work_groups_number), counters_gpu,
                                           prefix_sums_gpu, work_groups_number, cur_block_size);
-                    radix_prefix_sum_reduce.exec(gpu::WorkSize(work_group_size, work_groups_number / cur_block_size),
+                    radix_prefix_sum_reduce.exec(gpu::WorkSize(work_group_size, work_groups_number / cur_block_size / 2),
                                                  counters_gpu, work_groups_number, cur_block_size);
                 }
                 radix_prefix_sum.exec(gpu::WorkSize(work_group_size, work_groups_number), counters_gpu, prefix_sums_gpu,
