@@ -87,7 +87,6 @@ int main(int argc, char **argv) {
             as_gpu.writeN(as.data(), n);
             t.restart();
             for (int bits_offset = 0; bits_offset <= bits_in_uint; bits_offset += bits_number) {
-                counters_gpu.writeN(zeros.data(), counters_size);
                 prefix_sums_gpu.writeN(zeros.data(), counters_size);
                 radix_count.exec(gpu::WorkSize(work_group_size, n + work_group_size), as_gpu, n, counters_gpu,
                                  work_groups_number, bits_offset);
