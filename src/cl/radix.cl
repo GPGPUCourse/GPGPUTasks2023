@@ -3,16 +3,16 @@
 __kernel void radix_count(const __global unsigned int *as, const unsigned int n, __global unsigned int *counters,
                           const unsigned int working_groups_number, const unsigned int mask_offset) {
     const unsigned int i = get_global_id(0);
-    if (i >= n) {
-        return;
-    }
     const unsigned int local_i = get_local_id(0);
     const unsigned int mask = DIGITS_NUMBER - 1;
     __local unsigned int local_counters[DIGITS_NUMBER];
     if (local_i < DIGITS_NUMBER) {
         local_counters[local_i] = 0;
     }
-    atomic_add(&local_counters[(as[i] >> mask_offset) & mask], 1);
+    barrier(CLK_LOCAL_MEM_FENCE);
+    if (i < n) {
+        atomic_add(&local_counters[(as[i] >> mask_offset) & mask], 1);
+    }
     barrier(CLK_LOCAL_MEM_FENCE);
     if (local_i < DIGITS_NUMBER) {
         counters[local_i * working_groups_number + get_group_id(0)] = local_counters[local_i];
@@ -44,11 +44,12 @@ __kernel void radix_prefix_sum(const __global unsigned int *counters, __global u
 __kernel void radix_prefix_sum_reduce(__global unsigned int *counters, const unsigned int working_groups_number,
                                       const unsigned int cur_block_size) {
     const unsigned int i = get_global_id(0);
-    if ((i + 1) * cur_block_size < working_groups_number + 1 && i * cur_block_size > 0) {
+    const unsigned int main_index = (i + 1) * (cur_block_size << 1) - 1;
+    const unsigned int reduce_index = main_index - cur_block_size;
+    if (main_index < working_groups_number && reduce_index >= 0) {
         for (unsigned int cur_bit_offset = 0; cur_bit_offset < DIGITS_NUMBER * working_groups_number;
              cur_bit_offset += working_groups_number) {
-            counters[cur_bit_offset + (i + 1) * cur_block_size - 1] +=
-                    counters[cur_bit_offset + i * cur_block_size - 1];
+            counters[cur_bit_offset + main_index] += counters[cur_bit_offset + reduce_index];
         }
     }
 }
