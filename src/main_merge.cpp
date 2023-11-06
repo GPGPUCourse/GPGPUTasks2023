@@ -102,7 +102,6 @@ int main(int argc, char **argv) {
             for(;(1<<h)<=n;++h) {
                 unsigned int len = (1<<h);
                 unsigned int global_work_size = n / work_per_workitem;
-                //for(int j=0;j<n;j+=len) {
                 merge2.exec(
                     gpu::WorkSize(workGroupSize, global_work_size), 
                     as_gpu, 
@@ -110,7 +109,6 @@ int main(int argc, char **argv) {
                     n,
                     len
                 );
-                //}
                 std::swap(as_gpu, ss_gpu);
             }
             
