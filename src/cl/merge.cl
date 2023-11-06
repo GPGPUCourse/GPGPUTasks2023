@@ -78,10 +78,13 @@ __kernel void merge_local(
                     __global const float* as, 
                     __global float* ss,
                     const unsigned int n,
-                    const unsigned int len,
-                    const unsigned int shift)
+                    const unsigned int len)
 {
-    const unsigned x  = get_global_id(0);
+    const unsigned i = get_global_id(0);
+
+    unsigned int j = i * WORK_PER_WORKITEM / len;
+    unsigned int shift = j * len;
+    unsigned int x = i % (len / WORK_PER_WORKITEM);
 
     const unsigned int l1 = shift, r1 = l1+len/2;
     const unsigned int l2 = r1, r2 = l2 + len/2;
@@ -96,8 +99,8 @@ __kernel void merge_local(
 
     binary_search(as, l1, l2, len, x, &ssr1, &ssr2);
 
-    float suba[WORK_PER_WORKITEM]; 
-    float subb[WORK_PER_WORKITEM];
+    __local float suba[WORK_PER_WORKITEM]; 
+    __local float subb[WORK_PER_WORKITEM];
 
     for(unsigned int i=ssl1;i<ssr1;++i) {
         suba[i-ssl1] = as[l1+i];

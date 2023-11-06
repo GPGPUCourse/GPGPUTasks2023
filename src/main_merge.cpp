@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
     context.activate();
 
     int benchmarkingIters = 10;
-    unsigned int n = 32 * 1024 * 128;
+    unsigned int n = 32 * 1024 * 1024;
     std::vector<float> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -101,17 +101,16 @@ int main(int argc, char **argv) {
             // теперь будем мерджить два (уже больших) массива всеми воркитемами (каждый посчитает свой подотрезок ответа)
             for(;(1<<h)<=n;++h) {
                 unsigned int len = (1<<h);
-                unsigned int global_work_size = len / work_per_workitem;
-                for(int j=0;j<n;j+=len) {
-                    merge2.exec(
-                        gpu::WorkSize(workGroupSize, global_work_size), 
-                        as_gpu, 
-                        ss_gpu, 
-                        n,
-                        len,
-                        j
-                    );
-                }
+                unsigned int global_work_size = n / work_per_workitem;
+                //for(int j=0;j<n;j+=len) {
+                merge2.exec(
+                    gpu::WorkSize(workGroupSize, global_work_size), 
+                    as_gpu, 
+                    ss_gpu, 
+                    n,
+                    len
+                );
+                //}
                 std::swap(as_gpu, ss_gpu);
             }
             
