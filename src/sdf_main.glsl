@@ -1,11 +1,52 @@
+vec3 RED = vec3(1.0, 0.0, 0.0);
+vec3 GREEN = vec3(0.0, 1.0, 0.0);
+vec3 BLUE = vec3(0.4, 0.4, 8.0);
+vec3 BLACK = vec3(0.0, 0.0, 0.0);
+vec3 WHITE = vec3(1.0, 1.0, 1.0);
 
-// sphere with center in (0, 0, 0)
+float dot2( in vec2 v ) { return dot(v,v); }
+float dot2( in vec3 v ) { return dot(v,v); }
+float ndot( in vec2 a, in vec2 b ) { return a.x*b.x - a.y*b.y; }
+
+float smin( float a, float b, float k )
+{
+    float h = max( k-abs(a-b), 0.0 )/k;
+    return min( a, b ) - h*h*k*(1.0/4.0);
+}
+
+mat3 rotate(float theta) {
+    float c = cos(theta);
+    float s = sin(theta);
+    return mat3(
+        vec3(c, -s, 0),
+        vec3(s, c, 0),
+        vec3(0, 0, 1)
+    );
+}
+
+float sdRoundCone( vec3 p, float r1, float r2, float h )
+{
+  float b = (r1-r2)/h;
+  float a = sqrt(1.0-b*b);
+
+  vec2 q = vec2( length(p.xz), p.y );
+  float k = dot(q,vec2(-b,a));
+  if( k<0.0 ) return length(q) - r1;
+  if( k>a*h ) return length(q-vec2(0.0,h)) - r2;
+  return dot(q, vec2(a,b) ) - r1;
+}
+
+float sdVerticalCapsule( vec3 p, float h, float r )
+{
+  p.y -= clamp( p.y, 0.0, h );
+  return length( p ) - r;
+}
+
 float sdSphere(vec3 p, float r)
 {
     return length(p) - r;
 }
 
-// XZ plane
 float sdPlane(vec3 p)
 {
     return p.y;
@@ -14,10 +55,10 @@ float sdPlane(vec3 p)
 // косинус который пропускает некоторые периоды, удобно чтобы махать ручкой не все время
 float lazycos(float angle)
 {
-    int nsleep = 10;
+    int nsleep = 5;
     
     int iperiod = int(angle / 6.28318530718) % nsleep;
-    if (iperiod < 3) {
+    if (iperiod < 2) {
         return cos(angle);
     }
     
@@ -28,19 +69,41 @@ float lazycos(float angle)
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
 vec4 sdBody(vec3 p)
 {
+    float res = 1e10;
     float d = 1e10;
 
-    // TODO
-    d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
+    d = sdRoundCone(p, 0.1, 0.2, 0.2);
+    res = smin(res, d, 1.0);
     
+    d = sdVerticalCapsule(p-vec3(0.06, -0.32, 0.0), 0.3, 0.03);
+    res = smin(res, d, 0.05);
+    
+    d = sdVerticalCapsule(p-vec3(-0.06, -0.32, 0.0), 0.3, 0.03);
+    res = smin(res, d, 0.05);
+    
+    d = sdVerticalCapsule((p-vec3(-0.15, 0.2, 0.0)) * rotate(- lazycos(iTime * 3.0) - 2.0), 0.25, 0.04);
+    res = smin(res, d, 0.05);
+    
+    d = sdVerticalCapsule((p-vec3(0.15, 0.2, 0.0)) * rotate(3.0), 0.25, 0.04);
+    res = smin(res, d, 0.05);
     // return distance and color
-    return vec4(d, vec3(0.0, 1.0, 0.0));
+    return vec4(res, GREEN);
 }
 
 vec4 sdEye(vec3 p)
 {
-
-    vec4 res = vec4(1e10, 0.0, 0.0, 0.0);
+    float d = sdSphere(p-vec3(0.0, 0.25, 0.12), 0.1);
+    vec4 res = vec4(d, WHITE);
+    
+    d = sdSphere(p-vec3(0.0, 0.26, 0.155), 0.07);
+    if (d < res.x) {
+        res = vec4(d, BLACK);
+    }
+    
+    d = sdSphere(p-vec3(0.0, 0.265, 0.175), 0.05);
+    if (d < res.x) {
+        res = vec4(d, BLUE);
+    }
     
     return res;
 }
@@ -49,7 +112,7 @@ vec4 sdMonster(vec3 p)
 {
     // при рисовании сложного объекта из нескольких SDF, удобно на верхнем уровне 
     // модифицировать p, чтобы двигать объект как целое
-    p -= vec3(0.0, 0.08, 0.0);
+    p -= vec3(0.0, 0.35, -1.0);
     
     vec4 res = sdBody(p);
     
@@ -69,7 +132,7 @@ vec4 sdTotal(vec3 p)
     
     float dist = sdPlane(p);
     if (dist < res.x) {
-        res = vec4(dist, vec3(1.0, 0.0, 0.0));
+        res = vec4(dist, RED);
     }
     
     return res;
@@ -168,7 +231,7 @@ void mainImage( out vec4 fragColor, in vec2 fragCoord )
     vec3 surface_point = ray_origin + res.x*ray_direction;
     vec3 normal = calcNormal(surface_point);
     
-    vec3 light_source = vec3(1.0 + 2.5*sin(iTime), 10.0, 10.0);
+    vec3 light_source = vec3(1.0 + 2.5*sin(iTime / 5.0), 10.0, 10.0);
     
     float shad = shading(surface_point, light_source, normal);
     shad = min(shad, castShadow(surface_point, light_source));
