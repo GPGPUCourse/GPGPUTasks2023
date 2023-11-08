@@ -26,23 +26,95 @@ float lazycos(float angle)
 
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
+
+float smin( float a, float b, float k )
+{
+    float h = max( k-abs(a-b), 0.0 )/k;
+    return min( a, b ) - h*h*k*(1.0/4.0);
+}
+
 vec4 sdBody(vec3 p)
 {
     float d = 1e10;
 
     // TODO
-    d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
-    
+    float d1 = sdSphere((p - vec3(0.0, 0.7, -0.7)), 0.25);
+    float d2 = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
+    d = smin(d1,d2,0.25);
     // return distance and color
     return vec4(d, vec3(0.0, 1.0, 0.0));
 }
 
 vec4 sdEye(vec3 p)
 {
+    float d = sdSphere(p - vec3(0.0, 0.67, -0.53), 0.2);
+    vec4 res = vec4(d, vec3(1.0,1.0,1.0));
 
-    vec4 res = vec4(1e10, 0.0, 0.0, 0.0);
-    
+    d = sdSphere(p - vec3(0.0, 0.67, -0.48), 0.16);
+    if (d < res.x) {
+        res = vec4(d, vec3(0.0,0.0,1.0));
+    }
+
+    d = sdSphere(p - vec3(0.0, 0.67, -0.455), 0.1375);
+    if (d < res.x) {
+        res = vec4(d, vec3(0.0,0.0,0.0));
+    }
     return res;
+}
+
+float sdRoundCone( vec3 p, float r1, float r2, float h )
+{
+  // sampling independent computations (only depend on shape)
+  float b = (r1-r2)/h;
+  float a = sqrt(1.0-b*b);
+
+  // sampling dependant computations
+  vec2 q = vec2( length(p.xz), p.y );
+  float k = dot(q,vec2(-b,a));
+  if( k<0.0 ) return length(q) - r1;
+  if( k>a*h ) return length(q-vec2(0.0,h)) - r2;
+  return dot(q, vec2(a,b) ) - r1;
+}
+
+mat3 rotate(float theta) {
+    float c = cos(theta);
+    float s = sin(theta);
+    return mat3(
+        vec3(c, -s, 0),
+        vec3(s, c, 0),
+        vec3(0, 0, c)
+    );
+}
+
+vec4 sdRArm(vec3 p) {
+    float d = 1e10;
+    float rotating_angle = lazycos(iTime * 5.0);
+    
+    p = p - vec3(-0.35, 0.7, -0.7);
+
+    vec3 arm_pivot = vec3(0.05, -0.05, 0.0);
+
+    p = p - arm_pivot;
+    p = rotate(rotating_angle) * p;
+    p = p + arm_pivot;
+
+    d = sdRoundCone(p, 0.1, 0.075, 0.25);
+    return vec4(d, vec3(0.0, 1.0, 0.0));
+}
+
+vec4 sdLArm(vec3 p) {
+    float d = 1e10;
+    d = sdRoundCone((p - vec3(0.35, 0.1, -0.7)), 0.075,0.1,0.25);
+    return vec4(d, vec3(0.0, 1.0, 0.0));
+}
+
+vec4 sdLeg(vec3 p)
+{
+    float d = 1e10;
+    float d1 = sdRoundCone((p - vec3(0.15, 0.0, -0.55)), 0.075,0.1,0.25);
+    float d2 = sdRoundCone((p - vec3(-0.15, 0.0, -0.55)), 0.075,0.1,0.25);
+    d = min(d1,d2);
+    return vec4(d, vec3(0.0, 1.0, 0.0));
 }
 
 vec4 sdMonster(vec3 p)
@@ -56,6 +128,21 @@ vec4 sdMonster(vec3 p)
     vec4 eye = sdEye(p);
     if (eye.x < res.x) {
         res = eye;
+    }
+    
+    vec4 rArm = sdRArm(p);
+    if (rArm.x < res.x) {
+        res = rArm;
+    }
+    
+    vec4 lArm = sdLArm(p);
+    if (lArm.x < res.x) {
+        res = lArm;
+    }
+    
+    vec4 leg = sdLeg(p);
+    if (leg.x < res.x) {
+        res = leg;
     }
     
     return res;
