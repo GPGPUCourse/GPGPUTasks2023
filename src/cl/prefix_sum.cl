@@ -31,11 +31,11 @@ __kernel void block_prefix_sum(
 {
     const unsigned int x = get_global_id(0);
 
-    unsigned int s[WG];
-    for(int i=0;i<WG;++i) s[i]=ss[x*WG+i];
-    for(int i=0;i<WG;++i) {
+    unsigned int s[SZ];
+    for(int i=0;i<SZ;++i) s[i]=ss[x*SZ+i];
+    for(int i=0;i<SZ;++i) {
         unsigned int a = 0;
         for(int j=0;j<=i;++j) a+=s[j];
-        as[x*WG+i] = a;
+        as[x*SZ+i] = a;
     }
 }

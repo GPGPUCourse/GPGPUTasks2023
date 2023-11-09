@@ -92,6 +92,7 @@ int main(int argc, char **argv) {
         {
             const unsigned int k = 4;
             const unsigned int WGT = 16;
+            const unsigned int WG = 128;
 
             ocl::Kernel merge_sort_kernel = get_kernel(
                 merge_kernel, 
@@ -110,35 +111,35 @@ int main(int argc, char **argv) {
                 prefix_sum_kernel, 
                 prefix_sum_kernel_length, 
                 "prefix_sum", 
-                "-DWG=" + to_string(1 << k)
+                "-DWG=" + to_string(WG) + " -DSZ=" + to_string(WGT)
             );
 
             ocl::Kernel block_prefix_sum = get_kernel(
                 prefix_sum_kernel, 
                 prefix_sum_kernel_length, 
                 "block_prefix_sum", 
-                "-DWG=" + to_string(1 << k)
+                "-DWG=" + to_string(WG) + " -DSZ=" + to_string(WGT)
             );
 
             ocl::Kernel accum = get_kernel(
                 prefix_sum_kernel, 
                 prefix_sum_kernel_length, 
                 "accum", 
-                "-DWG=" + to_string(1 << k)
+                "-DWG=" + to_string(WG) + " -DSZ=" + to_string(WGT)
             );
 
             ocl::Kernel count = get_kernel(
                 radix_kernel, 
                 radix_kernel_length, 
                 "count", 
-                "-DWG=" + to_string(1 << k)
+                "-DWG=" + to_string(WG) + " -DSZ=" + to_string(WGT)
             );
 
             ocl::Kernel radix = get_kernel(
                 radix_kernel, 
                 radix_kernel_length, 
-                "radix", 
-                "-DWG=" + to_string(1 << k)
+                "radix",
+                "-DWG=" + to_string(WG) + " -DSZ=" + to_string(1<<k)
             );
 
             std::vector<unsigned int> n_zeros = std::vector<unsigned int>(n, 0);
@@ -150,7 +151,7 @@ int main(int argc, char **argv) {
                 // Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
                 t.restart();
 
-                const unsigned int work_group_size = 1 << k;
+                const unsigned int work_group_size = WG;
                 unsigned int work_group_ct = n / work_group_size;
                 for (int shift = 0; shift < sizeof(unsigned int) * 8; shift += k)
                 {
@@ -197,33 +198,34 @@ int main(int argc, char **argv) {
                         );
                     }
                     // std::cout << "cs_gpu\n";
-                    // print_gpu_mem(cs_gpu, work_group_ct, work_group_size);
+                    // print_gpu_mem(cs_gpu, work_group_ct, WGT);
 
                     // transpose
-                    {
+                    {   
+                        // any (x,y) such that x is a divisor of (1<<k) + y is a divisor of n/(work_group_size=128)
                         transpose_kernel.exec(
-                            gpu::WorkSize(WGT, WGT, work_group_size, work_group_ct), 
+                            gpu::WorkSize(WGT, WGT, WGT, work_group_ct), 
                             cs_gpu, 
                             cs_t_gpu, 
-                            work_group_size, 
+                            WGT, 
                             work_group_ct
                         );
                     }
                     // std::cout << "cs_t_gpu\n";
-                    // print_gpu_mem(cs_t_gpu, work_group_size, work_group_ct);
+                    // print_gpu_mem(cs_t_gpu, WGT, work_group_ct);
     
                     // prefix sums 
                     {
-                        unsigned int work_group_size = std::min(n/(1<<k), 128u);
+                        unsigned int work_group_size = std::min(n/WGT, 128u);
 
                         block_prefix_sum.exec(
-                            gpu::WorkSize(work_group_size, n/(1<<k)), 
+                            gpu::WorkSize(work_group_size, n/WGT), 
                             pref_gpu, 
                             cs_gpu
                         );
                     }
                     // std::cout << "pref_gpu\n";
-                    // print_gpu_mem(pref_gpu, work_group_ct, work_group_size);
+                    // print_gpu_mem(pref_gpu, work_group_ct, WGT);
                     
                     // prefix sums T
                     {
@@ -257,7 +259,7 @@ int main(int argc, char **argv) {
                         }
                     }
                     // std::cout << "pref_t_gpu\n";
-                    // print_gpu_mem(pref_t_gpu, work_group_size, work_group_ct);
+                    // print_gpu_mem(pref_t_gpu, WGT, work_group_ct);
 
                     // radix
                     {
