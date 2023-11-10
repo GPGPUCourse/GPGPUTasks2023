@@ -1,4 +1,11 @@
 
+const vec3 RED = vec3(1.0, 0.0, 0.0);
+const vec3 GREEN = vec3(0.0, 1.0, 0.0);
+const vec3 BLUE = vec3(0.0, 0.0, 1.0);
+const vec3 BLACK = vec3(0.0, 0.0, 0.0);
+const vec3 WHITE = vec3(1.0, 1.0, 1.0);
+const vec3 EYE_COLOR = vec3(24, 159, 237) / 255.0;
+
 // sphere with center in (0, 0, 0)
 float sdSphere(vec3 p, float r)
 {
@@ -11,53 +18,159 @@ float sdPlane(vec3 p)
     return p.y;
 }
 
+float sdCapsule( vec3 p, vec3 a, vec3 b, float r )
+{
+  vec3 pa = p - a, ba = b - a;
+  float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+  return length( pa - ba*h ) - r;
+}
+
+
+float sdCutHollowSphere( vec3 p, float r, float h, float t )
+{
+  // sampling independent computations (only depend on shape)
+  float w = sqrt(r*r-h*h);
+
+  // sampling dependant computations
+  vec2 q = vec2( length(p.xz), p.y );
+  return ((h*q.x<w*q.y) ? length(q-vec2(w,h)) :
+                          abs(length(q)-r) ) - t;
+}
+
+vec3 rotateY(vec3 pos, float theta) {
+    float X = pos.x*cos(theta) + pos.z*sin(theta);
+    float Y = pos.y;
+    float Z = pos.z*cos(theta) - pos.x*sin(theta);
+    return vec3(X, Y, Z);
+}
+
+vec3 rotateX(vec3 pos, float theta) {
+    float X = pos.x;
+    float Y = pos.y*cos(theta) - pos.z*sin(theta);
+    float Z = pos.y*sin(theta) + pos.z*cos(theta);
+    return vec3(X, Y, Z);
+}
+
 // косинус который пропускает некоторые периоды, удобно чтобы махать ручкой не все время
 float lazycos(float angle)
 {
     int nsleep = 10;
-    
+
     int iperiod = int(angle / 6.28318530718) % nsleep;
     if (iperiod < 3) {
         return cos(angle);
     }
-    
+
     return 1.0;
 }
+
+float smin( float a, float b, float k )
+{
+    float h = max( k-abs(a-b), 0.0 )/k;
+    return min( a, b ) - h*h*k*(1.0/4.0);
+}
+
+vec4 upd(vec4 res, float new_dist, vec3 new_col) {
+    if (new_dist < res.x) {
+        return vec4(new_dist, new_col);
+    }
+    else {
+        return res;
+    }
+}
+
+
 
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
 vec4 sdBody(vec3 p)
 {
-    float d = 1e10;
+    vec4 res = vec4(1e10, BLACK);
 
-    // TODO
-    d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
-    
-    // return distance and color
-    return vec4(d, vec3(0.0, 1.0, 0.0));
+    // body
+    const float body_depth = -0.7;
+
+    res = upd(res,
+            smin(sdSphere(p - vec3(0.0, 0.35, body_depth), 0.35),
+                sdSphere(p - vec3(0.0, 0.7, body_depth + 0.05), 0.20),
+                0.3),
+            GREEN);
+
+    // legs
+    const float leg_rad = 0.07;
+    const float leg_len = 0.20;
+    const float leg_dist = 0.1;
+    const float leg_h_pos = 0.1;
+
+    res = upd(res,
+            sdCapsule(p, vec3(-leg_dist, leg_h_pos, body_depth), vec3(-leg_dist, leg_h_pos - leg_len, body_depth), leg_rad),
+            GREEN);
+
+    res = upd(res,
+            sdCapsule(p, vec3(leg_dist, leg_h_pos, body_depth), vec3(leg_dist, leg_h_pos - leg_len, body_depth), leg_rad),
+            GREEN);
+
+    // hands
+    const float hand_dist = 0.30;
+    const float hand_len = 0.1;
+    const float hand_h_pos = 0.35;
+    const float hand_depth_delta = 0.05;
+    const float hand_rad = 0.12;
+    const float hand_rotation_speed = 10.0;
+
+    const float hand_depth = body_depth + hand_depth_delta;
+    res = upd(res,
+        sdCapsule(p, vec3(-hand_dist, hand_h_pos, hand_depth), vec3(-hand_dist - hand_len, hand_h_pos - hand_rad * lazycos(hand_rotation_speed * iTime), hand_depth + hand_rad * (1.0 - lazycos(hand_rotation_speed * iTime))), leg_rad),
+        GREEN);
+
+    res = upd(res,
+        sdCapsule(p, vec3(hand_dist, hand_h_pos, hand_depth), vec3(hand_dist + hand_len, hand_h_pos - hand_rad, hand_depth), leg_rad),
+        GREEN);
+
+
+
+    return res;
 }
 
 vec4 sdEye(vec3 p)
 {
 
-    vec4 res = vec4(1e10, 0.0, 0.0, 0.0);
-    
+    vec4 res = vec4(1e10, BLACK);
+
+    vec3 pos = rotateX(p - vec3(0.0, 0.55, -0.5), 1.7);
+    const float r = 0.2;
+    const float t = 0.01;
+    const float eps = 1e-5;
+
+    res = upd(res,
+        sdCutHollowSphere(pos, r, 0.0, t),
+        WHITE);
+
+    res = upd(res,
+        sdCutHollowSphere(pos, r + eps, -r * 0.8, t),
+        EYE_COLOR);
+
+    res = upd(res,
+        sdCutHollowSphere(pos, r + 2.0 * eps, -r * 0.95, t),
+        BLACK);
+
     return res;
 }
 
 vec4 sdMonster(vec3 p)
 {
-    // при рисовании сложного объекта из нескольких SDF, удобно на верхнем уровне 
+    // при рисовании сложного объекта из нескольких SDF, удобно на верхнем уровне
     // модифицировать p, чтобы двигать объект как целое
-    p -= vec3(0.0, 0.08, 0.0);
-    
+    p -= vec3(0.0, 0.17, 0.0);
+
     vec4 res = sdBody(p);
-    
+
     vec4 eye = sdEye(p);
+    // return eye;
     if (eye.x < res.x) {
         res = eye;
     }
-    
+
     return res;
 }
 
