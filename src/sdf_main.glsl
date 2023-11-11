@@ -1,8 +1,58 @@
-
 // sphere with center in (0, 0, 0)
 float sdSphere(vec3 p, float r)
 {
     return length(p) - r;
+}
+
+// sphere with center in (0, 0.25, 0)
+float sdSphereHead(vec3 p, float r)
+{
+    return length(p - vec3(0, 0.25, 0)) - r;
+}
+
+// sphere with center in (0, 0.2, 0.1)
+float sdSphereEye(vec3 p, vec3 c, float r)
+{
+    return length(p - c) - r;
+}
+
+float dot2(in vec3 v ) { return dot(v,v); }
+float sdRoundCone( vec3 p, vec3 a, vec3 b, float r1, float r2 )
+{
+  // sampling independent computations (only depend on shape)
+  vec3  ba = b - a;
+  float l2 = dot(ba,ba);
+  float rr = r1 - r2;
+  float a2 = l2 - rr*rr;
+  float il2 = 1.0/l2;
+    
+  // sampling dependant computations
+  vec3 pa = p - a;
+  float y = dot(pa,ba);
+  float z = y - l2;
+  float x2 = dot2( pa*l2 - ba*y );
+  float y2 = y*y*l2;
+  float z2 = z*z*l2;
+
+  // single square root!
+  float k = sign(rr)*rr*rr*x2;
+  if( sign(z)*a2*z2>k ) return  sqrt(x2 + z2)        *il2 - r2;
+  if( sign(y)*a2*y2<k ) return  sqrt(x2 + y2)        *il2 - r1;
+                        return (sqrt(x2*a2*il2)+y*rr)*il2 - r1;
+}
+
+float sdCapsule( vec3 p, vec3 a, vec3 b, float r )
+{
+    vec3 pa = p - a, ba = b - a;
+    float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+    return length( pa - ba*h ) - r;
+}
+
+// root smooth min (k=0.01)
+float smin( float a, float b, float k )
+{
+    float h = a-b;
+    return 0.5*( (a+b) - sqrt(h*h+k) );
 }
 
 // XZ plane
@@ -30,17 +80,34 @@ vec4 sdBody(vec3 p)
 {
     float d = 1e10;
 
-    // TODO
-    d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
-    
+    vec3 pt = p - vec3(0.0, 0.35, -0.7);
+    d = min(min(smin(sdSphere(pt, 0.35), sdSphereHead(pt, 0.25), 0.01),
+            sdRoundCone(pt, vec3(-0.33, 0.0, 0.0), vec3(-0.38, -0.1 * lazycos(iTime * 3.0), 0.1), 0.06, 0.04)),
+            sdRoundCone(pt, vec3(0.33, 0.0, 0.0), vec3(0.38, -0.1, 0.1), 0.06, 0.04));
+    d = min(d, min(sdCapsule(pt, vec3(-0.1, -0.33, 0.0), vec3(-0.1, -0.38, 0.0), 0.05),
+                   sdCapsule(pt, vec3(0.1, -0.33, 0.0), vec3(0.1, -0.38, 0.0), 0.05)));
     // return distance and color
     return vec4(d, vec3(0.0, 1.0, 0.0));
 }
 
 vec4 sdEye(vec3 p)
 {
-
-    vec4 res = vec4(1e10, 0.0, 0.0, 0.0);
+    vec3 eyeCenter = vec3(0, 0.2, 0.2);
+    vec3 pt = p - vec3(0.0, 0.35, -0.7);
+    float d = 1e10;
+    d = sdSphereEye(pt, eyeCenter, 0.2);
+    
+    vec4 res;
+    if (lazycos(iTime * 10.0) < -0.8) {
+        return vec4(d, vec3(0.1, 1.0, 0.0));
+    }
+    if (length(vec2(eyeCenter.x, eyeCenter.y) - vec2(pt.x, pt.y)) < 0.05) {
+        res = vec4(d, vec3(0.0, 0.0, 0.0));
+    } else if (length(vec2(eyeCenter.x, eyeCenter.y) - vec2(pt.x, pt.y)) < 0.1) {
+        res = vec4(d, vec3(0.0, 0.8, 1.0));
+    } else {
+        res = vec4(d, vec3(1.0, 1.0, 1.0));
+    }
     
     return res;
 }
@@ -84,7 +151,6 @@ vec3 calcNormal( in vec3 p ) // for function f(p)
                            sdTotal(p+h.yxy).x - sdTotal(p-h.yxy).x,
                            sdTotal(p+h.yyx).x - sdTotal(p-h.yyx).x ) );
 }
-
 
 vec4 raycast(vec3 ray_origin, vec3 ray_direction)
 {
