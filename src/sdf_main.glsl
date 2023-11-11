@@ -1,4 +1,3 @@
-
 // sphere with center in (0, 0, 0)
 float sdSphere(vec3 p, float r)
 {
@@ -11,38 +10,133 @@ float sdPlane(vec3 p)
     return p.y;
 }
 
-// косинус который пропускает некоторые периоды, удобно чтобы махать ручкой не все время
-float lazycos(float angle)
+vec3 rotateX(vec3 p, float a)
 {
-    int nsleep = 10;
-    
-    int iperiod = int(angle / 6.28318530718) % nsleep;
-    if (iperiod < 3) {
-        return cos(angle);
-    }
-    
-    return 1.0;
+    return  p * mat3(
+        1.0, 0.0, 0.0,
+        0.0, cos(a), -sin(a),
+        0.0, sin(a), cos(a)
+    );
+}
+
+vec3 rotateY(vec3 p, float a)
+{
+    return p * mat3(
+        cos(a), 0.0, sin(a),
+        0.0, 1.0, 0.0,
+        -sin(a), 0.0, cos(a)
+    );
+}
+
+vec3 rotateZ(vec3 p, float a)
+{
+    return p * mat3(
+        cos(a), -sin(a), 0.0,
+        sin(a), cos(a), 0.0,
+        0.0, 0.0, 1.0
+    );
+}
+
+float sdCutSphere( vec3 p, float r, float h )
+{
+  // sampling independent computations (only depend on shape)
+  float w = sqrt(r*r-h*h);
+
+  // sampling dependant computations
+  vec2 q = vec2( length(p.xz), p.y );
+  float s = max( (h-r)*q.x*q.x+w*w*(h+r-2.0*q.y), h*q.x-w*q.y );
+  return (s<0.0) ? length(q)-r :
+         (q.x<w) ? h - q.y     :
+                   length(q-vec2(w,h));
+}
+
+
+float sdRoundCone( vec3 p, float r1, float r2, float h )
+{
+  // sampling independent computations (only depend on shape)
+  float b = (r1-r2)/h;
+  float a = sqrt(1.0-b*b);
+
+  // sampling dependant computations
+  vec2 q = vec2( length(p.xz), p.y );
+  float k = dot(q,vec2(-b,a));
+  if( k<0.0 ) return length(q) - r1;
+  if( k>a*h ) return length(q-vec2(0.0,h)) - r2;
+  return dot(q, vec2(a,b) ) - r1;
+}
+
+float smin( float a, float b, float k )
+{
+  float h = clamp( 0.5+0.5*(b-a)/k, 0.0, 1.0 );
+    return mix( b, a, h ) - k*h*(1.0-h);
 }
 
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
 vec4 sdBody(vec3 p)
 {
-    float d = 1e10;
+    float body = 1e10, head = 1e10, legl = 1e10, legr = 1e10;
 
-    // TODO
-    d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
+    body = sdSphere((p - vec3(0.0, 0.4, -0.7)), 0.33);
+    head = sdCutSphere((p - vec3(0.0, 0.65, -0.7)), 0.25, -0.1);
+    legl = sdRoundCone((p - vec3(-0.12, -0.03, -0.8)), 0.05, 0.04, 0.1);
+    legr = sdRoundCone((p - vec3(0.1, -0.03, -0.8)), 0.05, 0.04, 0.1);
     
+    float legs = smin(legl, legr, 0.1);
+    float full_body = smin(body, head, 0.1);
     // return distance and color
-    return vec4(d, vec3(0.0, 1.0, 0.0));
+    return vec4(smin(full_body, legs, 0.1), vec3(0.0, 1.0, 0.0));
 }
+
+float sdCutHollowSphere( vec3 p, float r, float h, float t )
+{
+  // sampling independent computations (only depend on shape)
+  float w = sqrt(r*r-h*h);
+  
+  // sampling dependant computations
+  vec2 q = vec2( length(p.xz), p.y );
+  return ((h*q.x<w*q.y) ? length(q-vec2(w,h)) : 
+                          abs(length(q)-r) ) - t;
+}
+
+
 
 vec4 sdEye(vec3 p)
 {
-
-    vec4 res = vec4(1e10, 0.0, 0.0, 0.0);
+    p = p - vec3(0.0, 0.63, -0.5);
+    float eye = sdCutHollowSphere(p, 0.07, 0.1, 0.1);
     
-    return res;
+    vec3 col = vec3(1, 1, 1);
+    float len = sqrt(p.x * p.x + p.y * p.y);
+    if (len < 0.05) {
+        col = vec3(0.0, 0.0, 0.0);
+    } else if (len < 0.1) {
+        col.x = 0.0;
+    }
+
+    return vec4(eye, col);
+   
+}
+
+vec4 sdHands(vec3 p) {
+    
+    vec3 pl = p - vec3(-0.28, 0.5, -0.6);
+    pl = rotateZ(pl, -0.5);
+    float t = mod(iTime, 2.0);
+    if (t < 1.0) {
+        pl = rotateX(pl, -t);
+    } else if (t < 2.0) {
+        pl = rotateX(pl,  t - 2.0 );
+    }
+    float handl = sdRoundCone(pl, 0.05, 0.05, 0.25);
+    
+   
+    vec3 pr = p - vec3(0.28, 0.5, -0.6);
+    pr = rotateX(pr, -3.0);
+    pr = rotateZ(pr, 0.5);
+    float handr = sdRoundCone(pr, 0.05, 0.05, 0.25);
+    
+    return vec4(smin(handr, handl, 0.1), vec3(0,1,0));
 }
 
 vec4 sdMonster(vec3 p)
@@ -54,8 +148,12 @@ vec4 sdMonster(vec3 p)
     vec4 res = sdBody(p);
     
     vec4 eye = sdEye(p);
+    vec4 hands = sdHands(p);
     if (eye.x < res.x) {
         res = eye;
+    }
+    if (hands.x < res.x) {
+        res = hands;
     }
     
     return res;
