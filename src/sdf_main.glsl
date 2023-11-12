@@ -11,16 +11,30 @@ float sdPlane(vec3 p)
     return p.y;
 }
 
+float smin( float a, float b, float k )
+{
+    float h = max( k-abs(a-b), 0.0 )/k;
+    return min( a, b ) - h*h*k*(1.0/4.0);
+}
+
+
+float sdEllipsoid( vec3 p, vec3 r )
+{
+  float k0 = length(p/r);
+  float k1 = length(p/(r*r));
+  return k0*(k0-1.0)/k1;
+}
+
 // косинус который пропускает некоторые периоды, удобно чтобы махать ручкой не все время
 float lazycos(float angle)
 {
     int nsleep = 10;
-    
+
     int iperiod = int(angle / 6.28318530718) % nsleep;
     if (iperiod < 3) {
         return cos(angle);
     }
-    
+
     return 1.0;
 }
 
@@ -31,33 +45,52 @@ vec4 sdBody(vec3 p)
     float d = 1e10;
 
     // TODO
-    d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
-    
-    // return distance and color
+
+    d = smin(sdSphere((p - vec3(0.0, 0.6, -0.7)), 0.25),d,0.25);
+    d = smin(sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35),d,0.25);
+
+    float noiseLeft = 0.05 * lazycos(iTime * 5.0);
+    float noiseRight = -0.05 * lazycos(iTime * 5.0);
+
+    //Right arm
+    d = smin(sdEllipsoid((p - vec3(0.3, 0.5 + noiseRight, -0.6)), vec3(0.15, 0.05, 0.1)), d, 0.06);
+
+    //Left Arm
+    d = smin(sdEllipsoid((p - vec3(-0.3, 0.5 + noiseLeft, -0.6)), vec3(0.15, 0.05, 0.1)), d, 0.06);
+
+    d = smin(sdEllipsoid((p - vec3(0.2, 0.05, -0.7)), vec3(0.07, 0.1, 0.1)), d, 0.04);
+    d = smin(sdEllipsoid((p - vec3(-0.2, 0.05, -0.7)), vec3(0.07, 0.1, 0.1)), d, 0.04);
+
     return vec4(d, vec3(0.0, 1.0, 0.0));
 }
 
 vec4 sdEye(vec3 p)
 {
+    float d1 = sdSphere(p - vec3(0.0, 0.57, -0.45), 0.195);
+    vec4 res = vec4(d1, vec3(1.0,1.0,1.0));
 
-    vec4 res = vec4(1e10, 0.0, 0.0, 0.0);
-    
+    float d2 = sdSphere(p - vec3(0.0, 0.57, -0.4), 0.16);
+    if (d2 < res.x) {
+        res = vec4(d2, vec3(0.0,0.0,1.0));
+    }
+
+    float d3 = sdSphere(p - vec3(0.0, 0.57, -0.375), 0.1375);
+    if (d3 < res.x) {
+        res = vec4(d3, vec3(0.0,0.0,0.0));
+    }
     return res;
 }
 
 vec4 sdMonster(vec3 p)
 {
-    // при рисовании сложного объекта из нескольких SDF, удобно на верхнем уровне 
+    // при рисовании сложного объекта из нескольких SDF, удобно на верхнем уровне
     // модифицировать p, чтобы двигать объект как целое
     p -= vec3(0.0, 0.08, 0.0);
-    
     vec4 res = sdBody(p);
-    
     vec4 eye = sdEye(p);
     if (eye.x < res.x) {
         res = eye;
     }
-    
     return res;
 }
 
@@ -65,13 +98,11 @@ vec4 sdMonster(vec3 p)
 vec4 sdTotal(vec3 p)
 {
     vec4 res = sdMonster(p);
-    
-    
+
     float dist = sdPlane(p);
     if (dist < res.x) {
         res = vec4(dist, vec3(1.0, 0.0, 0.0));
     }
-    
     return res;
 }
 
