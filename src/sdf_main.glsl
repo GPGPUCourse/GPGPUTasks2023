@@ -24,14 +24,33 @@ float lazycos(float angle)
     return 1.0;
 }
 
+float lazysin(float angle)
+{
+    int nsleep = 10;
+    
+    int iperiod = int(angle / 6.28318530718) % nsleep;
+    if (iperiod < 3) {
+        return sin(angle);
+    }
+    
+    return 0.0;
+}
+
+float smin(float a, float b)
+{
+    float k = 32.f;
+    float res = exp2( -k*a ) + exp2( -k*b );
+    return -log2( res )/k;
+}
+
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
 vec4 sdBody(vec3 p)
 {
     float d = 1e10;
 
-    // TODO
-    d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
+    d = smin(d, sdSphere(p - vec3(0.0, 0.35, -0.7), 0.35));
+    d = smin(d, sdSphere(p - vec3(0.0, 0.63, -0.65), 0.27));
     
     // return distance and color
     return vec4(d, vec3(0.0, 1.0, 0.0));
@@ -39,10 +58,68 @@ vec4 sdBody(vec3 p)
 
 vec4 sdEye(vec3 p)
 {
-
-    vec4 res = vec4(1e10, 0.0, 0.0, 0.0);
+    float white = sdSphere(p - vec3(0.0, 0.63, -0.5), 0.18);
+    float cyan = sdSphere(p - vec3(0.0, 0.63, -0.4), 0.11);
+    float black = sdSphere(p - vec3(0.0, 0.63, -0.34), 0.06);
     
-    return res;
+    if (white <= cyan && white <= black)
+        return vec4(white, vec3(1.0, 1.0, 1.0));
+       
+    if (cyan <= white && cyan <= black)
+        return vec4(cyan, vec3(0.0, 1.0, 1.0));
+        
+    if (black <= cyan && black <= white)
+        return vec4(black, vec3(0.0, 0.0, 0.0));
+}
+
+float sdCapsule(vec3 p, vec3 a, vec3 b, float r)
+{
+    vec3 pa = p - a, ba = b - a;
+    float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+    return length( pa - ba*h ) - r;
+}
+
+vec4 sdLeftArm(vec3 p) {
+    float angle = iTime * 3.0;
+    vec3 a = vec3(0.27, 0.45, -0.6);
+    vec3 b = vec3(0.35, 0.35, -0.7);
+    
+    float d = 1e10;
+    d = smin(d, sdCapsule(p, a, b, 0.05));
+    return vec4(d, vec3(0.0, 1.0, 0.0));
+}
+
+vec4 sdRightArm(vec3 p) {
+    float angle = iTime * 3.0;
+    vec3 a = vec3(-0.27, 0.45, -0.6);
+    float len_x = 0.1;
+    float len_y = 0.1;
+    float len_z = 0.1;
+    vec3 b = vec3(-0.35 - len_x * abs(lazysin(angle)), 0.45 - len_y * lazycos(angle), -0.7 + len_z * abs(lazysin(angle)));
+    
+    float d = 1e10;
+    d = smin(d, sdCapsule(p, a, b, 0.05));
+    return vec4(d, vec3(0.0, 1.0, 0.0));
+}
+
+vec4 sdLeftLeg(vec3 p) {
+    float angle = iTime * 3.0;
+    vec3 a = vec3(0.07, 0.1, -0.7);
+    vec3 b = vec3(0.07, -0.15, -0.7);
+    
+    float d = 1e10;
+    d = smin(d, sdCapsule(p, a, b, 0.05));
+    return vec4(d, vec3(0.0, 1.0, 0.0));
+}
+
+vec4 sdRightLeg(vec3 p) {
+    float angle = iTime * 3.0;
+    vec3 a = vec3(-0.07, 0.1, -0.7);
+    vec3 b = vec3(-0.07, -0.15, -0.7);
+    
+    float d = 1e10;
+    d = smin(d, sdCapsule(p, a, b, 0.05));
+    return vec4(d, vec3(0.0, 1.0, 0.0));
 }
 
 vec4 sdMonster(vec3 p)
@@ -56,6 +133,23 @@ vec4 sdMonster(vec3 p)
     vec4 eye = sdEye(p);
     if (eye.x < res.x) {
         res = eye;
+    }
+    
+    vec4 leftArm = sdLeftArm(p);
+    if (leftArm.x < res.x) {
+        res = leftArm;
+    }
+    vec4 rightArm = sdRightArm(p);
+    if (rightArm.x < res.x) {
+        res = rightArm;
+    }
+    vec4 leftLeg = sdLeftLeg(p);
+    if (leftLeg.x < res.x) {
+        res = leftLeg;
+    }
+    vec4 rightLeg = sdRightLeg(p);
+    if (rightLeg.x < res.x) {
+        res = rightLeg;
     }
     
     return res;
