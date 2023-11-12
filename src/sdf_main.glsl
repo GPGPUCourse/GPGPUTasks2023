@@ -24,25 +24,68 @@ float lazycos(float angle)
     return 1.0;
 }
 
+
+// Next two functions are from iquilezles.org
+// root smooth min (k=0.01)
+float smin( float a, float b, float k )
+{
+    float h = a-b;
+    return 0.5*( (a+b) - sqrt(h*h+k) );
+}
+
+
+float sdCapsule( vec3 p, vec3 a, vec3 b, float r )
+{
+  vec3 pa = p - a, ba = b - a;
+  float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+  return length( pa - ba*h ) - r;
+}
+
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
 vec4 sdBody(vec3 p)
 {
     float d = 1e10;
 
-    // TODO
     d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
+    float head = sdSphere((p - vec3(0.0, 0.75, -0.7)), 0.2);
     
-    // return distance and color
-    return vec4(d, vec3(0.0, 1.0, 0.0));
+    float result = smin(d, head, 0.08);
+    
+    float fat_width = 0.07; // width of arms and legs
+    float y_should = 0.46; // y coordinate of shoulders
+    float x_should = 0.33; // x coordinate of shoulders
+    float arms_len = 0.15; // length of arms
+    float arm_boost = 3.0; // higher value means faster speed
+    
+    // arms: shaking and still
+    result = min(result, sdCapsule(p-vec3(0.0, .0, -0.6), vec3(-x_should-arms_len,y_should-arms_len*lazycos(iTime*arm_boost),.0), vec3(-x_should, y_should, .0), fat_width));
+    result = min(result, sdCapsule(p-vec3(0.0, .0, -0.6), vec3(+x_should+arms_len,y_should-arms_len,.0), vec3(+x_should, y_should, .0), fat_width));
+
+    // legs
+    float leg_bias = 0.15;
+    result = min(result, sdCapsule(p-vec3(0.0, .0, -0.6), vec3(+leg_bias,-.03,.0), vec3(+leg_bias, .3, .0), fat_width));
+    result = min(result, sdCapsule(p-vec3(0.0, .0, -0.6), vec3(-leg_bias,-.03,.0), vec3(-leg_bias, .3, .0), fat_width));
+
+
+    return vec4(result, vec3(0.0, 1.0, 0.0));
 }
 
 vec4 sdEye(vec3 p)
 {
-
-    vec4 res = vec4(1e10, 0.0, 0.0, 0.0);
     
-    return res;
+    vec3 eye_center = vec3(0.0, 0.66, -.5);
+
+    float eye_dist = sdSphere(p-eye_center, 0.22);
+    vec3 color = vec3(1.0, 1.0, 1.0);
+    
+    vec3 dir = normalize(p-eye_center);
+    if (dir.x*dir.x+dir.y*dir.y < .2) color = vec3(0., 1., 1.);
+    if (dir.x*dir.x+dir.y*dir.y < .07) color = vec3(0., 0., 0.);
+
+   
+    
+    return vec4(eye_dist, color);
 }
 
 vec4 sdMonster(vec3 p)
