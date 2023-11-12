@@ -24,24 +24,57 @@ float lazycos(float angle)
     return 1.0;
 }
 
+float sdCapsule( vec3 p, vec3 a, vec3 b, float r )
+{
+  vec3 pa = p - a, ba = b - a;
+  float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+  return length( pa - ba*h ) - r;
+}
+
+float sdVerticalCapsule( vec3 p, float h, float r )
+{
+  p.y -= clamp( p.y, 0.0, h );
+  return length( p ) - r;
+}
+    
+// exponential smooth min (k=32)
+float smin( float a, float b, float k )
+{
+    float res = exp2( -k*a ) + exp2( -k*b );
+    return -log2( res )/k;
+}
+
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
 vec4 sdBody(vec3 p)
 {
-    float d = 1e10;
+    float body = sdSphere((p - vec3(0.0, 0.45, -0.7)), 0.32);
+    float head = sdSphere((p - vec3(0.0, 0.75, -0.7)), 0.25);
+    float leg_l = sdVerticalCapsule((p - vec3(-0.16, -0.03, -0.8)), 0.15, 0.08);
+    float leg_r = sdVerticalCapsule((p - vec3(0.16, -0.03, -0.8)), 0.15, 0.08);
+    float hand_l = sdCapsule((p - vec3(-0.3, 0.5, -0.7)), vec3(-0.2, -0.12 * lazycos(iTime * 6.0), 0.16), vec3(0.0, 0.0, 0), 0.05);
+    float hand_r = sdCapsule((p - vec3(0.3, 0.5, -0.7)), vec3(0.2, -0.12 * -lazycos(iTime * 6.0), 0.16), vec3(0.0, 0.0, 0), 0.05);
 
-    // TODO
-    d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
-    
+    vec4 res = vec4(smin(body,head,32.0), vec3(0.0, 1.0, 0.0));
+    float legs = smin(leg_l,leg_r,100.0);
+    float hands = smin(hand_l,hand_r,60.0);
+    float tot = smin(legs, hands, 30.0);
+    res.x = smin(res.x, tot, 32.0);
+
     // return distance and color
-    return vec4(d, vec3(0.0, 1.0, 0.0));
+    return res;
 }
 
 vec4 sdEye(vec3 p)
 {
-
-    vec4 res = vec4(1e10, 0.0, 0.0, 0.0);
+    float eye = sdSphere((p - vec3(0.0, 0.75, -0.5)), 0.15);
+    vec4 res = vec4(eye, vec3(1.0, 1.0, 1.0));
     
+    if (length(p - vec3(0.0, 0.75, -0.4)) < 0.1)
+        res = vec4(eye, vec3(0.8, 0.3, 0.2));
+    if (length(p - vec3(0.0, 0.75, -0.35)) < 0.05)
+        res = vec4(eye, vec3(0, 0, 0));
+
     return res;
 }
 
