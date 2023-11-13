@@ -1,8 +1,63 @@
+// we need this
+float dot2( in vec3 v ) { return dot(v,v); }
+
+float opU(float a, float b)
+{
+    return min(a, b);
+}
+
+// polynomial smooth min 2 (k=0.1)
+float opSoftU( float a, float b, float k )
+{
+    float h = max( k-abs(a-b), 0.0 )/k;
+    return min( a, b ) - h*h*k*(1.0/4.0);
+}
 
 // sphere with center in (0, 0, 0)
 float sdSphere(vec3 p, float r)
 {
     return length(p) - r;
+}
+
+#define PI 3.1415926538
+vec2 circle(float t, float r, float speed) {
+    t = mod(t, (PI * 2.0)) - PI;
+    t *= speed;
+    float x = r * sin(t);
+    float y = r * cos(t);
+    return vec2(x, y);
+}
+
+// capsule
+float sdCapsule( vec3 p, vec3 a, vec3 b, float r )
+{
+  vec3 pa = p - a, ba = b - a;
+  float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
+  return length( pa - ba*h ) - r;
+}
+
+float sdRoundCone( vec3 p, vec3 a, vec3 b, float r1, float r2 )
+{
+  // sampling independent computations (only depend on shape)
+  vec3  ba = b - a;
+  float l2 = dot(ba,ba);
+  float rr = r1 - r2;
+  float a2 = l2 - rr*rr;
+  float il2 = 1.0/l2;
+    
+  // sampling dependant computations
+  vec3 pa = p - a;
+  float y = dot(pa,ba);
+  float z = y - l2;
+  float x2 = dot2( pa*l2 - ba*y );
+  float y2 = y*y*l2;
+  float z2 = z*z*l2;
+
+  // single square root!
+  float k = sign(rr)*rr*rr*x2;
+  if( sign(z)*a2*z2>k ) return  sqrt(x2 + z2)        *il2 - r2;
+  if( sign(y)*a2*y2<k ) return  sqrt(x2 + y2)        *il2 - r1;
+                        return (sqrt(x2*a2*il2)+y*rr)*il2 - r1;
 }
 
 // XZ plane
@@ -24,17 +79,42 @@ float lazycos(float angle)
     return 1.0;
 }
 
+float ass(vec3 p)
+{
+    float assR = 0.35, assAmp = 0.07, assSpeed = 4.0;
+    vec2 circlePoint = circle(iTime, assAmp, assSpeed);
+    // TODO
+    vec3 startPoint = -vec3(0.0, 0.35, -0.2);
+    startPoint += p;
+    startPoint.x += circlePoint.x; startPoint.y += circlePoint.y;
+    return sdSphere(startPoint, assR);
+}
+
+float head(vec3 p)
+{
+    float headR = 0.2, headAmp = 0.03, headSpeed = 4.0;
+    vec2 circlePoint = circle(iTime, headAmp, headSpeed);
+    vec3 startPoint = -vec3(-0.05, 0.65 - circlePoint.y, -0.23);
+    startPoint += p;
+    return sdSphere(startPoint, headR);
+}
+
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
 // способ сделать гладкий переход между примитивами: https://iquilezles.org/articles/smin/
 vec4 sdBody(vec3 p)
 {
     float d = 1e10;
-
+    
     // TODO
-    d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
+    float smoothFactor = 0.05;
+    
+    float assD = ass(p);
+    float headD = head(p);
+    d = opSoftU(assD, headD, smoothFactor);
+    // d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
     
     // return distance and color
-    return vec4(d, vec3(0.0, 1.0, 0.0));
+    return vec4(d, vec3(1.0, 1.0, 0.0));
 }
 
 vec4 sdEye(vec3 p)
