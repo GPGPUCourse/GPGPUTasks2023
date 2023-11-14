@@ -13,10 +13,41 @@ float opSoftU( float a, float b, float k )
     return min( a, b ) - h*h*k*(1.0/4.0);
 }
 
+float sdVesicaSegment( in vec3 p, in vec3 a, in vec3 b, in float w )
+{
+    vec3  c = (a+b)*0.5;
+    float l = length(b-a);
+    vec3  v = (b-a)/l;
+    float y = dot(p-c,v);
+    vec2  q = vec2(length(p-c-y*v),abs(y));
+    
+    float r = 0.5*l;
+    float d = 0.5*(r*r-w*w)/w;
+    vec3  h = (r*q.x<d*(q.y-r)) ? vec3(0.0,r,0.0) : vec3(-d,0.0,d+w);
+ 
+    return length(q-h.xy) - h.z;
+}
+
 // sphere with center in (0, 0, 0)
 float sdSphere(vec3 p, float r)
 {
     return length(p) - r;
+}
+
+float sdBox( vec3 p, vec3 b )
+{
+  vec3 q = abs(p) - b;
+  return length(max(q,0.0)) + min(max(q.x,max(q.y,q.z)),0.0);
+}
+
+float sdBoxTx(vec3 p, vec3 b, mat3 t)
+{
+    return sdBox( inverse(t)*p, b);
+}
+
+float sdVesicaSegmentTx(vec3 p,vec3 a,vec3 b,float w ,mat3 t)
+{
+    return sdVesicaSegment( inverse(t)*p, a, b, w);
 }
 
 #define PI 3.1415926538
@@ -26,21 +57,6 @@ vec2 circle(float t, float r, float speed) {
     float x = r * sin(t);
     float y = r * cos(t);
     return vec2(x, y);
-}
-
-// capsule
-float sdCappedCylinder( vec3 p, vec3 a, vec3 b, float r )
-{
-  vec3  ba = b - a;
-  vec3  pa = p - a;
-  float baba = dot(ba,ba);
-  float paba = dot(pa,ba);
-  float x = length(pa*baba-ba*paba) - r*baba;
-  float y = abs(paba-baba*0.5)-baba*0.5;
-  float x2 = x*x;
-  float y2 = y*y*baba;
-  float d = (max(x,y)<0.0)?-min(x2,y2):(((x>0.0)?x2:0.0)+((y>0.0)?y2:0.0));
-  return sign(d)*sqrt(abs(d))/baba;
 }
 
 float sdRoundCone( vec3 p, float r1, float r2, float h )
@@ -78,7 +94,7 @@ float lazycos(float angle)
 
 float ass(vec3 p)
 {
-    float assR = 0.35, assAmp = 0.05, assSpeed = 6.0;
+    float assR = 0.35, assAmp = 0.05, assSpeed = 10.0;
     vec2 circlePoint = circle(iTime, assAmp, assSpeed);
     // TODO
     vec3 startPoint = -vec3(0.0, 0.35, -0.2);
@@ -111,25 +127,36 @@ float legs(vec3 p)
 }
 
 float backPack(vec3 p)
-{
-    // head circle
-    float headR = 0.21, headAmp = 0.03, headSpeed = 4.0;
-    vec2 headCirclePoint = circle(iTime, headAmp, headSpeed);
-    
+{    
     // ass circle
-    float assAmp = 0.05, assSpeed = 6.0;
+    float assAmp = 0.05, assSpeed = 10.0;
     vec2 assCirclePoint = circle(iTime, assAmp, assSpeed);
     
-    float bpR = 0.08, bpZ = 0.05, bpY = 0.61, bpX = 0.0;
+    float bpR = 0.08, bpZ = 0.05, bpY = 0.5, bpX = 0.0;
     vec3 startPoint = -vec3(bpX, bpY, bpZ);
     startPoint += p;
     
-    return sdCappedCylinder(
+    startPoint.x += assCirclePoint.x;
+    startPoint.y += assCirclePoint.y;
+    
+    float xRotationA = 0.2;
+    mat3 transform;
+    transform[0] = vec3(1.0, 0.0, 0.0);
+    transform[1] = vec3(0.0, cos(xRotationA), -sin(xRotationA));
+    transform[2] = vec3(0.0, cos(xRotationA), sin(xRotationA));
+    
+    return sdBoxTx(
+    startPoint, 
+    vec3(0.1, 0.15, 0.1), 
+    transform);
+    /*
+    sdCappedCylinder(
         startPoint,
         vec3(-0.05, 0.08 - headCirclePoint.y, 0.0),
         vec3(0.05 - assCirclePoint.x, -0.08 - assCirclePoint.y, 0.06),
         bpR
     );
+    */
 }
 
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
@@ -147,7 +174,7 @@ vec4 sdBody(vec3 p)
     float bpD = backPack(p);
     d = opSoftU(assD, headD, smoothFactor);
     d = opSoftU(d, legsD, smoothFactor);
-    d = opSoftU(d, bpD, smoothFactor);
+    d = opU(d, bpD);
     // d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
     
     // return distance and color
@@ -159,13 +186,22 @@ vec4 sdEye(vec3 p)
     // head circle
     float headR = 0.21, headAmp = 0.03, headSpeed = 4.0;
     vec2 headCirclePoint = circle(iTime, headAmp, headSpeed);
-
-    float eyeR = 0.05, eyeX = -0.25, eyeY = 0.75, eyeZ = -0.1;
+    
+    float eyeR = 0.1, eyeX = -0.20, eyeY = 0.75, eyeZ = 0.0;
     vec3 startPoint = -vec3(eyeX, eyeY - headCirclePoint.y, eyeZ);
     startPoint += p;
+    mat3 transform;
+    float yTransform = abs(headCirclePoint.y) / headAmp / 2.0;
+    transform[0] = vec3(1.0, 0.0, 0.0);
+    transform[1] = vec3(0.0, 0.5 + yTransform, 0.0);
+    transform[2] = vec3(0.0, 0.0, 1.0);
     
-    
-    float eyeD = sdSphere(startPoint, eyeR);
+    float eyeD = sdVesicaSegmentTx(startPoint,
+    vec3(-0.02, 0.0, 0.0),
+    vec3(0.02, 0.0, 0.0),
+    eyeR,
+    transform
+    );
 
     vec4 res = vec4(eyeD, vec3(1.0, 1.0, 1.0));
     
