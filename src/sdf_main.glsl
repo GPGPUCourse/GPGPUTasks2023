@@ -120,13 +120,13 @@ float backPack(vec3 p)
     float assAmp = 0.05, assSpeed = 6.0;
     vec2 assCirclePoint = circle(iTime, assAmp, assSpeed);
     
-    float bpR = 0.08, bpZ = 0.01, bpY = 0.7, bpX = 0.0;
+    float bpR = 0.08, bpZ = 0.05, bpY = 0.61, bpX = 0.0;
     vec3 startPoint = -vec3(bpX, bpY, bpZ);
     startPoint += p;
     
     return sdCappedCylinder(
         startPoint,
-        vec3(-0.05, 0.08 - headCirclePoint.y, -0.06),
+        vec3(-0.05, 0.08 - headCirclePoint.y, 0.0),
         vec3(0.05 - assCirclePoint.x, -0.08 - assCirclePoint.y, 0.06),
         bpR
     );
@@ -156,8 +156,18 @@ vec4 sdBody(vec3 p)
 
 vec4 sdEye(vec3 p)
 {
+    // head circle
+    float headR = 0.21, headAmp = 0.03, headSpeed = 4.0;
+    vec2 headCirclePoint = circle(iTime, headAmp, headSpeed);
 
-    vec4 res = vec4(1e10, 0.0, 0.0, 0.0);
+    float eyeR = 0.05, eyeX = -0.25, eyeY = 0.75, eyeZ = -0.1;
+    vec3 startPoint = -vec3(eyeX, eyeY - headCirclePoint.y, eyeZ);
+    startPoint += p;
+    
+    
+    float eyeD = sdSphere(startPoint, eyeR);
+
+    vec4 res = vec4(eyeD, vec3(1.0, 1.0, 1.0));
     
     return res;
 }
