@@ -29,35 +29,32 @@ vec2 circle(float t, float r, float speed) {
 }
 
 // capsule
-float sdCapsule( vec3 p, vec3 a, vec3 b, float r )
+float sdCappedCylinder( vec3 p, vec3 a, vec3 b, float r )
 {
-  vec3 pa = p - a, ba = b - a;
-  float h = clamp( dot(pa,ba)/dot(ba,ba), 0.0, 1.0 );
-  return length( pa - ba*h ) - r;
+  vec3  ba = b - a;
+  vec3  pa = p - a;
+  float baba = dot(ba,ba);
+  float paba = dot(pa,ba);
+  float x = length(pa*baba-ba*paba) - r*baba;
+  float y = abs(paba-baba*0.5)-baba*0.5;
+  float x2 = x*x;
+  float y2 = y*y*baba;
+  float d = (max(x,y)<0.0)?-min(x2,y2):(((x>0.0)?x2:0.0)+((y>0.0)?y2:0.0));
+  return sign(d)*sqrt(abs(d))/baba;
 }
 
-float sdRoundCone( vec3 p, vec3 a, vec3 b, float r1, float r2 )
+float sdRoundCone( vec3 p, float r1, float r2, float h )
 {
   // sampling independent computations (only depend on shape)
-  vec3  ba = b - a;
-  float l2 = dot(ba,ba);
-  float rr = r1 - r2;
-  float a2 = l2 - rr*rr;
-  float il2 = 1.0/l2;
-    
-  // sampling dependant computations
-  vec3 pa = p - a;
-  float y = dot(pa,ba);
-  float z = y - l2;
-  float x2 = dot2( pa*l2 - ba*y );
-  float y2 = y*y*l2;
-  float z2 = z*z*l2;
+  float b = (r1-r2)/h;
+  float a = sqrt(1.0-b*b);
 
-  // single square root!
-  float k = sign(rr)*rr*rr*x2;
-  if( sign(z)*a2*z2>k ) return  sqrt(x2 + z2)        *il2 - r2;
-  if( sign(y)*a2*y2<k ) return  sqrt(x2 + y2)        *il2 - r1;
-                        return (sqrt(x2*a2*il2)+y*rr)*il2 - r1;
+  // sampling dependant computations
+  vec2 q = vec2( length(p.xz), p.y );
+  float k = dot(q,vec2(-b,a));
+  if( k<0.0 ) return length(q) - r1;
+  if( k>a*h ) return length(q-vec2(0.0,h)) - r2;
+  return dot(q, vec2(a,b) ) - r1;
 }
 
 // XZ plane
@@ -81,7 +78,7 @@ float lazycos(float angle)
 
 float ass(vec3 p)
 {
-    float assR = 0.35, assAmp = 0.07, assSpeed = 4.0;
+    float assR = 0.35, assAmp = 0.05, assSpeed = 6.0;
     vec2 circlePoint = circle(iTime, assAmp, assSpeed);
     // TODO
     vec3 startPoint = -vec3(0.0, 0.35, -0.2);
@@ -92,11 +89,47 @@ float ass(vec3 p)
 
 float head(vec3 p)
 {
-    float headR = 0.2, headAmp = 0.03, headSpeed = 4.0;
+    float headR = 0.21, headAmp = 0.03, headSpeed = 4.0, headY = 0.7, headX = -0.1, headZ = -0.20;
     vec2 circlePoint = circle(iTime, headAmp, headSpeed);
-    vec3 startPoint = -vec3(-0.05, 0.65 - circlePoint.y, -0.23);
+    vec3 startPoint = -vec3(headX, headY - circlePoint.y, headZ);
     startPoint += p;
     return sdSphere(startPoint, headR);
+}
+
+float legs(vec3 p)
+{
+    float legH = 0.25, legBotR = 0.1, legTopR = 0.11, legZ = -0.19;
+    float legDistance = 0.13;
+    
+    float lLeg = sdRoundCone(
+    (p - vec3(-legDistance, 0.0, legZ)),
+    legTopR,legBotR,legH);
+    float rLeg = sdRoundCone(
+    (p - vec3(legDistance, 0.0, legZ)),
+    legTopR,legBotR,legH);
+    return opU(lLeg, rLeg);
+}
+
+float backPack(vec3 p)
+{
+    // head circle
+    float headR = 0.21, headAmp = 0.03, headSpeed = 4.0;
+    vec2 headCirclePoint = circle(iTime, headAmp, headSpeed);
+    
+    // ass circle
+    float assAmp = 0.05, assSpeed = 6.0;
+    vec2 assCirclePoint = circle(iTime, assAmp, assSpeed);
+    
+    float bpR = 0.08, bpZ = 0.01, bpY = 0.7, bpX = 0.0;
+    vec3 startPoint = -vec3(bpX, bpY, bpZ);
+    startPoint += p;
+    
+    return sdCappedCylinder(
+        startPoint,
+        vec3(-0.05, 0.08 - headCirclePoint.y, -0.06),
+        vec3(0.05 - assCirclePoint.x, -0.08 - assCirclePoint.y, 0.06),
+        bpR
+    );
 }
 
 // возможно, для конструирования тела пригодятся какие-то примитивы из набора https://iquilezles.org/articles/distfunctions/
@@ -110,7 +143,11 @@ vec4 sdBody(vec3 p)
     
     float assD = ass(p);
     float headD = head(p);
+    float legsD = legs(p);
+    float bpD = backPack(p);
     d = opSoftU(assD, headD, smoothFactor);
+    d = opSoftU(d, legsD, smoothFactor);
+    d = opSoftU(d, bpD, smoothFactor);
     // d = sdSphere((p - vec3(0.0, 0.35, -0.7)), 0.35);
     
     // return distance and color
