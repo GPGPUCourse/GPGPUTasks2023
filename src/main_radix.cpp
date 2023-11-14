@@ -30,6 +30,11 @@ using ocl::Kernel;
 using gpu::WorkSize;
 
 
+static Kernel createResetKernel() {
+    Kernel reset(radix_kernel, radix_kernel_length, "reset");
+    reset.compile();
+    return reset;
+}
 static Kernel createCountKernel() {
     Kernel count(radix_kernel, radix_kernel_length, "count");
     count.compile();
@@ -59,6 +64,11 @@ static Kernel createRadixSortKernel() {
     Kernel radix(radix_kernel, radix_kernel_length, "radix");
     radix.compile();
     return radix;
+}
+
+void reset(buffer output, unsigned n) {
+    static auto resetKernel = createResetKernel();
+    resetKernel.exec(WorkSize(groupSize, n), output);
 }
 
 void count(buffer output, buffer input, unsigned n, unsigned shift) {
@@ -150,8 +160,8 @@ int main(int argc, char **argv) {
 
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
             for (unsigned shift = 0; shift < 32; shift += nbits) {
-                counters.writeN(zeros.data(), tableSize);
-                aggregated_t.writeN(zeros.data(), tableSize);
+                reset(counters, tableSize);
+                reset(aggregated_t, tableSize);
 
                 count(counters, input, n, shift);
                 transpose(counters_t, counters, tableRows, tableCols);

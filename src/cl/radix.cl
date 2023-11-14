@@ -3,6 +3,10 @@
 #define Mask ((1u << Nbits) - 1u)
 #define GetKey(value, shift) (((value) >> (shift)) & Mask)
 
+kernel void reset(global unsigned *a) {
+    a[get_global_id(0)] = 0;
+}
+
 kernel void count(global unsigned *result, global const unsigned *a, unsigned shift) {
     unsigned gid = get_group_id(0);
     unsigned id = get_global_id(0);
