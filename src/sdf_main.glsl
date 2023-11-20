@@ -81,7 +81,7 @@ float sdRoundCone( vec3 p, vec3 a)
 }
 
 float sdCorpus(vec3 p) {
-  float r1 = 0.18;
+  float r1 = 0.2;
   float r2 = 0.12;
   float h = 0.2;
   
@@ -135,6 +135,7 @@ vec4 sdBody(vec3 p)
     vec3 color = vec3(0.0, 1.0, 0.0);
     
     float d = sdCorpus(p);
+    d = smin(d, sdSphere(p - vec3(0.0, 0.14, 0.0), 0.1), 0.14);
     d = smin(d, sdLeftArm(p), 0.04);
     d = smin(d, sdRightArm(p), 0.04);
     d = smin(d, sdLeftLeg(p), 0.08);
@@ -146,7 +147,7 @@ vec4 sdBody(vec3 p)
 vec4 sdEye(vec3 p)
 {
     vec3 color = vec3(1.0, 1.0, 1.0);
-    vec3 c = vec3(0.0, 0.2, 0.09);
+    vec3 c = vec3(0.0, 0.2, 0.13);
     float d = sdSphere((p - c), 0.08);
     float d2 = distance(p.xy, c.xy);
     
