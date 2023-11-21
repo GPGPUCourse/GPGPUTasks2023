@@ -113,7 +113,9 @@ int main(int argc, char **argv) {
     benchmarkKernel("matrix_multiplication_local_mem", gpu::WorkSize(16, 16, N, M), 16, 0);
 
     int threadWork = 8;
-    benchmarkKernel("matrix_multiplication_much_thread_work", gpu::WorkSize(16, 16, gpu::divup(N, threadWork), M), 16, threadWork);
+    int tileSize = 16;
+    benchmarkKernel("matrix_multiplication_much_thread_work", gpu::WorkSize(tileSize, tileSize / threadWork,
+                                                                           N, M / threadWork), tileSize, threadWork);
 
     return 0;
 }

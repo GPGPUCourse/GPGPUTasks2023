@@ -72,42 +72,43 @@ __kernel void matrix_multiplication_much_thread_work(
     unsigned int n
 )
 {
-    int i = get_global_id(0);
-    int j = get_global_id(1);
+    int local_col = get_local_id(0);
+    int local_row = get_local_id(1);
+    local_row *= THREAD_WORK;
 
-    int local_i = get_local_id(0);
-    int local_j = get_local_id(1);
+    int global_col = get_global_id(0);
+    int global_row = get_global_id(1);
+    global_row *= THREAD_WORK;
 
     __local float tileA[TILE_SIZE][TILE_SIZE];
-    __local float tileB[TILE_SIZE][TILE_SIZE][THREAD_WORK];
+    __local float tileB[TILE_SIZE][TILE_SIZE];
 
     float res[THREAD_WORK];
-    for (int t = 0; t < THREAD_WORK; t++) {
-        res[t] = 0;
+    for (int i = 0; i < THREAD_WORK; i++) {
+        res[i] = 0;
     }
 
-    for (int tileId = 0; tileId * TILE_SIZE < k; tileId++) {
-        int a_row = j;
-        int a_col = local_i + tileId * TILE_SIZE;
-        tileA[local_j][local_i] = (a_row < m && a_col < k ? a[a_row * k + a_col] : 0);
+    for (int tile = 0; tile < k; tile += TILE_SIZE) {
 
-        for (int w = 0; w < THREAD_WORK; w++) {
-            int b_row = local_j + tileId * TILE_SIZE;
-            int b_col = i + w * THREAD_WORK;
-            tileB[local_j][local_i][w] = (b_row < k && b_col < n ? b[b_row * k + b_col] : 0);
-            barrier(CLK_LOCAL_MEM_FENCE);
-            for (int t = 0; t < TILE_SIZE; t++) {
-                res[w] += tileA[local_j][t] * tileB[t][local_i][w];
-            }
-            barrier(CLK_LOCAL_MEM_FENCE);
+        for (int t = 0; t < THREAD_WORK; t++) {
+            tileA[local_row + t][local_col] = a[(global_row + t) * k + tile + local_col];
+            tileB[local_row + t][local_col] = b[(local_row + t + tile) * n + global_col];
         }
-    }
 
-    for (int w = 0; w < THREAD_WORK; w++) {
-        int row = j;
-        int col = i + w * THREAD_WORK;
-        if (row < m && col < n)
-            c[row * n + col] = res[w];
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        for (int v = 0; v < TILE_SIZE; v++) {
+            float tmp = tileB[v][local_col];
+            for (int t = 0; t < THREAD_WORK; t++) {
+                res[t] += tileA[local_row + t][v] * tmp;
+            }
+        }
+
+        barrier(CLK_LOCAL_MEM_FENCE);
+
+        for (int t = 0; t < THREAD_WORK; t++) {
+            c[(global_row + t) * n + global_col] = res[t];
+        }
     }
 }
 #endif
