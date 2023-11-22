@@ -122,7 +122,7 @@ int main(int argc, char **argv)
         gpu::gpu_mem_32f results;
         results.resizeN(jobDim);
 
-       bool printLog = true;
+       bool printLog = false;
        kernel.compile(printLog);
 
         timer t;
