@@ -80,7 +80,7 @@ int main(int argc, char **argv)
         ocl::Kernel tree(sum_kernel, sum_kernel_length, "sum_tree");
 
         ocl::Kernel kernels[5] = {baseline, loop, loop_coalesced, local, tree};
-        uint totalWorks[] = {n, n /4, n / 4, n, n};
+        uint totalWorks[] = {n, n /32, n / 32, n, n};
         std::string kernelNames[] = {" (baseline)\t\t", " (loop)\t\t", " (loop_coal)\t\t", " (local_mem)\t\t", " (tree)\t\t"};
         
 
