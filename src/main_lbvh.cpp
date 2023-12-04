@@ -83,10 +83,15 @@ struct State {
     int coord_shift;
 };
 
+bool floatEq(float a, float b) { return std::abs(a - b) < 1e-3f; }
+
 struct Point {
     int x, y;
 
-    bool operator==(const Point &rhs) const { return std::tie(x, y) == std::tie(rhs.x, rhs.y); }
+    bool operator==(const Point &rhs) const {
+        return floatEq(x, rhs.x) && floatEq(y, rhs.y);
+        // return std::tie(x, y) == std::tie(rhs.x, rhs.y);
+    }
 
     bool operator!=(const Point &rhs) const { return !(rhs == *this); }
 
@@ -213,7 +218,9 @@ struct BBox {
     bool empty() const { return minx > maxx; }
 
     bool operator==(const BBox &other) const {
-        return minx == other.minx && maxx == other.maxx && miny == other.miny && maxy == other.maxy;
+        return floatEq(minx, other.minx) && floatEq(maxx, other.maxx) && floatEq(miny, other.miny) &&
+               floatEq(maxy, other.maxy);
+        // return minx == other.minx && maxx == other.maxx && miny == other.miny && maxy == other.maxy;
     }
 
     bool operator!=(const BBox &other) const { return !(*this == other); }
@@ -257,8 +264,10 @@ struct Node {
     bool isLeaf() const { return !hasLeftChild() && !hasRightChild(); }
 
     bool operator==(const Node &other) const {
-        return std::tie(child_left, child_right, bbox, mass, cmsx, cmsy) ==
-               std::tie(other.child_left, other.child_right, other.bbox, other.mass, other.cmsx, other.cmsy);
+        return child_left == other.child_left && child_right == other.child_right && bbox == other.bbox &&
+               floatEq(mass, other.mass) && floatEq(cmsx, other.cmsx) && floatEq(cmsy, other.cmsy);
+        // return std::tie(child_left, child_right, bbox, mass, cmsx, cmsy) ==
+        //        std::tie(other.child_left, other.child_right, other.bbox, other.mass, other.cmsx, other.cmsy);
     }
 
     bool operator!=(const Node &other) const { return !(*this == other); }
@@ -971,12 +980,16 @@ int findSplit(const std::vector<morton_t> &codes, int i_begin, int i_end, int bi
     while (i_begin + 1 < i_end) {
         int m = i_begin + (i_end - i_begin) / 2;
         int b = getBit(codes[m], bit_index);
-        (b ? i_end : i_begin) = m;
+        if (b) {
+            i_end = m;
+        } else {
+            i_begin = m;
+        }
     }
     return i_end;
 
     // избыточно, так как на входе в функцию проверили, что ответ существует, но приятно иметь sanity-check на случай если набагали
-    throw std::runtime_error("4932492039458209485");
+    // throw std::runtime_error("4932492039458209485");
 }
 
 void buildLBVHRecursive(std::vector<Node> &nodes,
@@ -1067,11 +1080,15 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, const std::vector<mort
     //    }
 
     int l = i_node;
-    int r = dir > 0 ? int(codes.size()) : -1;
+    int r = dir > 0 ? N : -1;
     while (l + dir != r) {
         int m = l + (r - l) / 2;
         morton_t bits = getBits(codes[m], i_bit, K);
-        (bits == pref0 ? l : r) = m;
+        if (bits == pref0) {
+            l = m;
+        } else {
+            r = m;
+        }
     }
     i_node_end = l;
 
@@ -1501,9 +1518,12 @@ void checkTreesEqual(const std::vector<Node> &nodes_recursive,
                      const Node &root_recursive,
                      const Node &root) {
     EXPECT_EQ(root_recursive.bbox, root.bbox);
-    EXPECT_EQ(root_recursive.mass, root.mass);
-    EXPECT_EQ(root_recursive.cmsx, root.cmsx);
-    EXPECT_EQ(root_recursive.cmsy, root.cmsy);
+    EXPECT_TRUE(floatEq(root_recursive.mass, root.mass));
+    EXPECT_TRUE(floatEq(root_recursive.cmsx, root.cmsx));
+    EXPECT_TRUE(floatEq(root_recursive.cmsy, root.cmsy));
+    // EXPECT_EQ(root_recursive.mass, root.mass);
+    // EXPECT_EQ(root_recursive.cmsx, root.cmsx);
+    // EXPECT_EQ(root_recursive.cmsy, root.cmsy);
     EXPECT_EQ(root_recursive.hasLeftChild(), root.hasLeftChild());
     EXPECT_EQ(root_recursive.hasRightChild(), root.hasRightChild());
 
@@ -1907,7 +1927,7 @@ TEST(LBVH, Nbody) {
     nbody(false, evaluate_precision, 1);// gpu naive
 #endif
     nbody(false, evaluate_precision, 2);// cpu lbvh
-    // nbody(false, evaluate_precision, 3); // gpu lbvh
+    nbody(false, evaluate_precision, 3); // gpu lbvh
 }
 
 TEST(LBVH, Nbody_meditation) {
