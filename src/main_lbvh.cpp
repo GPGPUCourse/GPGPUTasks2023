@@ -34,7 +34,7 @@
 // TODO на сервер лучше коммитить самую простую конфигурацию. Замеры по времени получатся нерелевантные, но зато быстрее отработает CI
 // TODO локально интересны замеры на самой сложной версии, которую получится дождаться
 #define NBODY_INITIAL_STATE_COMPLEXITY 0
-//#define NBODY_INITIAL_STATE_COMPLEXITY 1
+// #define NBODY_INITIAL_STATE_COMPLEXITY 1
 //#define NBODY_INITIAL_STATE_COMPLEXITY 2
 
 // использовать lbvh для построения начального состояния. Нужно на очень больших N (>1000000)
@@ -83,7 +83,12 @@ struct State {
     int coord_shift;
 };
 
-bool floatEq(float a, float b) { return std::abs(a - b) < std::max(std::max(std::abs(a), std::abs(b)), 1.0f) * 1e-3f; }
+constexpr float MIN_DELTA = 1e-8f;
+constexpr float DEFAULT_EPS = 1e-3f;
+
+bool floatEq(float a, float b) {
+    return std::abs(a - b) < std::max(std::max(std::abs(a), std::abs(b)), MIN_DELTA) * DEFAULT_EPS;
+}
 
 struct Point {
     int x, y;
@@ -267,13 +272,13 @@ struct Node {
 
     bool operator!=(const Node &other) const { return !(*this == other); }
 
-    void expectEq(const Node &other, float eps) {
+    void expectEq(const Node &other, float eps = DEFAULT_EPS) {
         EXPECT_EQ(child_left, other.child_left);
         EXPECT_EQ(child_right, other.child_right);
         EXPECT_EQ(bbox, other.bbox);
-        EXPECT_NEAR(mass, other.mass, std::max(std::abs(mass), 1.0f) * eps);
-        EXPECT_NEAR(cmsx, other.cmsx, std::max(std::abs(cmsx), 1.0f) * eps);
-        EXPECT_NEAR(cmsy, other.cmsy, std::max(std::abs(cmsy), 1.0f) * eps);
+        EXPECT_NEAR(mass, other.mass, std::max(std::abs(mass), MIN_DELTA) * eps);
+        EXPECT_NEAR(cmsx, other.cmsx, std::max(std::abs(cmsx), MIN_DELTA) * eps);
+        EXPECT_NEAR(cmsy, other.cmsy, std::max(std::abs(cmsy), MIN_DELTA) * eps);
     }
 
     int child_left, child_right;
@@ -340,6 +345,9 @@ void calculateForce(float x0, float y0, float m0, const std::vector<Node> &nodes
     int stack_size = 0;
     stack[stack_size++] = 0;
 
+    float d_force_x = 0.0f;
+    float d_force_y = 0.0f;
+
     while (stack_size) {
         int i_node = stack[--stack_size];
         const Node &node = nodes[i_node];
@@ -375,14 +383,17 @@ void calculateForce(float x0, float y0, float m0, const std::vector<Node> &nodes
                 float fx = ex * dr2_inv * GRAVITATIONAL_FORCE;
                 float fy = ey * dr2_inv * GRAVITATIONAL_FORCE;
 
-                *force_x += child.mass * fx;
-                *force_y += child.mass * fy;
+                d_force_x += child.mass * fx;
+                d_force_y += child.mass * fy;
             } else {
                 stack[stack_size++] = i_child;
                 if (stack_size >= 2 * NBITS_PER_DIM) { throw std::runtime_error("0420392384283"); }
             }
         }
     }
+
+    *force_x += d_force_x;
+    *force_y += d_force_y;
 }
 
 void integrate(int i,
@@ -1522,9 +1533,9 @@ void checkTreesEqual(const std::vector<Node> &nodes_recursive,
                      const Node &root_recursive,
                      const Node &root) {
     EXPECT_EQ(root_recursive.bbox, root.bbox);
-    EXPECT_NEAR(root_recursive.mass, root.mass, 1e-3 * std::max(std::abs(root_recursive.mass), 1.0f));
-    EXPECT_NEAR(root_recursive.cmsx, root.cmsx, 1e-3 * std::max(std::abs(root_recursive.cmsx), 1.0f));
-    EXPECT_NEAR(root_recursive.cmsy, root.cmsy, 1e-3 * std::max(std::abs(root_recursive.cmsy), 1.0f));
+    EXPECT_NEAR(root_recursive.mass, root.mass, 1e-3 * std::max(std::abs(root_recursive.mass), MIN_DELTA));
+    EXPECT_NEAR(root_recursive.cmsx, root.cmsx, 1e-3 * std::max(std::abs(root_recursive.cmsx), MIN_DELTA));
+    EXPECT_NEAR(root_recursive.cmsy, root.cmsy, 1e-3 * std::max(std::abs(root_recursive.cmsy), MIN_DELTA));
     EXPECT_EQ(root_recursive.hasLeftChild(), root.hasLeftChild());
     EXPECT_EQ(root_recursive.hasRightChild(), root.hasRightChild());
 
@@ -1731,7 +1742,7 @@ TEST(LBVH, GPU) {
         nodes_gpu.read(tmp.data(), tree_size * sizeof(Node));
 
         for (int i = 0; i < tree_size; ++i) {
-            tmp[i].expectEq(nodes[i], 1e-3f);
+            tmp[i].expectEq(nodes[i]);
         }
     }
 
@@ -1754,7 +1765,7 @@ TEST(LBVH, GPU) {
     }
 
     for (int i = 0; i < tree_size; ++i) {
-        nodes[i].expectEq(nodes_cpu[i], 1e-3f);
+        nodes[i].expectEq(nodes_cpu[i]);
     }
 
 
@@ -1799,7 +1810,7 @@ TEST(LBVH, GPU) {
         buildBBoxes(nodes_cpu, flags, N);
 
         for (int i = 0; i < tree_size; ++i) {
-            nodes[i].expectEq(nodes_cpu[i], 1e-3f);
+            nodes[i].expectEq(nodes_cpu[i]);
         }
     }
 
@@ -1896,12 +1907,12 @@ TEST(LBVH, GPU) {
             if (std::abs(dvy[i] - dvy_cpu[i]) < rel_eps_super_good * std::abs(dvy_cpu[i])) n_super_good_dvy++;
 
             double rel_eps = 0.5;
-            EXPECT_NEAR(pxs[i], pxs_cpu[i], rel_eps * std::max(std::abs(pxs_cpu[i]), 1.0f));
-            EXPECT_NEAR(pys[i], pys_cpu[i], rel_eps * std::max(std::abs(pys_cpu[i]), 1.0f));
-            EXPECT_NEAR(vxs[i], vxs_cpu[i], rel_eps * std::max(std::abs(vxs_cpu[i]), 1.0f));
-            EXPECT_NEAR(vys[i], vys_cpu[i], rel_eps * std::max(std::abs(vys_cpu[i]), 1.0f));
-            EXPECT_NEAR(dvx[i], dvx_cpu[i], rel_eps * std::max(std::abs(dvx_cpu[i]), 1.0f));
-            EXPECT_NEAR(dvy[i], dvy_cpu[i], rel_eps * std::max(std::abs(dvy_cpu[i]), 1.0f));
+            EXPECT_NEAR(pxs[i], pxs_cpu[i], rel_eps * std::max(std::abs(pxs_cpu[i]), MIN_DELTA));
+            EXPECT_NEAR(pys[i], pys_cpu[i], rel_eps * std::max(std::abs(pys_cpu[i]), MIN_DELTA));
+            EXPECT_NEAR(vxs[i], vxs_cpu[i], rel_eps * std::max(std::abs(vxs_cpu[i]), MIN_DELTA));
+            EXPECT_NEAR(vys[i], vys_cpu[i], rel_eps * std::max(std::abs(vys_cpu[i]), MIN_DELTA));
+            EXPECT_NEAR(dvx[i], dvx_cpu[i], rel_eps * std::max(std::abs(dvx_cpu[i]), MIN_DELTA));
+            EXPECT_NEAR(dvy[i], dvy_cpu[i], rel_eps * std::max(std::abs(dvy_cpu[i]), MIN_DELTA));
         }
 
         EXPECT_GE(n_super_good_pxs, 0.99 * N);

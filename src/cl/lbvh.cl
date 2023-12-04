@@ -396,6 +396,9 @@ void calculateForce(float x0,
     int stack_size = 0;
     stack[stack_size++] = 0;
 
+    float d_force_x = 0.0f;
+    float d_force_y = 0.0f;
+
     while (stack_size) {
         int i_node = stack[--stack_size];
         __global const struct Node *node = &nodes[i_node];
@@ -433,14 +436,17 @@ void calculateForce(float x0,
                 float fx = ex * dr2_inv * GRAVITATIONAL_FORCE;
                 float fy = ey * dr2_inv * GRAVITATIONAL_FORCE;
 
-                *force_x += child->mass * fx;
-                *force_y += child->mass * fy;
+                d_force_x += child->mass * fx;
+                d_force_y += child->mass * fy;
             } else {
                 stack[stack_size++] = i_child;
                 if (stack_size >= 2 * NBITS_PER_DIM) { printf("0420392384283\n"); }
             }
         }
     }
+
+    *force_x += d_force_x;
+    *force_y += d_force_y;
 }
 
 __kernel void calculateForces(__global const float *pxs,
