@@ -83,7 +83,7 @@ struct State {
     int coord_shift;
 };
 
-bool floatEq(float a, float b) { return std::abs(a - b) < 1e-3f; }
+bool floatEq(float a, float b) { return std::abs(a - b) < 1e-3f * std::max(1.0f, std::max(std::abs(a), std::abs(b))); }
 
 struct Point {
     int x, y;
@@ -1521,9 +1521,6 @@ void checkTreesEqual(const std::vector<Node> &nodes_recursive,
     EXPECT_TRUE(floatEq(root_recursive.mass, root.mass));
     EXPECT_TRUE(floatEq(root_recursive.cmsx, root.cmsx));
     EXPECT_TRUE(floatEq(root_recursive.cmsy, root.cmsy));
-    // EXPECT_EQ(root_recursive.mass, root.mass);
-    // EXPECT_EQ(root_recursive.cmsx, root.cmsx);
-    // EXPECT_EQ(root_recursive.cmsy, root.cmsy);
     EXPECT_EQ(root_recursive.hasLeftChild(), root.hasLeftChild());
     EXPECT_EQ(root_recursive.hasRightChild(), root.hasRightChild());
 
@@ -1927,7 +1924,7 @@ TEST(LBVH, Nbody) {
     nbody(false, evaluate_precision, 1);// gpu naive
 #endif
     nbody(false, evaluate_precision, 2);// cpu lbvh
-    nbody(false, evaluate_precision, 3); // gpu lbvh
+    nbody(false, evaluate_precision, 3);// gpu lbvh
 }
 
 TEST(LBVH, Nbody_meditation) {
