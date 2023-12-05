@@ -86,14 +86,29 @@ int main(int argc, char **argv) {
             unsigned int total_work_size = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
 
             for (unsigned int current_bit = 0; current_bit < 32; current_bit++) {
+                //std::cout << "Counters:"
+                //          << " as_gpu size = " << as_gpu.size() / 4 // 33554432
+                //          << " counters_gpu size = " << counters_gpu.size() / 4 // 262144
+                //          << std::endl;
                 counters.exec(gpu::WorkSize(workGroupSize, global_work_size), as_gpu, counters_gpu, current_bit, n / 128);
                 counters_pref_gpu.writeN(counters_pref.data(), global_block_size);
                 for (unsigned int block_size = 1; block_size <= global_block_size; block_size *= 2) {
+
+                    //std::cout << "Sum:"
+                    //          << " counters_gpu size = " << counters_gpu.size() / 4 // 262144
+                    //          << " counters_pref_gpu size = " << counters_pref_gpu.size() / 4 << std::endl; // 262144
                     prefix_sum.exec(gpu::WorkSize(workGroupSize, global_work_size), counters_gpu, counters_pref_gpu, global_block_size, block_size);
+                    //std::cout << "Reduce:"
+                    //          << " counters_gpu size = " << counters_gpu.size() / 4 // 262144
+                    //          << " counters_res_gpu size = " << counters_res_gpu.size() / 4 << std::endl; // 262144
                     reduce.exec(gpu::WorkSize(workGroupSize, global_work_size), counters_gpu, counters_res_gpu, global_block_size / (block_size * 2));
                     counters_gpu.swap(counters_res_gpu);
                 }
-
+                //std::cout << "Radix:"
+                //          << " counters_pref_gpu size = " << counters_pref_gpu.size() / 4 // 262144
+                //          << " as_gpu size = " << as_gpu.size() / 4 // 33554432
+                //          << " bs_gpu size = " << bs_gpu.size() / 4 // 33554432
+                //          << std::endl;
                 radix.exec(gpu::WorkSize(workGroupSize, total_work_size), counters_pref_gpu, as_gpu, bs_gpu, current_bit, n);
                 as_gpu.swap(bs_gpu);
             }
