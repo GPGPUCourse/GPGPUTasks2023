@@ -20,13 +20,13 @@
 #define OPENCL_DEVICE_INDEX 0
 
 // TODO включить чтобы начали запускаться тесты
-#define ENABLE_TESTING 0
+#define ENABLE_TESTING 1
 
 // имеет смысл отключать при оффлайн симуляции больших N, но в итоговом решении стоит оставить
 #define EVALUATE_PRECISION 1
 
 // удобно включить при локальном тестировании
-#define ENABLE_GUI 0
+#define ENABLE_GUI 1
 
 // сброс картинок симуляции на диск
 #define SAVE_IMAGES 0
@@ -62,11 +62,25 @@ const Color WHITE{255, 255, 255};
 
 const double GRAVITATIONAL_FORCE = 0.0001;
 
+/// \note Both #dvx2d and #dvy2d are indexed by (t, i),
+/// where t is time and i is object ID.
 struct DeltaState {
+    /// Acceleration: difference of velocity.
     std::vector<float> dvx2d;
     std::vector<float> dvy2d;
+
+    /// \brief Set all deltas to zero.
+    void reset(int N, int NT_interactive) {
+        dvx2d.assign(NT_interactive * N, 0.0);
+        dvy2d.assign(NT_interactive * N, 0.0);
+    }
 };
 
+/// State of the scene:
+/// * N objects.
+/// Each has its position, velocity and mass.
+///
+/// Positions and velocity change, while mass remains constant.
 struct State {
 
     State() {}
@@ -79,12 +93,15 @@ struct State {
           , coord_shift(0)
     {}
 
+    /// Position.
     std::vector<float> pxs;
     std::vector<float> pys;
 
+    /// Velocity.
     std::vector<float> vxs;
     std::vector<float> vys;
 
+    /// Mass (constant).
     std::vector<float> mxs;
 
     int coord_shift;
@@ -453,8 +470,7 @@ void nbody_cpu_lbvh(DeltaState &delta_state, State &initial_state, int N, int NT
 {
     int NT_interactive = interactive_callback ? 1 : NT;
 
-    delta_state.dvx2d.assign(N * NT_interactive, 0.0);
-    delta_state.dvy2d.assign(N * NT_interactive, 0.0);
+    delta_state.reset(N, NT_interactive);
 
     std::vector<float> &pxs = initial_state.pxs;
     std::vector<float> &pys = initial_state.pys;
@@ -525,8 +541,7 @@ void nbody_cpu(DeltaState &delta_state, State &initial_state, int N, int NT, con
 {
     int NT_interactive = interactive_callback ? 1 : NT;
 
-    delta_state.dvx2d.assign(N * NT_interactive, 0.0);
-    delta_state.dvy2d.assign(N * NT_interactive, 0.0);
+    delta_state.reset(N, NT_interactive);
 
     std::vector<float> &pxs = initial_state.pxs;
     std::vector<float> &pys = initial_state.pys;
@@ -563,7 +578,7 @@ void nbody_cpu(DeltaState &delta_state, State &initial_state, int N, int NT, con
                 float dr2 = std::max(100.f, dx * dx + dy * dy);
 
                 float dr2_inv = 1.f / dr2;
-                float dr_inv = std::sqrt(dr2_inv);
+                float dr_inv = std::sqrt(dr2_inv); // fast Quake rsqrt xD
 
                 float ex = dx * dr_inv;
                 float ey = dy * dr_inv;
@@ -604,8 +619,7 @@ void nbody_gpu_lbvh(DeltaState &delta_state, State &initial_state, int N, int NT
 
     int NT_interactive = interactive_callback ? 1 : NT;
 
-    delta_state.dvx2d.assign(N * NT_interactive, 0.0);
-    delta_state.dvy2d.assign(N * NT_interactive, 0.0);
+    delta_state.reset(N, NT_interactive);
 
     std::vector<float> &pxs = initial_state.pxs;
     std::vector<float> &pys = initial_state.pys;
@@ -740,8 +754,7 @@ void nbody_gpu(DeltaState &delta_state, State &initial_state, int N, int NT, con
 {
     int NT_interactive = interactive_callback ? 1 : NT;
 
-    delta_state.dvx2d.assign(N * NT_interactive, 0.0);
-    delta_state.dvy2d.assign(N * NT_interactive, 0.0);
+    delta_state.reset(N, NT_interactive);
 
     std::vector<float> &pxs = initial_state.pxs;
     std::vector<float> &pys = initial_state.pys;
@@ -1929,8 +1942,8 @@ TEST (LBVH, Nbody)
     nbody(false, evaluate_precision, 0); // cpu naive
     nbody(false, evaluate_precision, 1); // gpu naive
 #endif
-    nbody(false, evaluate_precision, 2); // cpu lbvh
-    nbody(false, evaluate_precision, 3); // gpu lbvh
+    // nbody(false, evaluate_precision, 2); // cpu lbvh
+    // nbody(false, evaluate_precision, 3); // gpu lbvh
 }
 
 TEST (LBVH, Nbody_meditation)
@@ -1946,5 +1959,5 @@ TEST (LBVH, Nbody_meditation)
     context.init(device.device_id_opencl);
     context.activate();
 
-    nbody(true, false, 3); // gpu lbvh
+    nbody(true, false, 1);
 }
