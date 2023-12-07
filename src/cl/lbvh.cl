@@ -126,20 +126,17 @@ morton_t zOrder(float fx, float fy, int i){
     int x = fx + 0.5;
     int y = fy + 0.5;
 
-    // у нас нет эксепшенов, но можно писать коды ошибок просто в консоль, и следить чтобы вывод был пустой
-
     if (x < 0 || x >= (1 << NBITS_PER_DIM)) {
         printf("098245490432590890\n");
-//        return 0;
+        return 0;
     }
     if (y < 0 || y >= (1 << NBITS_PER_DIM)) {
         printf("432764328764237823\n");
-//        return 0;
+        return 0;
     }
 
-    // TODO
-
-    return 0;
+    morton_t morton_code = spreadBits(x) | (spreadBits(y) << 1);
+    return (morton_code << 32) | i;
 }
 
 __kernel void generateMortonCodes(__global const float *pxs, __global const float *pys,
@@ -189,9 +186,16 @@ void __kernel merge(__global const morton_t *as, __global morton_t *as_sorted, u
     as_sorted[idx] = val_cur;
 }
 
-int findSplit(__global const morton_t *codes, int i_begin, int i_end, int bit_index)
-{
-    // TODO
+int findSplit(
+    __global const morton_t *codes,
+    int i_begin,
+    int i_end,
+    int bit_index
+) {
+    if (getBit(codes[i_begin], bit_index) == getBit(codes[i_end], bit_index)) {
+        printf("na ge ren shi shei?");
+        return -1;
+    }
 }
 
 void findRegion(int *i_begin, int *i_end, int *bit_index, __global const morton_t *codes, int N, int i_node)
