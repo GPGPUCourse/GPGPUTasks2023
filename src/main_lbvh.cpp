@@ -62,6 +62,8 @@ const Color WHITE{255, 255, 255};
 
 const double GRAVITATIONAL_FORCE = 0.0001;
 
+constexpr double EPS = 1e-1;
+
 /// \note Both #dvx2d and #dvy2d are indexed by (t, i),
 /// where t is time and i is object ID.
 struct DeltaState {
@@ -327,6 +329,10 @@ private:
     int miny, maxy;
 };
 
+std::ostream &operator<<(std::ostream &out, const BBox &bbox) {
+    return out << "[" << bbox.minX() << ", " << bbox.maxX() << "] x [" << bbox.minY() << ", " << bbox.maxY() << "]";
+}
+
 /// Node of a BVH (bounding volume hierarchy).
 struct Node {
 
@@ -343,6 +349,9 @@ struct Node {
     }
 
     bool operator==(const Node &other) const {
+        // return std::tie(child_left, child_right, bbox)
+        //     == std::tie(other.child_left, other.child_right, other.bbox) &&
+        //        fabs(mass - other.mass) < EPS && fabs(cmsx - other.cmsx) < EPS && fabs(cmsy - other.cmsy) < EPS;
         return std::tie(child_left, child_right, bbox, mass, cmsx, cmsy) ==
                std::tie(other.child_left, other.child_right, other.bbox, other.mass, other.cmsx, other.cmsy);
     }
@@ -360,6 +369,13 @@ struct Node {
     float cmsx;
     float cmsy;
 };
+
+std::ostream &operator<<(std::ostream &out, const Node &node) {
+    return  out << std::setprecision(9) << "Node(\n  child_left = " << node.child_left << "\n  child_right = " << node.child_right
+               << "\n  bbox = " << node.bbox << "\n  mass = " << node.mass << "\n  cmsx = " << node.cmsx
+               << "\n  cmsy = " << node.cmsy << "\n)";
+}
+
 #pragma pack(pop)
 
 morton_t getBits(morton_t morton_code, int bit_index, int prefix_size) {
@@ -1224,7 +1240,7 @@ void buildBBoxes(std::vector<Node> &nodes, std::vector<int> &flags, int N, bool 
         int n_updated = 0;
 #pragma omp parallel for if (use_omp) reduction(+ : n_updated)
         for (int i_node = 0; i_node < N - 1; ++i_node) {
-            if (flags[i_node] == -1)
+            if (flags[i_node] != level)
                 continue;
             ++n_updated;
             Node &node = nodes[i_node];
@@ -1232,9 +1248,26 @@ void buildBBoxes(std::vector<Node> &nodes, std::vector<int> &flags, int N, bool 
             Node &right = nodes[node.child_right];
             node.bbox = left.bbox;
             node.bbox.grow(right.bbox);
-            node.mass = left.mass + right.mass;
-            node.cmsx = left.mass / node.mass * left.cmsx + right.mass / node.mass * right.cmsx;
-            node.cmsy = left.mass / node.mass * left.cmsy + right.mass / node.mass * right.cmsy;
+            float leftMass = left.mass;
+            float rightMass = right.mass;
+            float mass = leftMass + rightMass;
+            node.mass = mass;
+            float left1 = leftMass / mass;
+            float right1 = rightMass / mass;
+            float leftCmsx = left.cmsx;
+            float rightCmsx = right.cmsx;
+            float xl = left1 * leftCmsx;
+            float xr = right1 * rightCmsx;
+            float xx = xl + xr;
+            node.cmsx = xx;
+            float leftCmsy = left.cmsy;
+            float rightCmsy = right.cmsy;
+            float yl = left1 * leftCmsy;
+            float yr = right1 * rightCmsy;
+            float yy = yl + yr;
+            node.cmsy = yy;
+            // node.cmsx = 0;
+            // node.cmsy = 0;
         }
 
         // если глубина небольшая, то раньше закончим
@@ -1670,7 +1703,7 @@ TEST(LBVH, GPU) {
     codes_gpu.readN(codes.data(), N);
 
     for (int i = 0; i < N; ++i) {
-        EXPECT_EQ(codes[i], zOrder(makePoint(pxs[i], pys[i]), i));
+        ASSERT_EQ(codes[i], zOrder(makePoint(pxs[i], pys[i]), i));
     }
 
 
@@ -1690,13 +1723,13 @@ TEST(LBVH, GPU) {
     {
         std::sort(codes_tmp.begin(), codes_tmp.end());
         for (int i = 1; i < N; ++i) {
-            EXPECT_LE(codes_tmp[i - 1], codes_tmp[i]);
+            ASSERT_LE(codes_tmp[i - 1], codes_tmp[i]);
         }
         for (int i = 1; i < N; ++i) {
-            EXPECT_LE(codes[i - 1], codes[i]);
+            ASSERT_LE(codes[i - 1], codes[i]);
         }
         for (int i = 0; i < N; ++i) {
-            EXPECT_EQ(codes_tmp[i], codes[i]);
+            ASSERT_EQ(codes_tmp[i], codes[i]);
         }
     }
 
@@ -1727,15 +1760,29 @@ TEST(LBVH, GPU) {
         nodes_gpu.read(tmp.data(), tree_size * sizeof(Node));
 
         for (int i = 0; i < tree_size; ++i) {
-            EXPECT_EQ(tmp[i], nodes[i]);
+            ASSERT_EQ(tmp[i], nodes[i]);
+        }
+    }
+
+    {
+        std::vector<float> pxs_gpu_(N);
+        std::vector<float> pys_gpu_(N);
+        std::vector<float> mxs_gpu_(N);
+        pxs_gpu.readN(pxs_gpu_.data(), N);
+        pys_gpu.readN(pys_gpu_.data(), N);
+        mxs_gpu.readN(mxs_gpu_.data(), N);
+        for (int i = 0; i < N; ++i) {
+            ASSERT_EQ(pxs[i], pxs_gpu_[i]);
+            ASSERT_EQ(pys[i], pys_gpu_[i]);
+            ASSERT_EQ(mxs[i], mxs_gpu_[i]);
         }
     }
 
     ocl::Kernel kernel_build_lbvh(lbvh_kernel, lbvh_kernel_length, "buidLBVH");
     kernel_build_lbvh.compile();
 
-    kernel_build_lbvh.exec(gpu::WorkSize(workGroupSize, global_work_size_nodes), pxs_gpu, pys_gpu, mxs_gpu, codes_gpu,
-                           nodes_gpu, N);
+    kernel_build_lbvh.exec(gpu::WorkSize(workGroupSize, global_work_size_nodes), 
+            pxs_gpu, pys_gpu, mxs_gpu, codes_gpu, nodes_gpu, N);
 
 
     nodes_gpu.read(nodes.data(), tree_size * sizeof(Node));
@@ -1745,7 +1792,7 @@ TEST(LBVH, GPU) {
     }
 
     for (int i = 0; i < tree_size; ++i) {
-        EXPECT_EQ(nodes[i], nodes_cpu[i]);
+        ASSERT_EQ(nodes[i], nodes_cpu[i]);
     }
 
 
@@ -1784,8 +1831,15 @@ TEST(LBVH, GPU) {
         std::vector<int> flags;
         buildBBoxes(nodes_cpu, flags, N);
 
+        {
+            std::vector<int> flags_gpu_(N - 1);
+            flags_gpu.readN(flags_gpu_.data(), N - 1);
+            for (int i = 0; i < N - 1; ++i)
+                ASSERT_EQ(flags[i], flags_gpu_[i]);
+        }
+
         for (int i = 0; i < tree_size; ++i) {
-            EXPECT_EQ(nodes[i], nodes_cpu[i]);
+            ASSERT_EQ(nodes[i], nodes_cpu[i]);
         }
     }
 
@@ -1870,20 +1924,20 @@ TEST(LBVH, GPU) {
                 n_super_good_dvy++;
 
             double rel_eps = 0.5;
-            EXPECT_NEAR(pxs[i], pxs_cpu[i], rel_eps * std::abs(pxs_cpu[i]));
-            EXPECT_NEAR(pys[i], pys_cpu[i], rel_eps * std::abs(pys_cpu[i]));
-            EXPECT_NEAR(vxs[i], vxs_cpu[i], rel_eps * std::abs(vxs_cpu[i]));
-            EXPECT_NEAR(vys[i], vys_cpu[i], rel_eps * std::abs(vys_cpu[i]));
-            EXPECT_NEAR(dvx[i], dvx_cpu[i], rel_eps * std::abs(dvx_cpu[i]));
-            EXPECT_NEAR(dvy[i], dvy_cpu[i], rel_eps * std::abs(dvy_cpu[i]));
+            ASSERT_NEAR(pxs[i], pxs_cpu[i], rel_eps * std::max(1.f, std::abs(pxs_cpu[i])));
+            ASSERT_NEAR(pys[i], pys_cpu[i], rel_eps * std::max(1.f, std::abs(pys_cpu[i])));
+            ASSERT_NEAR(vxs[i], vxs_cpu[i], rel_eps * std::max(1e-6f, std::abs(vxs_cpu[i])));
+            ASSERT_NEAR(vys[i], vys_cpu[i], rel_eps * std::max(1e-6f, std::abs(vys_cpu[i])));
+            ASSERT_NEAR(dvx[i], dvx_cpu[i], rel_eps * std::max(1e-6f, std::abs(dvx_cpu[i])));
+            ASSERT_NEAR(dvy[i], dvy_cpu[i], rel_eps * std::max(1e-6f, std::abs(dvy_cpu[i])));
         }
 
-        EXPECT_GE(n_super_good_pxs, 0.99 * N);
-        EXPECT_GE(n_super_good_pys, 0.99 * N);
-        EXPECT_GE(n_super_good_vxs, 0.99 * N);
-        EXPECT_GE(n_super_good_vys, 0.99 * N);
-        EXPECT_GE(n_super_good_dvx, 0.99 * N);
-        EXPECT_GE(n_super_good_dvy, 0.99 * N);
+        ASSERT_GE(n_super_good_pxs, 0.99 * N);
+        ASSERT_GE(n_super_good_pys, 0.99 * N);
+        ASSERT_GE(n_super_good_vxs, 0.99 * N);
+        ASSERT_GE(n_super_good_vys, 0.99 * N);
+        ASSERT_GE(n_super_good_dvx, 0.99 * N);
+        ASSERT_GE(n_super_good_dvy, 0.99 * N);
     }
 }
 
@@ -1902,8 +1956,8 @@ TEST(LBVH, Nbody) {
     nbody(false, evaluate_precision, 0);// cpu naive
     nbody(false, evaluate_precision, 1);// gpu naive
 #endif
-    nbody(false, evaluate_precision, 2); // cpu lbvh
-    // nbody(false, evaluate_precision, 3); // gpu lbvh
+    nbody(false, evaluate_precision, 2);// cpu lbvh
+    nbody(false, evaluate_precision, 3); // gpu lbvh
 }
 
 TEST(LBVH, Nbody_meditation) {
