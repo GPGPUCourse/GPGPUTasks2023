@@ -1,3 +1,13 @@
+__kernel void fill(
+                __global unsigned int *as,
+                const unsigned int val,
+                const unsigned int n)
+{
+    const unsigned i = get_global_id(0);
+    if(i>=n) return;
+    as[i] = val;
+}
+
 __kernel void count(
                 __global const unsigned int *as,
                 __global unsigned int *cs,

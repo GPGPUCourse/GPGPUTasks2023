@@ -142,7 +142,12 @@ int main(int argc, char **argv) {
                 "-DWG=" + to_string(WG) + " -DSZ=" + to_string(1<<k)
             );
 
-            std::vector<unsigned int> n_zeros = std::vector<unsigned int>(n, 0);
+            ocl::Kernel fill = get_kernel(
+                radix_kernel, 
+                radix_kernel_length, 
+                "fill",
+                "-DWG=" + to_string(WG) + " -DSZ=" + to_string(1<<k)
+            );
 
             timer t;
             for (int iter = 0; iter < benchmarkingIters; ++iter) {
@@ -155,11 +160,17 @@ int main(int argc, char **argv) {
                 unsigned int work_group_ct = n / work_group_size;
                 for (int shift = 0; shift < sizeof(unsigned int) * 8; shift += k)
                 {
-                    temp_gpu.writeN(n_zeros.data(), n);
-                    cs_gpu.writeN(n_zeros.data(), n);
-                    cs_t_gpu.writeN(n_zeros.data(), n);
-                    pref_gpu.writeN(n_zeros.data(), n);
-                    pref_t_gpu.writeN(n_zeros.data(), n);
+                    // temp_gpu.writeN(n_zeros.data(), n);
+                    // cs_gpu.writeN(n_zeros.data(), n);
+                    // cs_t_gpu.writeN(n_zeros.data(), n);
+                    // pref_gpu.writeN(n_zeros.data(), n);
+                    // pref_t_gpu.writeN(n_zeros.data(), n);
+
+                    fill.exec(gpu::WorkSize(work_group_size, n), temp_gpu, 0, n);
+                    fill.exec(gpu::WorkSize(work_group_size, n), cs_gpu, 0, n);
+                    fill.exec(gpu::WorkSize(work_group_size, n), cs_t_gpu, 0, n);
+                    fill.exec(gpu::WorkSize(work_group_size, n), pref_gpu, 0, n);
+                    fill.exec(gpu::WorkSize(work_group_size, n), pref_t_gpu, 0, n);
 
                     //std::cout << "as_gpu\n";
                     //print_gpu_mem(as_gpu, n);
@@ -188,7 +199,8 @@ int main(int argc, char **argv) {
 
                     // calc counter 
                     {
-                        cs_gpu.writeN(n_zeros.data(), n);
+                        //cs_gpu.writeN(n_zeros.data(), n);
+                        fill.exec(gpu::WorkSize(work_group_size, n), cs_gpu, 0, n);
                         count.exec(
                             gpu::WorkSize(work_group_size, n), 
                             as_gpu, 
