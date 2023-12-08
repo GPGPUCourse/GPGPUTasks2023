@@ -28,6 +28,7 @@ gentype		min			(gentype x, gentype y);
 gentype		mix			(gentype x, gentype y, gentype a);
 gentype		radians		(gentype degrees);
 gentype		sign		(gentype x);
+gentype		sqrt		(gentype x);
 gentype		smoothstep	(gentype edge0, gentype edge1, gentype x);
 gentype		step		(gentype edge, gentype x);
 #undef gentype
