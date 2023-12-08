@@ -137,19 +137,21 @@ struct Point {
 void applyToAcceleration(float x0, float y0, float m0, float x1, float y1, float m1, float &dvx, float &dvy) {
     float dx = x1 - x0;
     float dy = y1 - y0;
-    float dr2 = std::max(100.f, dx * dx + dy * dy);
+    float dx2 = dx * dx;
+    float dy2 = dy * dy;
+    float dr2 = std::max(100.f, (float) (dx2 + dy2));
 
-    float dr2_inv = 1.f / dr2;
-    float dr_inv = std::sqrt(dr2_inv);// fast Quake rsqrt xD
+    float dr2_inv = (float) 1.f / dr2;
+    float dr_inv = std::sqrt(dr2_inv);
 
     float ex = dx * dr_inv;
     float ey = dy * dr_inv;
 
-    float fx = ex * dr2_inv * GRAVITATIONAL_FORCE;
-    float fy = ey * dr2_inv * GRAVITATIONAL_FORCE;
+    float fx = (float) (ex * dr2_inv) * GRAVITATIONAL_FORCE;
+    float fy = (float) (ey * dr2_inv) * GRAVITATIONAL_FORCE;
 
-    dvx += m1 * fx;
-    dvy += m1 * fy;
+    dvx = (float) dvx + (float) (m1 * fx);
+    dvy = (float) dvy + (float) (m1 * fy);
 }
 
 void bresenham(std::vector<Point> &line_points, const Point &from, const Point &to) {
@@ -371,9 +373,9 @@ struct Node {
 };
 
 std::ostream &operator<<(std::ostream &out, const Node &node) {
-    return  out << std::setprecision(9) << "Node(\n  child_left = " << node.child_left << "\n  child_right = " << node.child_right
-               << "\n  bbox = " << node.bbox << "\n  mass = " << node.mass << "\n  cmsx = " << node.cmsx
-               << "\n  cmsy = " << node.cmsy << "\n)";
+    return out << std::setprecision(9) << "Node(\n  child_left = " << node.child_left
+               << "\n  child_right = " << node.child_right << "\n  bbox = " << node.bbox << "\n  mass = " << node.mass
+               << "\n  cmsx = " << node.cmsx << "\n  cmsy = " << node.cmsy << "\n)";
 }
 
 #pragma pack(pop)
@@ -419,11 +421,11 @@ using interactive_callback_t =
 
 // https://en.wikipedia.org/wiki/Barnes%E2%80%93Hut_simulation
 bool barnesHutCondition(float x, float y, const Node &node) {
-    float dx = x - node.cmsx;
-    float dy = y - node.cmsy;
-    float s = std::max(node.bbox.maxX() - node.bbox.minX(), node.bbox.maxY() - node.bbox.minY());
-    float d2 = dx * dx + dy * dy;
-    float thresh = 0.5;
+    double dx = x - node.cmsx;
+    double dy = y - node.cmsy;
+    double s = std::max((double) (node.bbox.maxX() - node.bbox.minX()), (double) (node.bbox.maxY() - node.bbox.minY()));
+    double d2 = (double) (dx * dx) + (double) (dy * dy);
+    double thresh = 0.5;
 
     // возвращаем true, если находимся от ноды достаточно далеко, чтобы можно было ее считать примерно точечной
 
@@ -1248,23 +1250,24 @@ void buildBBoxes(std::vector<Node> &nodes, std::vector<int> &flags, int N, bool 
             Node &right = nodes[node.child_right];
             node.bbox = left.bbox;
             node.bbox.grow(right.bbox);
-            float leftMass = left.mass;
-            float rightMass = right.mass;
-            float mass = leftMass + rightMass;
+
+            double leftMass = left.mass;
+            double rightMass = right.mass;
+            double mass = leftMass + rightMass;
             node.mass = mass;
-            float left1 = leftMass / mass;
-            float right1 = rightMass / mass;
-            float leftCmsx = left.cmsx;
-            float rightCmsx = right.cmsx;
-            float xl = left1 * leftCmsx;
-            float xr = right1 * rightCmsx;
-            float xx = xl + xr;
+            double left1 = leftMass / mass;
+            double right1 = rightMass / mass;
+            double leftCmsx = left.cmsx;
+            double rightCmsx = right.cmsx;
+            double xl = left1 * leftCmsx;
+            double xr = right1 * rightCmsx;
+            double xx = xl + xr;
             node.cmsx = xx;
-            float leftCmsy = left.cmsy;
-            float rightCmsy = right.cmsy;
-            float yl = left1 * leftCmsy;
-            float yr = right1 * rightCmsy;
-            float yy = yl + yr;
+            double leftCmsy = left.cmsy;
+            double rightCmsy = right.cmsy;
+            double yl = left1 * leftCmsy;
+            double yr = right1 * rightCmsy;
+            double yy = yl + yr;
             node.cmsy = yy;
             // node.cmsx = 0;
             // node.cmsy = 0;
@@ -1781,8 +1784,8 @@ TEST(LBVH, GPU) {
     ocl::Kernel kernel_build_lbvh(lbvh_kernel, lbvh_kernel_length, "buidLBVH");
     kernel_build_lbvh.compile();
 
-    kernel_build_lbvh.exec(gpu::WorkSize(workGroupSize, global_work_size_nodes), 
-            pxs_gpu, pys_gpu, mxs_gpu, codes_gpu, nodes_gpu, N);
+    kernel_build_lbvh.exec(gpu::WorkSize(workGroupSize, global_work_size_nodes), pxs_gpu, pys_gpu, mxs_gpu, codes_gpu,
+                           nodes_gpu, N);
 
 
     nodes_gpu.read(nodes.data(), tree_size * sizeof(Node));
@@ -1826,8 +1829,6 @@ TEST(LBVH, GPU) {
                 break;
         }
 
-        nodes_gpu.read(nodes.data(), tree_size * sizeof(Node));
-
         std::vector<int> flags;
         buildBBoxes(nodes_cpu, flags, N);
 
@@ -1838,6 +1839,7 @@ TEST(LBVH, GPU) {
                 ASSERT_EQ(flags[i], flags_gpu_[i]);
         }
 
+        nodes_gpu.read(nodes.data(), tree_size * sizeof(Node));
         for (int i = 0; i < tree_size; ++i) {
             ASSERT_EQ(nodes[i], nodes_cpu[i]);
         }
@@ -1926,10 +1928,10 @@ TEST(LBVH, GPU) {
             double rel_eps = 0.5;
             ASSERT_NEAR(pxs[i], pxs_cpu[i], rel_eps * std::max(1.f, std::abs(pxs_cpu[i])));
             ASSERT_NEAR(pys[i], pys_cpu[i], rel_eps * std::max(1.f, std::abs(pys_cpu[i])));
-            ASSERT_NEAR(vxs[i], vxs_cpu[i], rel_eps * std::max(1e-6f, std::abs(vxs_cpu[i])));
-            ASSERT_NEAR(vys[i], vys_cpu[i], rel_eps * std::max(1e-6f, std::abs(vys_cpu[i])));
             ASSERT_NEAR(dvx[i], dvx_cpu[i], rel_eps * std::max(1e-6f, std::abs(dvx_cpu[i])));
             ASSERT_NEAR(dvy[i], dvy_cpu[i], rel_eps * std::max(1e-6f, std::abs(dvy_cpu[i])));
+            ASSERT_NEAR(vxs[i], vxs_cpu[i], rel_eps * std::max(1e-6f, std::abs(vxs_cpu[i])));
+            ASSERT_NEAR(vys[i], vys_cpu[i], rel_eps * std::max(1e-6f, std::abs(vys_cpu[i])));
         }
 
         ASSERT_GE(n_super_good_pxs, 0.99 * N);
@@ -1957,7 +1959,7 @@ TEST(LBVH, Nbody) {
     nbody(false, evaluate_precision, 1);// gpu naive
 #endif
     nbody(false, evaluate_precision, 2);// cpu lbvh
-    nbody(false, evaluate_precision, 3); // gpu lbvh
+    nbody(false, evaluate_precision, 3);// gpu lbvh
 }
 
 TEST(LBVH, Nbody_meditation) {

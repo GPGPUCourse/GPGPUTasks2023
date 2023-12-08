@@ -4,6 +4,7 @@
 
 #line 6
 
+#pragma OPENCL FP_CONTRACT OFF
 
 #define GRAVITATIONAL_FORCE 0.0001
 
@@ -367,29 +368,29 @@ void growNode(__global struct Node *node, __global struct Node *nodes)
     bbox_assign(&node->bbox, &left->bbox);
     growBBox(&node->bbox, &right->bbox);
 
-    float leftMass = left->mass;
-    float rightMass = right->mass;
-    float mass = leftMass + rightMass;
+    double leftMass = left->mass;
+    double rightMass = right->mass;
+    double mass = leftMass + rightMass;
     node->mass = mass;
 
     if (node->mass <= 1e-8) {
         printf("04230420340322\n");
     }
 
-    float left1 = leftMass / mass;
-    float right1 = rightMass / mass;
+    double left1 = leftMass / mass;
+    double right1 = rightMass / mass;
 
-    float leftCmsx = left->cmsx;
-    float rightCmsx = right->cmsx;
-    float xl = left1 * leftCmsx;
-    float xr = right1 * rightCmsx;
-    float xx = xl + xr;
+    double leftCmsx = left->cmsx;
+    double rightCmsx = right->cmsx;
+    double xl = left1 * leftCmsx;
+    double xr = right1 * rightCmsx;
+    double xx = xl + xr;
     node->cmsx = xx;
-    float leftCmsy = left->cmsy;
-    float yl = left1 * leftCmsy;
-    float rightCmsy = right->cmsy;
-    float yr = right1 * rightCmsy;
-    float yy = yl + yr;
+    double leftCmsy = left->cmsy;
+    double yl = left1 * leftCmsy;
+    double rightCmsy = right->cmsy;
+    double yr = right1 * rightCmsy;
+    double yy = yl + yr;
     node->cmsy = yy;
     //node->cmsx = 0;
     //node->cmsy = 0;
@@ -413,11 +414,14 @@ __kernel void growNodes(__global int *flags, __global struct Node *nodes,
 // https://en.wikipedia.org/wiki/Barnes%E2%80%93Hut_simulation
 bool barnesHutCondition(float x, float y, __global const struct Node *node)
 {
-    float dx = x - node->cmsx;
-    float dy = y - node->cmsy;
-    float s = max(node->bbox.maxx - node->bbox.minx, node->bbox.maxy - node->bbox.miny);
-    float d2 = dx*dx + dy*dy;
-    float thresh = 0.5;
+    double dx = x - node->cmsx;
+    double dy = y - node->cmsy;
+    double s = max(
+        (double)(node->bbox.maxx - node->bbox.minx),
+        (double)(node->bbox.maxy - node->bbox.miny)
+    );
+    double d2 = (double)(dx*dx) + (double)(dy*dy);
+    double thresh = 0.5;
 
     return s * s < d2 * thresh * thresh;
 }
@@ -434,18 +438,21 @@ void applyToAcceleration(
 ) {
     float dx = x1 - x0;
     float dy = y1 - y0;
-    float dr2 = fmax(100.f, dx * dx + dy * dy);
-    float dr2_inv = 1.f / dr2;
+    float dx2 = dx * dx;
+    float dy2 = dy * dy;
+    float dr2 = fmax(100.f, (float) (dx2 + dy2));
+
+    float dr2_inv = (float) 1.f / dr2;
     float dr_inv = sqrt(dr2_inv);
 
     float ex = dx * dr_inv;
     float ey = dy * dr_inv;
 
-    float fx = ex * dr2_inv * GRAVITATIONAL_FORCE;
-    float fy = ey * dr2_inv * GRAVITATIONAL_FORCE;
+    float fx = (float) (ex * dr2_inv) * GRAVITATIONAL_FORCE;
+    float fy = (float) (ey * dr2_inv) * GRAVITATIONAL_FORCE;
 
-    *dvx += m1 * fx;
-    *dvy += m1 * fy;
+    *dvx = (float) (*dvx) + (float) (m1 * fx);
+    *dvy = (float) (*dvy) + (float) (m1 * fy);
 }
 
 void calculateForce(
@@ -479,7 +486,7 @@ void calculateForce(
         for (int child_id = 0; child_id < 2; ++child_id) {
             int i_child = children[child_id];
             __global const struct Node *child = nodes + i_child;
-            if (contains(&child->bbox, x0, y0) && barnesHutCondition(x0, y0, child)) {
+            if (!contains(&child->bbox, x0, y0) && barnesHutCondition(x0, y0, child)) {
                 applyToAcceleration(x0, y0, m0, child->cmsx, child->cmsy, child->mass, force_x, force_y);
                 continue;
             }
@@ -492,36 +499,49 @@ void calculateForce(
 }
 
 __kernel void calculateForces(
-        __global const float *pxs, __global const float *pys,
-        __global const float *vxs, __global const float *vys,
-        __global const float *mxs,
-        __global const struct Node *nodes,
-        __global float * dvx2d, __global float * dvy2d,
-        int N,
-        int t)
-{
+    __global const float *pxs,
+    __global const float *pys,
+    __global const float *vxs,
+    __global const float *vys,
+    __global const float *mxs,
+    __global const struct Node *nodes,
+    __global float *dvx2d,
+    __global float *dvy2d,
+    int N,
+    int t
+) {
     int i = get_global_id(0);
     if (i >= N)
         return;
-    calculateForce(pxs[i], pys[i], mxs[i], nodes, dvx2d + t * N + i, dvy2d + t * N + i);
+    calculateForce(
+        pxs[i],
+        pys[i],
+        mxs[i],
+        nodes,
+        dvx2d + t * N + i,
+        dvy2d + t * N + i
+    );
 }
 
 __kernel void integrate(
-        __global float * pxs, __global float * pys,
-        __global float *vxs, __global float *vys,
+        __global float *pxs,
+        __global float *pys,
+        __global float *vxs,
+        __global float *vys,
         __global const float *mxs,
-        __global float * dvx2d, __global float * dvy2d,
+        __global const float *dvx2d,
+        __global const float *dvy2d,
         int N,
         int t,
-        int coord_shift)
-{
+        int coord_shift
+) {
     unsigned int i = get_global_id(0);
 
     if (i >= N)
         return;
 
-    __global float * dvx = dvx2d + t * N;
-    __global float * dvy = dvy2d + t * N;
+    __global const float *dvx = dvx2d + t * N;
+    __global const float *dvy = dvy2d + t * N;
 
     vxs[i] += dvx[i];
     vys[i] += dvy[i];
