@@ -137,9 +137,9 @@ morton_t zOrder(float fx, float fy, int i){
 //        return 0;
     }
 
-    // TODO
+    morton_t code = spreadBits(x) * 2 + spreadBits(y);
 
-    return 0;
+    return (code << 32) | i;
 }
 
 __kernel void generateMortonCodes(__global const float *pxs, __global const float *pys,
@@ -191,18 +191,167 @@ void __kernel merge(__global const morton_t *as, __global morton_t *as_sorted, u
 
 int findSplit(__global const morton_t *codes, int i_begin, int i_end, int bit_index)
 {
-    // TODO
+    if (getBit(codes[i_begin], bit_index) == getBit(codes[i_end-1], bit_index)) {
+        return -1;
+    }
+
+    int l = i_begin;
+    int r = i_end - 1;
+    while ((r - l) > 1) {
+        int m = (l + r) / 2;
+        if (getBit(codes[i_begin], bit_index) == getBit(codes[m], bit_index)) {
+            l = m;
+        }
+        else {
+            r = m;
+        }
+    }
+    return r;
 }
 
 void findRegion(int *i_begin, int *i_end, int *bit_index, __global const morton_t *codes, int N, int i_node)
 {
-    // TODO
+    if (i_node < 1 || i_node > N - 2) {
+        printf("842384298293482\n");
+    }
+
+    // 1. найдем, какого типа мы граница: левая или правая. Идем от самого старшего бита и паттерн-матчим тройки соседних битов
+    //  если нашли (0, 0, 1), то мы правая граница, если нашли (0, 1, 1), то мы левая
+    // dir: 1 если мы левая граница и -1 если правая
+    int dir = 0;
+    int i_bit = NBITS-1;
+    for (; i_bit >= 0; --i_bit) {
+        unsigned int cur_bit = (codes[i_node] >> i_bit) & 1;
+        if (cur_bit > ((codes[i_node - 1] >> i_bit) & 1)) {
+            dir = 1;
+            break;
+        }
+        if (cur_bit < ((codes[i_node + 1] >> i_bit) & 1)) {
+            dir = -1;
+            break;
+        }
+    }
+
+    if (dir == 0) {
+        printf("8923482374983\n");
+    }
+
+    // 2. Найдем вторую границу нашей зоны ответственности
+
+    // количество совпадающих бит в префиксе
+    int K = NBITS - i_bit;
+    morton_t pref0 = getBits(codes[i_node], i_bit, K);
+
+    // граница зоны ответственности - момент, когда префикс перестает совпадать
+    int i_node_end = -1;
+    // наивная версия, линейный поиск, можно использовать для отладки бинпоиска
+    //    for (int i = i_node; i >= 0 && i < int(codes.size()); i += dir) {
+    //        if (getBits(codes[i], i_bit, K) == pref0) {
+    //            i_node_end = i;
+    //        } else {
+    //            break;
+    //        }
+    //    }
+    //    if (i_node_end == -1) {
+    //        throw std::runtime_error("47248457284332098");
+    //    }
+
+    int i_node_last_in = i_node;
+    int i_node_first_out = (dir == 1) ? N : -1;
+    int dlt = (1 - dir) / 2;
+    while (abs(i_node_first_out - i_node_last_in) > 1) {
+        int m = (i_node_last_in + i_node_first_out + dlt) / 2;
+        if (pref0 == getBits(codes[m], i_bit, K)) {
+            i_node_last_in = m;
+        }
+        else {
+            i_node_first_out = m;
+        }
+    }
+    i_node_end = i_node_last_in;
+
+    *bit_index = i_bit - 1;
+
+    if (dir > 0) {
+        *i_begin = i_node;
+        *i_end = i_node_end + 1;
+    } else {
+        *i_begin = i_node_end;
+        *i_end = i_node + 1;
+    }
 }
 
 
 void initLBVHNode(__global struct Node *nodes, int i_node, __global const morton_t *codes, int N, __global const float *pxs, __global const float *pys, __global const float *mxs)
 {
-    // TODO
+    __global struct Node* node = &nodes[i_node];
+    clear(&node->bbox);
+    node->mass = 0;
+    node->cmsx = 0;
+    node->cmsy = 0;
+
+    // первые N-1 элементов - внутренние ноды, за ними N листьев
+
+    // инициализируем лист
+    if (i_node >= N-1) {
+        nodes[i_node].child_left = -1;
+        nodes[i_node].child_right = -1;
+        int i_point = i_node - (N-1);
+
+        float center_mass_x, center_mass_y;
+        float mass;
+        int index = getIndex(codes[i_point]);
+        center_mass_x = pxs[index];
+        center_mass_y = pys[index];
+        mass = mxs[index];
+
+        growPoint(&node->bbox, center_mass_x, center_mass_y);
+        node->cmsx = center_mass_x;
+        node->cmsy = center_mass_y;
+        node->mass = mass;
+
+        return;
+    }
+
+    // инициализируем внутреннюю ноду
+
+    int i_begin = 0, i_end = N, bit_index = NBITS-1;
+    // если рассматриваем не корень, то нужно найти зону ответственности ноды и самый старший бит, с которого надо начинать поиск разреза
+    if (i_node) {
+        findRegion(&i_begin, &i_end, &bit_index, codes, i_node);
+    }
+
+    bool found = false;
+    for (int i_bit = bit_index; i_bit >= 0; --i_bit) {
+        int split = findSplit(codes, i_begin, i_end, i_bit);
+        if (split < 0) continue;
+
+        if (split < 1) {
+            throw std::runtime_error("043204230042342");
+        }
+
+        if (split == i_begin + 1) {
+            nodes[i_node].child_left = split + N - 2;
+        }
+        else {
+            nodes[i_node].child_left = split - 1;
+        }
+
+        if (split == i_end - 1) {
+            nodes[i_node].child_right = split + N - 1;
+        }
+        else {
+            nodes[i_node].child_right = split;
+        }
+
+
+        found = true;
+        break;
+    }
+
+    if (!found) {
+        throw std::runtime_error("54356549645");
+    }
 }
 
 __kernel void buidLBVH(__global const float *pxs, __global const float *pys, __global const float *mxs,
