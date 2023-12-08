@@ -17,7 +17,7 @@
 
 
 // может понадобиться поменять индекс локально чтобы выбрать GPU если у вас более одного девайса
-#define OPENCL_DEVICE_INDEX 1
+#define OPENCL_DEVICE_INDEX 0
 
 // TODO включить чтобы начали запускаться тесты
 #define ENABLE_TESTING 1
@@ -45,6 +45,7 @@
 ////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////
+
 
 
 struct Color {
@@ -329,6 +330,39 @@ struct Node {
     float cmsy;
 };
 #pragma pack (pop)
+
+testing::AssertionResult NodeEQ(const char* lhs_expression,
+                                const char* rhs_expression,
+                                const Node& lhs,
+                                const Node& rhs) {
+    bool success = true;
+    if (lhs.child_left != rhs.child_left) {
+        success = false;
+    }
+    if (lhs.child_right != rhs.child_right) {
+        success = false;
+    }
+    if (lhs.bbox != rhs.bbox) {
+        success = false;
+    }
+    if (!testing::internal::CmpHelperFloatingPointEQ<float>(lhs_expression, rhs_expression, lhs.mass, rhs.mass)) {
+        success = false;
+    }
+    if (!testing::internal::CmpHelperFloatingPointEQ<float>(lhs_expression, rhs_expression, lhs.cmsy, rhs.cmsy)) {
+        success = false;
+    }
+    if (!testing::internal::CmpHelperFloatingPointEQ<float>(lhs_expression, rhs_expression, lhs.cmsx, rhs.cmsx)) {
+        success = false;
+    }
+
+    if (success) {
+        return testing::AssertionSuccess();
+    }
+    return testing::internal::CmpHelperEQFailure(lhs_expression, rhs_expression, lhs, rhs);
+}
+
+#define EXPECT_NODE_EQ(node1, node2)\
+    EXPECT_PRED_FORMAT2(NodeEQ, node1, node2)
 
 morton_t getBits(morton_t morton_code, int bit_index, int prefix_size)
 {
@@ -1879,7 +1913,7 @@ TEST (LBVH, GPU)
         buildBBoxes(nodes_cpu, flags, N);
 
         for (int i = 0; i < tree_size; ++i) {
-            EXPECT_EQ(nodes[i], nodes_cpu[i]);
+            EXPECT_NODE_EQ(nodes[i], nodes_cpu[i]);
         }
     }
 
@@ -1998,7 +2032,7 @@ TEST (LBVH, Nbody)
     nbody(false, evaluate_precision, 1); // gpu naive
 #endif
     nbody(false, evaluate_precision, 2); // cpu lbvh
-    // nbody(false, evaluate_precision, 3); // gpu lbvh
+    nbody(false, evaluate_precision, 3); // gpu lbvh
 }
 
 TEST (LBVH, Nbody_meditation)
