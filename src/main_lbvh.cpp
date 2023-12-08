@@ -196,10 +196,11 @@ morton_t zOrder(const Point &coord, int i){
     int y = coord.y;
 
     throw std::runtime_error("not implemented");
-//    morton_t morton_code = TODO
-//
-//    // augmentation
-//    return (morton_code << 32) | i;
+//  TODO
+    morton_t morton_code = spreadBits(coord.x) * 2 | spreadBits(coord.y);
+
+    //    augmentation
+    return (morton_code << 32) | i;
 }
 
 #pragma pack (push, 1)
@@ -379,10 +380,10 @@ void calculateForce(float x0, float y0, float m0, const std::vector<Node> &nodes
     int stack[2 * NBITS_PER_DIM];
     int stack_size = 0;
     // TODO кладем корень на стек
-    throw std::runtime_error("not implemented");
-   /* while (stack_size) {
+    stack[stack_size++] = 0;
+    while (stack_size) {
         // TODO берем ноду со стека
-        throw std::runtime_error("not implemented");
+        Node node = nodes[stack[--stack_size]];
 
         if (node.isLeaf()) {
             continue;
@@ -410,16 +411,32 @@ void calculateForce(float x0, float y0, float m0, const std::vector<Node> &nodes
             //   У нас поле неоднородное, и такая замена - лишь приближение. Чтобы оно было достаточно точным, будем спускаться внутрь ноды, пока она не станет похожа на точечное тело (маленький размер ее ббокса относительно нашего расстояния до центра масс ноды)
             if (!child.bbox.contains(x0, y0) && barnesHutCondition(x0, y0, child)) {
                 // TODO посчитать взаимодействие точки с центром масс ноды
-                throw std::runtime_error("not implemented");
+                float x1 = node.cmsx;
+                float y1 = node.cmsy;
+                float m1 = node.mass;
+
+                float dx = x1 - x0;
+                float dy = y1 - y0;
+
+                float dr2 = std::max(100.f, dx * dx + dy * dy);
+
+                float dr2_inv = 1.f / dr2;
+                float dr_inv = std::sqrt(dr2_inv);
+
+                float ex = dx * dr_inv;
+                float ey = dy * dr_inv;
+
+                *force_x += ex * dr2_inv * GRAVITATIONAL_FORCE;
+                *force_y += ey * dr2_inv * GRAVITATIONAL_FORCE;
             } else {
                 // TODO кладем ребенка на стек
-                throw std::runtime_error("not implemented");
+                stack[stack_size++] = i_child;
                 if (stack_size >= 2 * NBITS_PER_DIM) {
                     throw std::runtime_error("0420392384283");
                 }
             }
         }
-    }*/
+    }
 }
 
 void integrate(int i, std::vector<float> &pxs, std::vector<float> &pys, std::vector<float> &vxs, std::vector<float> &vys, float *dvx, float *dvy, int coord_shift)
