@@ -196,7 +196,7 @@ morton_t zOrder(const Point &coord, int i){
     int y = coord.y;
 
 //  TODO
-    morton_t morton_code = spreadBits(coord.x) * 2 | spreadBits(coord.y);
+    morton_t morton_code = spreadBits(coord.x) | spreadBits(coord.y) * 2;
 
     //    augmentation
     return (morton_code << 32) | i;
@@ -410,9 +410,9 @@ void calculateForce(float x0, float y0, float m0, const std::vector<Node> &nodes
             //   У нас поле неоднородное, и такая замена - лишь приближение. Чтобы оно было достаточно точным, будем спускаться внутрь ноды, пока она не станет похожа на точечное тело (маленький размер ее ббокса относительно нашего расстояния до центра масс ноды)
             if (!child.bbox.contains(x0, y0) && barnesHutCondition(x0, y0, child)) {
                 // TODO посчитать взаимодействие точки с центром масс ноды
-                float x1 = node.cmsx;
-                float y1 = node.cmsy;
-                float m1 = node.mass;
+                float x1 = child.cmsx;
+                float y1 = child.cmsy;
+                float m1 = child.mass;
 
                 float dx = x1 - x0;
                 float dy = y1 - y0;
@@ -991,17 +991,8 @@ int findSplit(const std::vector<morton_t> &codes, int i_begin, int i_end, int bi
         return -1;
     }
 
-    // наивная версия, линейный поиск, можно использовать для отладки бинпоиска
-    //    for (int i = i_begin + 1; i < i_end; ++i) {
-    //        int a = getBit(codes[i-1].first, bit_index);
-    //        int b = getBit(codes[i].first, bit_index);
-    //        if (a < b) {
-    //            return i;
-    //        }
-    //    }
-
     // TODO бинпоиск для нахождения разбиения области ответственности ноды
-    int l = i_begin, r = i_end - 1;
+    int l = i_begin, r = i_end;
     while (l + 1 < r) {
         int m = (l + r) / 2;
         int lb = getBit(codes[l], bit_index);
@@ -1069,12 +1060,12 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, const std::vector<mort
     morton_t lmorton = codes[i_node - 1];
     morton_t mmorton = codes[i_node];
     morton_t rmorton = codes[i_node + 1];
-    const morton_t right = 1, left = 3;
+    const int right = 1, left = 3;
     for (; i_bit >= 0; --i_bit) {
         // TODO найти dir и значащий бит
-        int64_t m = getBit(lmorton, i_bit) |
-                      getBit(mmorton, i_bit) |
-                      getBit(rmorton, i_bit);
+        int m = (!!getBit(lmorton, i_bit) << 2) |
+                (!!getBit(mmorton, i_bit) << 1) |
+                !!getBit(rmorton, i_bit);
         if (m == left) {
             dir = 1;
             break;
@@ -1096,39 +1087,39 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, const std::vector<mort
     morton_t pref0 = getBits(codes[i_node], i_bit, K);
 
     // граница зоны ответственности - момент, когда префикс перестает совпадать
-    int i_node_end = (dir > 0) ? N - 2 : i_node;
+    // int i_node_end = (dir > 0) ? N - 2 : i_node;
+    int i_node_end = -1;
     // наивная версия, линейный поиск, можно использовать для отладки бинпоиска
-    //    for (int i = i_node; i >= 0 && i < int(codes.size()); i += dir) {
-    //        if (getBits(codes[i], i_bit, K) == pref0) {
-    //            i_node_end = i;
-    //        } else {
-    //            break;
-    //        }
-    //    }
-    if (i_node_end == -1) {
-        throw std::runtime_error("47248457284332098");
-    }
+       for (int i = i_node; i >= 0 && i < int(codes.size()); i += dir) {
+           if (getBits(codes[i], i_bit, K) == pref0) {
+               i_node_end = i;
+           } else {
+               break;
+           }
+       }
+    // if (i_node_end == -1) {
+    //     throw std::runtime_error("47248457284332098");
+    // }
 
     // TODO бинпоиск зоны ответственности
 
-    int l, r;
-    if (dir > 0) {
-        l = i_node;
-        r = N - 1;
-    } else {
-        l = 0;
-        r = i_node;
-    }
-    while (l + 1 < r) {
-        int m = (l + r) / 2;
-        if (getBits(codes[m], i_bit, K) == pref0) {
-            ((dir > 0) ? l : r) = m;
-        } else {
-            ((dir > 0) ? r : l) = m;
-        }
-    }
-    i_node_end = r;
-
+    // int i_node_end = (dir > 0) ? N - 2 : i_node;
+    // int l, r;
+    // if (dir > 0) {
+    //     l = i_node;
+    //     r = N - 1;
+    // } else {
+    //     l = 0;
+    //     r = i_node;
+    // }
+    // while (l + 1 < r) {
+    //     int m = (l + r) / 2;
+    //     if (getBits(codes[m], i_bit, K) == pref0) {
+    //         ((dir > 0) ? l : r) = m;
+    //     } else {
+    //         ((dir > 0) ? r : l) = m;
+    //     }
+    // }
     *bit_index = i_bit - 1;
 
     if (dir > 0) {
@@ -1192,8 +1183,8 @@ void initLBVHNode(std::vector<Node> &nodes, int i_node, const std::vector<morton
         }
         // TODO проинициализировать nodes[i_node].child_left, nodes[i_node].child_right на основе i_begin, i_end, split
         //   не забудьте на N-1 сдвинуть индексы, указывающие на листья
-        nodes[i_node].child_left = split - 1 + ((i_end - i_begin == 1) ? N -1 : 0);
-        nodes[i_node].child_right = split + ((i_end - i_begin == 1) ? N -1 : 0);
+        nodes[i_node].child_left = split - 1 + ((split - i_begin == 1) ? N -1 : 0);
+        nodes[i_node].child_right = split + ((i_end - split == 1) ? N -1 : 0);
 
         found = true;
         break;
@@ -1307,14 +1298,8 @@ void buildBBoxes(std::vector<Node> &nodes, std::vector<int> &flags, int N, bool 
            if (flags[i_node] == level) {
                 //  TODO
                 Node& node_root = nodes[i_node];
-                Node& node_left = nodes[node_root.child_left];
-                Node& node_right = nodes[node_root.child_right];
                 node_root.bbox.clear();
-                node_root.bbox.grow(node_left.bbox);
-                node_root.bbox.grow(node_right.bbox);
-                node_root.mass = node_left.mass + node_right.mass;
-                node_root.cmsx = (node_left.cmsx * node_left.mass + node_right.cmsx * node_right.mass) / node_root.mass;
-                node_root.cmsy = (node_left.cmsy * node_left.mass + node_right.cmsy * node_right.mass) / node_root.mass;
+                growNode(node_root, nodes);
                 ++n_updated;
            }
         }
@@ -1598,9 +1583,9 @@ void nbody(bool interactive, bool evaluate_precision, int nbody_impl_index)
 void checkTreesEqual(const std::vector<Node> &nodes_recursive, const std::vector<Node> &nodes, const Node &root_recursive, const Node &root)
 {
     EXPECT_EQ(root_recursive.bbox, root.bbox);
-    EXPECT_EQ(root_recursive.mass, root.mass);
-    EXPECT_EQ(root_recursive.cmsx, root.cmsx);
-    EXPECT_EQ(root_recursive.cmsy, root.cmsy);
+    EXPECT_FLOAT_EQ(root_recursive.mass, root.mass);
+    EXPECT_FLOAT_EQ(root_recursive.cmsx, root.cmsx);
+    EXPECT_FLOAT_EQ(root_recursive.cmsy, root.cmsy);
     EXPECT_EQ(root_recursive.hasLeftChild(), root.hasLeftChild());
     EXPECT_EQ(root_recursive.hasRightChild(), root.hasRightChild());
 
