@@ -195,11 +195,12 @@ morton_t zOrder(const Point &coord, int i){
     int x = coord.x;
     int y = coord.y;
 
-    throw std::runtime_error("not implemented");
-//    morton_t morton_code = TODO
-//
-//    // augmentation
-//    return (morton_code << 32) | i;
+    int x_spread = spreadBits(x);
+    int y_spread = spreadBits(y);
+    morton_t morton_code = y_spread | (x_spread << 1);
+
+    // augmentation
+    return (morton_code << 32) | i;
 }
 
 #pragma pack (push, 1)
@@ -378,11 +379,12 @@ void calculateForce(float x0, float y0, float m0, const std::vector<Node> &nodes
 
     int stack[2 * NBITS_PER_DIM];
     int stack_size = 0;
-    // TODO кладем корень на стек
-    throw std::runtime_error("not implemented");
-   /* while (stack_size) {
-        // TODO берем ноду со стека
-        throw std::runtime_error("not implemented");
+    // кладем корень на стек
+    stack[stack_size++] = 0;
+
+    while (stack_size) {
+        // берем ноду со стека
+        const Node& node = nodes[stack[--stack_size]];
 
         if (node.isLeaf()) {
             continue;
@@ -409,17 +411,32 @@ void calculateForce(float x0, float y0, float m0, const std::vector<Node> &nodes
             //   Но, с точки зрения физики, замена гравитационного влияния всех точек в регионе на взаимодействие с суммарной массой в центре масс - это точное решение только в однородном поле (например, на поверхности земли)
             //   У нас поле неоднородное, и такая замена - лишь приближение. Чтобы оно было достаточно точным, будем спускаться внутрь ноды, пока она не станет похожа на точечное тело (маленький размер ее ббокса относительно нашего расстояния до центра масс ноды)
             if (!child.bbox.contains(x0, y0) && barnesHutCondition(x0, y0, child)) {
-                // TODO посчитать взаимодействие точки с центром масс ноды
-                throw std::runtime_error("not implemented");
+                // посчитать взаимодействие точки с центром масс ноды
+                float m1 = child.mass;
+
+                float dx = child.cmsx - x0;
+                float dy = child.cmsy - y0;
+                float dr2 = std::max(100.f, dx * dx + dy * dy);
+
+                float dr2_inv = 1.f / dr2;
+                float dr_inv = std::sqrt(dr2_inv);
+
+                float ex = dx * dr_inv;
+                float ey = dy * dr_inv;
+
+                float fx = ex * dr2_inv * GRAVITATIONAL_FORCE;
+                float fy = ey * dr2_inv * GRAVITATIONAL_FORCE;
+
+                *force_x += m1 * fx;
+                *force_y += m1 * fy;
             } else {
-                // TODO кладем ребенка на стек
-                throw std::runtime_error("not implemented");
+                stack[stack_size++] = i_child;
                 if (stack_size >= 2 * NBITS_PER_DIM) {
                     throw std::runtime_error("0420392384283");
                 }
             }
         }
-    }*/
+    }
 }
 
 void integrate(int i, std::vector<float> &pxs, std::vector<float> &pys, std::vector<float> &vxs, std::vector<float> &vys, float *dvx, float *dvy, int coord_shift)
@@ -975,20 +992,20 @@ int findSplit(const std::vector<morton_t> &codes, int i_begin, int i_end, int bi
         return -1;
     }
 
-    // наивная версия, линейный поиск, можно использовать для отладки бинпоиска
-    //    for (int i = i_begin + 1; i < i_end; ++i) {
-    //        int a = getBit(codes[i-1].first, bit_index);
-    //        int b = getBit(codes[i].first, bit_index);
-    //        if (a < b) {
-    //            return i;
-    //        }
-    //    }
+    // Бинпоиск для нахождения разбиения области ответственности ноды.
+    int l = i_begin;
+    int r = i_end;
+    int m = (r + l) / 2;
 
-    // TODO бинпоиск для нахождения разбиения области ответственности ноды
-    throw std::runtime_error("not implemented");
-
-    // избыточно, так как на входе в функцию проверили, что ответ существует, но приятно иметь sanity-check на случай если набагали
-    throw std::runtime_error("4932492039458209485");
+    while (l < r) {
+        if (getBit(codes[m] , bit_index) == 0) {
+            l = m + 1;
+        } else {
+            r = m;
+        }
+        m = (r + l) / 2;
+    }
+    return m;
 }
 
 void buildLBVHRecursive(std::vector<Node> &nodes, const std::vector<morton_t> &codes, const std::vector<Point> &points, int i_begin, int i_end, int bit_index)
@@ -1037,9 +1054,22 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, const std::vector<mort
     // dir: 1 если мы левая граница и -1 если правая
     int dir = 0;
     int i_bit = NBITS-1;
+
+    morton_t l = codes[i_node - 1];
+    morton_t m = codes[i_node];
+    morton_t r = codes[i_node + 1];
+    int bits[3] {};
     for (; i_bit >= 0; --i_bit) {
-        // TODO найти dir и значащий бит
-        throw std::runtime_error("not implemented");
+        bits[0] = getBit(l, i_bit);
+        bits[1] = getBit(m, i_bit);
+        bits[2] = getBit(r, i_bit);
+        if (bits[0] != bits[2]) {
+            dir = -1;
+            if (bits[1]) { // left
+                dir = 1;
+            }
+            break;
+        }
     }
 
     if (dir == 0) {
@@ -1054,20 +1084,34 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, const std::vector<mort
 
     // граница зоны ответственности - момент, когда префикс перестает совпадать
     int i_node_end = -1;
-    // наивная версия, линейный поиск, можно использовать для отладки бинпоиска
-    //    for (int i = i_node; i >= 0 && i < int(codes.size()); i += dir) {
-    //        if (getBits(codes[i], i_bit, K) == pref0) {
-    //            i_node_end = i;
-    //        } else {
-    //            break;
-    //        }
-    //    }
-    //    if (i_node_end == -1) {
-    //        throw std::runtime_error("47248457284332098");
-    //    }
 
-    // TODO бинпоиск зоны ответственности
-    throw std::runtime_error("not implemented");
+    { // Бинпоиск зоны ответственности
+        int l = dir > 0 ? i_node : -1;
+        int r = dir > 0 ? N : i_node;
+        int m = (l + r) / 2;
+
+        if (dir > 0) {
+            while (l + 1 < r) {
+                if (getBits(codes[m], i_bit, K) == pref0) {
+                    l = m;
+                } else {
+                    r = m;
+                }
+                m = (l + r) / 2;
+            }
+            i_node_end = l;
+        } else {
+            while (l + 1 < r) {
+                if (getBits(codes[m], i_bit, K) != pref0) {
+                    l = m;
+                } else {
+                    r = m;
+                }
+                m = (l + r) / 2;
+            }
+            i_node_end = l + 1;
+        }
+    }
 
     *bit_index = i_bit - 1;
 
@@ -1118,28 +1162,22 @@ void initLBVHNode(std::vector<Node> &nodes, int i_node, const std::vector<morton
     int i_begin = 0, i_end = N, bit_index = NBITS-1;
     // если рассматриваем не корень, то нужно найти зону ответственности ноды и самый старший бит, с которого надо начинать поиск разреза
     if (i_node) {
-        // TODO
-        throw std::runtime_error("not implemented");
+        findRegion(&i_begin, &i_end, &bit_index, codes, i_node);
     }
 
     bool found = false;
     for (int i_bit = bit_index; i_bit >= 0; --i_bit) {
-        /*
-        int split = TODO
+        int split = findSplit(codes, i_begin, i_end, i_bit);
         if (split < 0) continue;
 
         if (split < 1) {
             throw std::runtime_error("043204230042342");
         }
-         */
-        throw std::runtime_error("not implemented");
 
-
-        // TODO проинициализировать nodes[i_node].child_left, nodes[i_node].child_right на основе i_begin, i_end, split
-        //   не забудьте на N-1 сдвинуть индексы, указывающие на листья
-
-        throw std::runtime_error("not implemented");
-
+        // Проинициализировать nodes[i_node].child_left, nodes[i_node].child_right на основе i_begin, i_end, split
+        // Не забудьте на N-1 сдвинуть индексы, указывающие на листья
+        nodes[i_node].child_left = split + (split - i_begin <= 1 ? N - 2 : -1);
+        nodes[i_node].child_right = split + (i_end - split <= 1 ? N - 1 : 0);
 
         found = true;
         break;
@@ -1158,8 +1196,7 @@ void buildLBVH(std::vector<Node> &nodes, const std::vector<morton_t> &codes, con
 
     const points_mass_functor points_mass_array = [&](int i) { return std::make_tuple((float) points[i].x, (float) points[i].y, 1.f); };
 
-    // можно раскомментировать и будет работать, но для дебага удобнее оставить однопоточную версию
-    //    #pragma omp parallel for
+#pragma omp parallel for
     for (int i_node = 0; i_node < tree_size; ++i_node) {
         initLBVHNode(nodes, i_node, codes, points_mass_array);
     }
@@ -1249,15 +1286,23 @@ void buildBBoxes(std::vector<Node> &nodes, std::vector<int> &flags, int N, bool 
         int n_updated = 0;
 #pragma omp parallel for if(use_omp) reduction(+:n_updated)
         for (int i_node = 0; i_node < N-1; ++i_node) {
-            // TODO если находимся на нужном уровне (нужный flag), проинициализируем ббокс и центр масс ноды
-//            if (TODO) {
-//                  TODO
-//                ++n_updated;
-//            }
+            // Если находимся на нужном уровне (нужный flag), проинициализируем ббокс и центр масс ноды.
+            if (flags[i_node] == level) {
+                Node &node = nodes[i_node];
+                Node &child_left = nodes[node.child_left];
+                Node &child_right = nodes[node.child_right];
+                node.bbox.clear();
+                node.bbox.grow(child_left.bbox);
+                node.bbox.grow(child_right.bbox);
 
+                node.mass = child_left.mass + child_right.mass;
+
+                node.cmsx = (child_left.cmsx * child_left.mass + child_right.cmsx * child_right.mass) / node.mass;
+                node.cmsy = (child_left.cmsy * child_left.mass + child_right.cmsy * child_right.mass) / node.mass;
+
+                ++n_updated;
+            }
         }
-
-//        std::cout << "n updated: " << n_updated << std::endl;
 
         // если глубина небольшая, то раньше закончим
         if (!n_updated) {
@@ -1536,9 +1581,9 @@ void nbody(bool interactive, bool evaluate_precision, int nbody_impl_index)
 void checkTreesEqual(const std::vector<Node> &nodes_recursive, const std::vector<Node> &nodes, const Node &root_recursive, const Node &root)
 {
     EXPECT_EQ(root_recursive.bbox, root.bbox);
-    EXPECT_EQ(root_recursive.mass, root.mass);
-    EXPECT_EQ(root_recursive.cmsx, root.cmsx);
-    EXPECT_EQ(root_recursive.cmsy, root.cmsy);
+    EXPECT_FLOAT_EQ(root_recursive.mass, root.mass);
+    EXPECT_FLOAT_EQ(root_recursive.cmsx, root.cmsx);
+    EXPECT_FLOAT_EQ(root_recursive.cmsy, root.cmsy);
     EXPECT_EQ(root_recursive.hasLeftChild(), root.hasLeftChild());
     EXPECT_EQ(root_recursive.hasRightChild(), root.hasRightChild());
 
