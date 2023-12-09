@@ -362,7 +362,7 @@ void initLBVHNode(__global struct Node *nodes, int i_node, __global const morton
     }
 }
 
-__kernel void buidLBVH(__global const float *pxs, __global const float *pys, __global const float *mxs,
+__kernel void buildLBVH(__global const float *pxs, __global const float *pys, __global const float *mxs,
                        __global const morton_t *codes, __global struct Node *nodes,
                        int N)
 {

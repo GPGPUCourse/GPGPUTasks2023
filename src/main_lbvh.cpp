@@ -17,7 +17,7 @@
 
 
 // может понадобиться поменять индекс локально чтобы выбрать GPU если у вас более одного девайса
-#define OPENCL_DEVICE_INDEX 0
+#define OPENCL_DEVICE_INDEX 1
 
 // TODO включить чтобы начали запускаться тесты
 #define ENABLE_TESTING 1
@@ -26,7 +26,7 @@
 #define EVALUATE_PRECISION 1
 
 // удобно включить при локальном тестировании
-#define ENABLE_GUI 0
+#define ENABLE_GUI 1
 
 // сброс картинок симуляции на диск
 #define SAVE_IMAGES 0
@@ -35,7 +35,7 @@
 // TODO локально интересны замеры на самой сложной версии, которую получится дождаться
 #define NBODY_INITIAL_STATE_COMPLEXITY 0
 //#define NBODY_INITIAL_STATE_COMPLEXITY 1
-//#define NBODY_INITIAL_STATE_COMPLEXITY 2
+// #define NBODY_INITIAL_STATE_COMPLEXITY 2
 
 // использовать lbvh для построения начального состояния. Нужно на очень больших N (>1000000)
 #define ENABLE_LBVH_STATE_INITIALIZATION 0
@@ -640,7 +640,7 @@ void nbody_gpu_lbvh(DeltaState &delta_state, State &initial_state, int N, int NT
 
     ocl::Kernel kernel_generate_morton_codes(lbvh_kernel, lbvh_kernel_length, "generateMortonCodes");
     ocl::Kernel kernel_merge(lbvh_kernel, lbvh_kernel_length, "merge");
-    ocl::Kernel kernel_build_lbvh(lbvh_kernel, lbvh_kernel_length, "buidLBVH");
+    ocl::Kernel kernel_build_lbvh(lbvh_kernel, lbvh_kernel_length, "buildLBVH");
     ocl::Kernel kernel_init_flags(lbvh_kernel, lbvh_kernel_length, "initFlags");
     ocl::Kernel kernel_grow_nodes(lbvh_kernel, lbvh_kernel_length, "growNodes");
     ocl::Kernel kernel_calculate_forces(lbvh_kernel, lbvh_kernel_length, "calculateForces");
@@ -1671,279 +1671,279 @@ TEST (LBVH, CPU)
     }
 }
 
-// TEST (LBVH, GPU)
-// {
-//     if (!ENABLE_TESTING)
-//         return;
+TEST (LBVH, GPU)
+{
+    if (!ENABLE_TESTING)
+        return;
 
-//     gpu::Device device = gpu::chooseGPUDevice(OPENCL_DEVICE_INDEX);
-//     gpu::Context context;
-//     context.init(device.device_id_opencl);
-//     context.activate();
+    gpu::Device device = gpu::chooseGPUDevice(OPENCL_DEVICE_INDEX);
+    gpu::Context context;
+    context.init(device.device_id_opencl);
+    context.activate();
 
-//     std::srand(1);
+    std::srand(1);
 
-//     int N = 100000;
-//     std::vector<float> pxs(N);
-//     std::vector<float> pys(N);
-//     std::vector<float> mxs(N);
-//     std::vector<morton_t> codes(N);
-//     for (int i = 0; i < N; ++i) {
-//         pxs[i] = std::rand() % (1 << NBITS_PER_DIM);
-//         pys[i] = std::rand() % (1 << NBITS_PER_DIM);
-//         mxs[i] = 100;
-//     }
+    int N = 100000;
+    std::vector<float> pxs(N);
+    std::vector<float> pys(N);
+    std::vector<float> mxs(N);
+    std::vector<morton_t> codes(N);
+    for (int i = 0; i < N; ++i) {
+        pxs[i] = std::rand() % (1 << NBITS_PER_DIM);
+        pys[i] = std::rand() % (1 << NBITS_PER_DIM);
+        mxs[i] = 100;
+    }
 
-//     const points_mass_functor points_mass_array = [&](int i) { return std::make_tuple(pxs[i], pys[i], mxs[i]); };
+    const points_mass_functor points_mass_array = [&](int i) { return std::make_tuple(pxs[i], pys[i], mxs[i]); };
 
-//     unsigned int workGroupSize = 128;
-//     unsigned int global_work_size_points = (N + workGroupSize - 1) / workGroupSize * workGroupSize;
-//     unsigned int global_work_size_nodes = (LBVHSize(N) + workGroupSize - 1) / workGroupSize * workGroupSize;
-//     ocl::Kernel kernel_generate_morton_codes(lbvh_kernel, lbvh_kernel_length, "generateMortonCodes");
-//     kernel_generate_morton_codes.compile();
-//     gpu::gpu_mem_32f pxs_gpu, pys_gpu, mxs_gpu;
-//     gpu::shared_device_buffer_typed<morton_t> codes_gpu;
+    unsigned int workGroupSize = 128;
+    unsigned int global_work_size_points = (N + workGroupSize - 1) / workGroupSize * workGroupSize;
+    unsigned int global_work_size_nodes = (LBVHSize(N) + workGroupSize - 1) / workGroupSize * workGroupSize;
+    ocl::Kernel kernel_generate_morton_codes(lbvh_kernel, lbvh_kernel_length, "generateMortonCodes");
+    kernel_generate_morton_codes.compile();
+    gpu::gpu_mem_32f pxs_gpu, pys_gpu, mxs_gpu;
+    gpu::shared_device_buffer_typed<morton_t> codes_gpu;
 
-//     pxs_gpu.resizeN(N);
-//     pys_gpu.resizeN(N);
-//     mxs_gpu.resizeN(N);
-//     codes_gpu.resizeN(N);
+    pxs_gpu.resizeN(N);
+    pys_gpu.resizeN(N);
+    mxs_gpu.resizeN(N);
+    codes_gpu.resizeN(N);
 
-//     pxs_gpu.writeN(pxs.data(), N);
-//     pys_gpu.writeN(pys.data(), N);
-//     mxs_gpu.writeN(mxs.data(), N);
-
-
-//     // GENERATE MORTON CODES
-
-//     kernel_generate_morton_codes.exec(gpu::WorkSize(workGroupSize, global_work_size_points),
-//                                       pxs_gpu, pys_gpu,
-//                                       codes_gpu,
-//                                       N);
-
-//     codes_gpu.readN(codes.data(), N);
-
-//     for (int i = 0; i < N; ++i) {
-//         EXPECT_EQ(codes[i], zOrder(makePoint(pxs[i], pys[i]), i));
-//     }
+    pxs_gpu.writeN(pxs.data(), N);
+    pys_gpu.writeN(pys.data(), N);
+    mxs_gpu.writeN(mxs.data(), N);
 
 
-//     // SORT MORTON CODES
+    // GENERATE MORTON CODES
 
-//     ocl::Kernel kernel_merge(lbvh_kernel, lbvh_kernel_length, "merge");
-//     kernel_merge.compile();
+    kernel_generate_morton_codes.exec(gpu::WorkSize(workGroupSize, global_work_size_points),
+                                      pxs_gpu, pys_gpu,
+                                      codes_gpu,
+                                      N);
 
-//     gpu::gpu_mem_64f codes_gpu_buf;
-//     codes_gpu_buf.resizeN(N);
-//     for (unsigned int subn = 1; subn < N; subn *= 2) {
-//         kernel_merge.exec(gpu::WorkSize(workGroupSize, global_work_size_points), codes_gpu, codes_gpu_buf, N, subn);
-//         codes_gpu.swap(codes_gpu_buf);
-//     }
-//     std::vector<morton_t> codes_tmp = codes;
-//     codes_gpu.readN(codes.data(), N);
-//     {
-//         std::sort(codes_tmp.begin(), codes_tmp.end());
-//         for (int i = 1; i < N; ++i) {
-//             EXPECT_LE(codes_tmp[i-1], codes_tmp[i]);
-//         }
-//         for (int i = 1; i < N; ++i) {
-//             EXPECT_LE(codes[i-1], codes[i]);
-//         }
-//         for (int i = 0; i < N; ++i) {
-//             EXPECT_EQ(codes_tmp[i], codes[i]);
-//         }
-//     }
+    codes_gpu.readN(codes.data(), N);
+
+    for (int i = 0; i < N; ++i) {
+        EXPECT_EQ(codes[i], zOrder(makePoint(pxs[i], pys[i]), i));
+    }
 
 
-//     // BUILD LBVH
+    // SORT MORTON CODES
 
-//     const int tree_size = LBVHSize(N);
+    ocl::Kernel kernel_merge(lbvh_kernel, lbvh_kernel_length, "merge");
+    kernel_merge.compile();
 
-//     std::vector<Node> nodes(tree_size);
-//     // init with something just for test
-//     for (int i = 0; i < tree_size; ++i) {
-//         Node &n = nodes[i];
-//         n.mass = std::rand();
-//         n.cmsx = std::rand();
-//         n.cmsy = std::rand();
-//         n.child_right = std::rand();
-//         n.child_left = std::rand();
-//         n.bbox.grow(makePoint(std::rand(), std::rand()));
-//     }
-//     std::vector<Node> nodes_cpu = nodes;
-
-//     gpu::gpu_mem_any nodes_gpu;
-//     nodes_gpu.resize(tree_size * sizeof(Node));
-
-//     {
-//         nodes_gpu.write(nodes.data(), tree_size * sizeof(Node));
-//         std::vector<Node> tmp(tree_size);
-//         nodes_gpu.read(tmp.data(), tree_size * sizeof(Node));
-
-//         for (int i = 0; i < tree_size; ++i) {
-//             EXPECT_EQ(tmp[i], nodes[i]);
-//         }
-//     }
-
-//     ocl::Kernel kernel_build_lbvh(lbvh_kernel, lbvh_kernel_length, "buildLBVH");
-//     kernel_build_lbvh.compile();
-
-//     kernel_build_lbvh.exec(gpu::WorkSize(workGroupSize, global_work_size_nodes),
-//                            pxs_gpu, pys_gpu, mxs_gpu,
-//                            codes_gpu, nodes_gpu,
-//                            N);
+    gpu::gpu_mem_64f codes_gpu_buf;
+    codes_gpu_buf.resizeN(N);
+    for (unsigned int subn = 1; subn < N; subn *= 2) {
+        kernel_merge.exec(gpu::WorkSize(workGroupSize, global_work_size_points), codes_gpu, codes_gpu_buf, N, subn);
+        codes_gpu.swap(codes_gpu_buf);
+    }
+    std::vector<morton_t> codes_tmp = codes;
+    codes_gpu.readN(codes.data(), N);
+    {
+        std::sort(codes_tmp.begin(), codes_tmp.end());
+        for (int i = 1; i < N; ++i) {
+            EXPECT_LE(codes_tmp[i-1], codes_tmp[i]);
+        }
+        for (int i = 1; i < N; ++i) {
+            EXPECT_LE(codes[i-1], codes[i]);
+        }
+        for (int i = 0; i < N; ++i) {
+            EXPECT_EQ(codes_tmp[i], codes[i]);
+        }
+    }
 
 
-//     nodes_gpu.read(nodes.data(), tree_size * sizeof(Node));
+    // BUILD LBVH
 
-//     for (int i = 0; i < tree_size; ++i) {
-        // initLBVHNode(nodes_cpu, i, codes, points_mass_array);
-//     }
+    const int tree_size = LBVHSize(N);
 
-//     for (int i = 0; i < tree_size; ++i) {
-//         EXPECT_EQ(nodes[i], nodes_cpu[i]);
-//     }
+    std::vector<Node> nodes(tree_size);
+    // init with something just for test
+    for (int i = 0; i < tree_size; ++i) {
+        Node &n = nodes[i];
+        n.mass = std::rand();
+        n.cmsx = std::rand();
+        n.cmsy = std::rand();
+        n.child_right = std::rand();
+        n.child_left = std::rand();
+        n.bbox.grow(makePoint(std::rand(), std::rand()));
+    }
+    std::vector<Node> nodes_cpu = nodes;
+
+    gpu::gpu_mem_any nodes_gpu;
+    nodes_gpu.resize(tree_size * sizeof(Node));
+
+    {
+        nodes_gpu.write(nodes.data(), tree_size * sizeof(Node));
+        std::vector<Node> tmp(tree_size);
+        nodes_gpu.read(tmp.data(), tree_size * sizeof(Node));
+
+        for (int i = 0; i < tree_size; ++i) {
+            EXPECT_EQ(tmp[i], nodes[i]);
+        }
+    }
+
+    ocl::Kernel kernel_build_lbvh(lbvh_kernel, lbvh_kernel_length, "buildLBVH");
+    kernel_build_lbvh.compile();
+
+    kernel_build_lbvh.exec(gpu::WorkSize(workGroupSize, global_work_size_nodes),
+                           pxs_gpu, pys_gpu, mxs_gpu,
+                           codes_gpu, nodes_gpu,
+                           N);
 
 
-//     // BUILD BBOXES AND AGGREGATE MASS INFO
+    nodes_gpu.read(nodes.data(), tree_size * sizeof(Node));
 
-//     // аналог buildBBoxes
-//     {
-//         gpu::gpu_mem_32i flags_gpu;
-//         flags_gpu.resizeN(N);
+    for (int i = 0; i < tree_size; ++i) {
+        initLBVHNode(nodes_cpu, i, codes, points_mass_array);
+    }
 
-//         ocl::Kernel kernel_init_flags(lbvh_kernel, lbvh_kernel_length, "initFlags");
-//         ocl::Kernel kernel_grow_nodes(lbvh_kernel, lbvh_kernel_length, "growNodes");
+    for (int i = 0; i < tree_size; ++i) {
+        EXPECT_EQ(nodes[i], nodes_cpu[i]);
+    }
 
-//         kernel_init_flags.compile();
-//         kernel_grow_nodes.compile();
 
-//         for (int level = 0; level < NBITS; ++level) {
+    // BUILD BBOXES AND AGGREGATE MASS INFO
 
-//             kernel_init_flags.exec(gpu::WorkSize(workGroupSize, global_work_size_points),
-//                                    flags_gpu, nodes_gpu,
-//                                    N, level);
+    // аналог buildBBoxes
+    {
+        gpu::gpu_mem_32i flags_gpu;
+        flags_gpu.resizeN(N);
 
-//             kernel_grow_nodes.exec(gpu::WorkSize(workGroupSize, global_work_size_points),
-//                                    flags_gpu, nodes_gpu,
-//                                    N, level);
+        ocl::Kernel kernel_init_flags(lbvh_kernel, lbvh_kernel_length, "initFlags");
+        ocl::Kernel kernel_grow_nodes(lbvh_kernel, lbvh_kernel_length, "growNodes");
 
-//             int n_updated;
-//             flags_gpu.readN(&n_updated, 1, N-1);
+        kernel_init_flags.compile();
+        kernel_grow_nodes.compile();
 
-//             //            std::cout << "n updated: " << n_updated << std::endl;
+        for (int level = 0; level < NBITS; ++level) {
 
-//             if (!n_updated)
-//                 break;
-//         }
+            kernel_init_flags.exec(gpu::WorkSize(workGroupSize, global_work_size_points),
+                                   flags_gpu, nodes_gpu,
+                                   N, level);
 
-//         nodes_gpu.read(nodes.data(), tree_size * sizeof(Node));
+            kernel_grow_nodes.exec(gpu::WorkSize(workGroupSize, global_work_size_points),
+                                   flags_gpu, nodes_gpu,
+                                   N, level);
 
-//         std::vector<int> flags;
-//         buildBBoxes(nodes_cpu, flags, N);
+            int n_updated;
+            flags_gpu.readN(&n_updated, 1, N-1);
 
-//         for (int i = 0; i < tree_size; ++i) {
-//             EXPECT_EQ(nodes[i], nodes_cpu[i]);
-//         }
-//     }
+            //            std::cout << "n updated: " << n_updated << std::endl;
 
-//     std::vector<float> vxs(N);
-//     std::vector<float> vys(N);
-//     std::vector<float> dvx(N);
-//     std::vector<float> dvy(N);
+            if (!n_updated)
+                break;
+        }
 
-//     gpu::gpu_mem_32f vxs_gpu, vys_gpu;
-//     gpu::gpu_mem_32f dvx_gpu, dvy_gpu;
+        nodes_gpu.read(nodes.data(), tree_size * sizeof(Node));
 
-//     vxs_gpu.resizeN(N);
-//     vys_gpu.resizeN(N);
-//     dvx_gpu.resizeN(N);
-//     dvy_gpu.resizeN(N);
+        std::vector<int> flags;
+        buildBBoxes(nodes_cpu, flags, N);
 
-//     vxs_gpu.writeN(vxs.data(), N);
-//     vys_gpu.writeN(vys.data(), N);
-//     dvx_gpu.writeN(dvx.data(), N);
-//     dvy_gpu.writeN(dvy.data(), N);
+        for (int i = 0; i < tree_size; ++i) {
+            EXPECT_EQ(nodes[i], nodes_cpu[i]);
+        }
+    }
 
-//     std::vector<float> pxs_cpu = pxs;
-//     std::vector<float> pys_cpu = pys;
-//     std::vector<float> vxs_cpu = vxs;
-//     std::vector<float> vys_cpu = vys;
-//     std::vector<float> dvx_cpu = dvx;
-//     std::vector<float> dvy_cpu = dvy;
+    std::vector<float> vxs(N);
+    std::vector<float> vys(N);
+    std::vector<float> dvx(N);
+    std::vector<float> dvy(N);
 
-//     {
-//         ocl::Kernel kernel_calculate_forces(lbvh_kernel, lbvh_kernel_length, "calculateForces");
-//         ocl::Kernel kernel_integrate(lbvh_kernel, lbvh_kernel_length, "integrate");
+    gpu::gpu_mem_32f vxs_gpu, vys_gpu;
+    gpu::gpu_mem_32f dvx_gpu, dvy_gpu;
 
-//         kernel_calculate_forces.compile();
-//         kernel_integrate.compile();
+    vxs_gpu.resizeN(N);
+    vys_gpu.resizeN(N);
+    dvx_gpu.resizeN(N);
+    dvy_gpu.resizeN(N);
 
-//         int t = 0;
-//         int coord_shift = 0;
+    vxs_gpu.writeN(vxs.data(), N);
+    vys_gpu.writeN(vys.data(), N);
+    dvx_gpu.writeN(dvx.data(), N);
+    dvy_gpu.writeN(dvy.data(), N);
 
-//         kernel_calculate_forces.exec(gpu::WorkSize(workGroupSize, global_work_size_points),
-//                                      pxs_gpu, pys_gpu, vxs_gpu, vys_gpu,
-//                                      mxs_gpu, nodes_gpu,
-//                                      dvx_gpu, dvy_gpu,
-//                                      N, t);
+    std::vector<float> pxs_cpu = pxs;
+    std::vector<float> pys_cpu = pys;
+    std::vector<float> vxs_cpu = vxs;
+    std::vector<float> vys_cpu = vys;
+    std::vector<float> dvx_cpu = dvx;
+    std::vector<float> dvy_cpu = dvy;
 
-//         kernel_integrate.exec(gpu::WorkSize(workGroupSize, global_work_size_points),
-//                               pxs_gpu, pys_gpu, vxs_gpu, vys_gpu,
-//                               mxs_gpu,
-//                               dvx_gpu, dvy_gpu,
-//                               N, t, coord_shift);
+    {
+        ocl::Kernel kernel_calculate_forces(lbvh_kernel, lbvh_kernel_length, "calculateForces");
+        ocl::Kernel kernel_integrate(lbvh_kernel, lbvh_kernel_length, "integrate");
 
-//         pxs_gpu.readN(pxs.data(), N);
-//         pys_gpu.readN(pys.data(), N);
-//         vxs_gpu.readN(vxs.data(), N);
-//         vys_gpu.readN(vys.data(), N);
-//         dvx_gpu.readN(dvx.data(), N);
-//         dvy_gpu.readN(dvy.data(), N);
-//     }
+        kernel_calculate_forces.compile();
+        kernel_integrate.compile();
 
-//     {
-//         for (int i = 0; i < N; ++i) {
-//             float x0 = pxs_cpu[i];
-//             float y0 = pys_cpu[i];
-//             float m0 = mxs[i];
-//             calculateForce(x0, y0, m0, nodes_cpu, &dvx_cpu[i], &dvy_cpu[i]);
-//         }
+        int t = 0;
+        int coord_shift = 0;
 
-//         int n_super_good_pxs = 0;
-//         int n_super_good_pys = 0;
-//         int n_super_good_vxs = 0;
-//         int n_super_good_vys = 0;
-//         int n_super_good_dvx = 0;
-//         int n_super_good_dvy = 0;
-//         for (int i = 0; i < N; ++i) {
-//             integrate(i, pxs_cpu, pys_cpu, vxs_cpu, vys_cpu, dvx_cpu.data(), dvy_cpu.data(), 0);
+        kernel_calculate_forces.exec(gpu::WorkSize(workGroupSize, global_work_size_points),
+                                     pxs_gpu, pys_gpu, vxs_gpu, vys_gpu,
+                                     mxs_gpu, nodes_gpu,
+                                     dvx_gpu, dvy_gpu,
+                                     N, t);
 
-//             double rel_eps_super_good = 1e-3;
-//             if (std::abs(pxs[i] - pxs_cpu[i]) < rel_eps_super_good * std::abs(pxs_cpu[i])) n_super_good_pxs++;
-//             if (std::abs(pys[i] - pys_cpu[i]) < rel_eps_super_good * std::abs(pys_cpu[i])) n_super_good_pys++;
-//             if (std::abs(vxs[i] - vxs_cpu[i]) < rel_eps_super_good * std::abs(vxs_cpu[i])) n_super_good_vxs++;
-//             if (std::abs(vys[i] - vys_cpu[i]) < rel_eps_super_good * std::abs(vys_cpu[i])) n_super_good_vys++;
-//             if (std::abs(dvx[i] - dvx_cpu[i]) < rel_eps_super_good * std::abs(dvx_cpu[i])) n_super_good_dvx++;
-//             if (std::abs(dvy[i] - dvy_cpu[i]) < rel_eps_super_good * std::abs(dvy_cpu[i])) n_super_good_dvy++;
+        kernel_integrate.exec(gpu::WorkSize(workGroupSize, global_work_size_points),
+                              pxs_gpu, pys_gpu, vxs_gpu, vys_gpu,
+                              mxs_gpu,
+                              dvx_gpu, dvy_gpu,
+                              N, t, coord_shift);
 
-//             double rel_eps = 0.5;
-//             EXPECT_NEAR(pxs[i], pxs_cpu[i], rel_eps * std::abs(pxs_cpu[i]));
-//             EXPECT_NEAR(pys[i], pys_cpu[i], rel_eps * std::abs(pys_cpu[i]));
-//             EXPECT_NEAR(vxs[i], vxs_cpu[i], rel_eps * std::abs(vxs_cpu[i]));
-//             EXPECT_NEAR(vys[i], vys_cpu[i], rel_eps * std::abs(vys_cpu[i]));
-//             EXPECT_NEAR(dvx[i], dvx_cpu[i], rel_eps * std::abs(dvx_cpu[i]));
-//             EXPECT_NEAR(dvy[i], dvy_cpu[i], rel_eps * std::abs(dvy_cpu[i]));
-//         }
+        pxs_gpu.readN(pxs.data(), N);
+        pys_gpu.readN(pys.data(), N);
+        vxs_gpu.readN(vxs.data(), N);
+        vys_gpu.readN(vys.data(), N);
+        dvx_gpu.readN(dvx.data(), N);
+        dvy_gpu.readN(dvy.data(), N);
+    }
 
-//         EXPECT_GE(n_super_good_pxs, 0.99 * N);
-//         EXPECT_GE(n_super_good_pys, 0.99 * N);
-//         EXPECT_GE(n_super_good_vxs, 0.99 * N);
-//         EXPECT_GE(n_super_good_vys, 0.99 * N);
-//         EXPECT_GE(n_super_good_dvx, 0.99 * N);
-//         EXPECT_GE(n_super_good_dvy, 0.99 * N);
-//     }
-// }
+    {
+        for (int i = 0; i < N; ++i) {
+            float x0 = pxs_cpu[i];
+            float y0 = pys_cpu[i];
+            float m0 = mxs[i];
+            calculateForce(x0, y0, m0, nodes_cpu, &dvx_cpu[i], &dvy_cpu[i]);
+        }
+
+        int n_super_good_pxs = 0;
+        int n_super_good_pys = 0;
+        int n_super_good_vxs = 0;
+        int n_super_good_vys = 0;
+        int n_super_good_dvx = 0;
+        int n_super_good_dvy = 0;
+        for (int i = 0; i < N; ++i) {
+            integrate(i, pxs_cpu, pys_cpu, vxs_cpu, vys_cpu, dvx_cpu.data(), dvy_cpu.data(), 0);
+
+            double rel_eps_super_good = 1e-3;
+            if (std::abs(pxs[i] - pxs_cpu[i]) < rel_eps_super_good * std::abs(pxs_cpu[i])) n_super_good_pxs++;
+            if (std::abs(pys[i] - pys_cpu[i]) < rel_eps_super_good * std::abs(pys_cpu[i])) n_super_good_pys++;
+            if (std::abs(vxs[i] - vxs_cpu[i]) < rel_eps_super_good * std::abs(vxs_cpu[i])) n_super_good_vxs++;
+            if (std::abs(vys[i] - vys_cpu[i]) < rel_eps_super_good * std::abs(vys_cpu[i])) n_super_good_vys++;
+            if (std::abs(dvx[i] - dvx_cpu[i]) < rel_eps_super_good * std::abs(dvx_cpu[i])) n_super_good_dvx++;
+            if (std::abs(dvy[i] - dvy_cpu[i]) < rel_eps_super_good * std::abs(dvy_cpu[i])) n_super_good_dvy++;
+
+            double rel_eps = 0.5;
+            EXPECT_NEAR(pxs[i], pxs_cpu[i], rel_eps * std::abs(pxs_cpu[i]));
+            EXPECT_NEAR(pys[i], pys_cpu[i], rel_eps * std::abs(pys_cpu[i]));
+            EXPECT_NEAR(vxs[i], vxs_cpu[i], rel_eps * std::abs(vxs_cpu[i]));
+            EXPECT_NEAR(vys[i], vys_cpu[i], rel_eps * std::abs(vys_cpu[i]));
+            EXPECT_NEAR(dvx[i], dvx_cpu[i], rel_eps * std::abs(dvx_cpu[i]));
+            EXPECT_NEAR(dvy[i], dvy_cpu[i], rel_eps * std::abs(dvy_cpu[i]));
+        }
+
+        EXPECT_GE(n_super_good_pxs, 0.99 * N);
+        EXPECT_GE(n_super_good_pys, 0.99 * N);
+        EXPECT_GE(n_super_good_vxs, 0.99 * N);
+        EXPECT_GE(n_super_good_vys, 0.99 * N);
+        EXPECT_GE(n_super_good_dvx, 0.99 * N);
+        EXPECT_GE(n_super_good_dvy, 0.99 * N);
+    }
+}
 
 TEST (LBVH, Nbody)
 {
@@ -1962,21 +1962,21 @@ TEST (LBVH, Nbody)
     nbody(false, evaluate_precision, 1); // gpu naive
 #endif
     nbody(false, evaluate_precision, 2); // cpu lbvh
-    // nbody(false, evaluate_precision, 3); // gpu lbvh
+    nbody(false, evaluate_precision, 3); // gpu lbvh
 }
 
-// TEST (LBVH, Nbody_meditation)
-// {
-//     if (!ENABLE_TESTING)
-//         return;
+TEST (LBVH, Nbody_meditation)
+{
+    if (!ENABLE_TESTING)
+        return;
 
-//     if (!ENABLE_GUI)
-//         return;
+    if (!ENABLE_GUI)
+        return;
 
-//     gpu::Device device = gpu::chooseGPUDevice(OPENCL_DEVICE_INDEX);
-//     gpu::Context context;
-//     context.init(device.device_id_opencl);
-//     context.activate();
+    gpu::Device device = gpu::chooseGPUDevice(OPENCL_DEVICE_INDEX);
+    gpu::Context context;
+    context.init(device.device_id_opencl);
+    context.activate();
 
-//     nbody(true, false, 3); // gpu lbvh
-// }
+    nbody(true, false, 3); // gpu lbvh
+}
