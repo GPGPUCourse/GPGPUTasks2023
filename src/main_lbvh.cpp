@@ -1185,22 +1185,16 @@ void initLBVHNode(std::vector<Node> &nodes, int i_node, const std::vector<morton
 
     bool found = false;
     for (int i_bit = bit_index; i_bit >= 0; --i_bit) {
-        /*
-        int split = TODO
+        int split = findSplit(codes, i_begin, i_end, i_bit);
         if (split < 0) continue;
 
         if (split < 1) {
             throw std::runtime_error("043204230042342");
         }
-         */
-        throw std::runtime_error("not implemented");
-
-
         // TODO проинициализировать nodes[i_node].child_left, nodes[i_node].child_right на основе i_begin, i_end, split
         //   не забудьте на N-1 сдвинуть индексы, указывающие на листья
-
-        throw std::runtime_error("not implemented");
-
+        nodes[i_node].child_left = split - 1 + (split - 1 == i_begin) ? N -1 : 0;
+        nodes[i_node].child_right = split + (split == i_end) ? N -1 : 0;
 
         found = true;
         break;
@@ -1311,10 +1305,19 @@ void buildBBoxes(std::vector<Node> &nodes, std::vector<int> &flags, int N, bool 
 #pragma omp parallel for if(use_omp) reduction(+:n_updated)
         for (int i_node = 0; i_node < N-1; ++i_node) {
             // TODO если находимся на нужном уровне (нужный flag), проинициализируем ббокс и центр масс ноды
-//            if (TODO) {
-//                  TODO
-//                ++n_updated;
-//            }
+           if (flags[i_node] == level) {
+                //  TODO
+                BBox bbox;
+                Node& node_left = nodes[nodes[i_node].child_left];
+                Node& node_right = nodes[nodes[i_node].child_right];
+                bbox.grow(node_left.bbox);
+                bbox.grow(node_right.bbox);
+                nodes[i_node].bbox = bbox;
+                nodes[i_node].cmsx = (node_left.cmsx + node_right.cmsx) / 2.;
+                nodes[i_node].cmsy = (node_left.cmsy + node_right.cmsy) / 2.;
+                nodes[i_node].mass = node_left.mass + node_right.mass;
+                ++n_updated;
+           }
 
         }
 
