@@ -382,7 +382,7 @@ void calculateForce(float x0, float y0, float m0, const std::vector<Node> &nodes
     stack[stack_size++] = 0;
     while (stack_size) {
         // TODO берем ноду со стека
-        Node node = nodes[stack[--stack_size]];
+        const Node& node = nodes[stack[--stack_size]];
 
         if (node.isLeaf()) {
             continue;
@@ -425,8 +425,8 @@ void calculateForce(float x0, float y0, float m0, const std::vector<Node> &nodes
                 float ex = dx * dr_inv;
                 float ey = dy * dr_inv;
 
-                *force_x += ex * dr2_inv * GRAVITATIONAL_FORCE;
-                *force_y += ey * dr2_inv * GRAVITATIONAL_FORCE;
+                *force_x += m1 * ex * dr2_inv * GRAVITATIONAL_FORCE;
+                *force_y += m1 * ey * dr2_inv * GRAVITATIONAL_FORCE;
             } else {
                 // TODO кладем ребенка на стек
                 stack[stack_size++] = i_child;
@@ -1192,8 +1192,8 @@ void initLBVHNode(std::vector<Node> &nodes, int i_node, const std::vector<morton
         }
         // TODO проинициализировать nodes[i_node].child_left, nodes[i_node].child_right на основе i_begin, i_end, split
         //   не забудьте на N-1 сдвинуть индексы, указывающие на листья
-        nodes[i_node].child_left = split - 1 + (split - 1 == i_begin) ? N -1 : 0;
-        nodes[i_node].child_right = split + (split == i_end) ? N -1 : 0;
+        nodes[i_node].child_left = split - 1 + ((i_end - i_begin == 1) ? N -1 : 0);
+        nodes[i_node].child_right = split + ((i_end - i_begin == 1) ? N -1 : 0);
 
         found = true;
         break;
@@ -1306,18 +1306,17 @@ void buildBBoxes(std::vector<Node> &nodes, std::vector<int> &flags, int N, bool 
             // TODO если находимся на нужном уровне (нужный flag), проинициализируем ббокс и центр масс ноды
            if (flags[i_node] == level) {
                 //  TODO
-                BBox bbox;
-                Node& node_left = nodes[nodes[i_node].child_left];
-                Node& node_right = nodes[nodes[i_node].child_right];
-                bbox.grow(node_left.bbox);
-                bbox.grow(node_right.bbox);
-                nodes[i_node].bbox = bbox;
-                nodes[i_node].cmsx = (node_left.cmsx + node_right.cmsx) / 2.;
-                nodes[i_node].cmsy = (node_left.cmsy + node_right.cmsy) / 2.;
-                nodes[i_node].mass = node_left.mass + node_right.mass;
+                Node& node_root = nodes[i_node];
+                Node& node_left = nodes[node_root.child_left];
+                Node& node_right = nodes[node_root.child_right];
+                node_root.bbox.clear();
+                node_root.bbox.grow(node_left.bbox);
+                node_root.bbox.grow(node_right.bbox);
+                node_root.mass = node_left.mass + node_right.mass;
+                node_root.cmsx = (node_left.cmsx * node_left.mass + node_right.cmsx * node_right.mass) / node_root.mass;
+                node_root.cmsy = (node_left.cmsy * node_left.mass + node_right.cmsy * node_right.mass) / node_root.mass;
                 ++n_updated;
            }
-
         }
 
 //        std::cout << "n updated: " << n_updated << std::endl;
