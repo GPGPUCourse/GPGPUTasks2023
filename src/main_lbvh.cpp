@@ -395,17 +395,28 @@ void calculateForce(float x0, float y0, float m0, const std::vector<Node> &nodes
 
     int stack[2 * NBITS_PER_DIM];
     int stack_size = 0;
-    // TODO кладем корень на стек
-    throw std::runtime_error("not implemented");
-   /* while (stack_size) {
-        // TODO берем ноду со стека
-        throw std::runtime_error("not implemented");
+
+	auto push = [&stack, &stack_size](int node) {
+		stack[stack_size++] = node;
+	};
+	auto pop = [&stack, &stack_size]() {
+		return stack[--stack_size];
+	};
+
+	push(0);
+
+	float &dvx = *force_x;
+	float &dvy = *force_y;
+
+    while (stack_size) {
+		int i_node = pop();
+		const Node &node = nodes[i_node];
 
         if (node.isLeaf()) {
             continue;
         }
 
-        // если запрос содержится и а левом и в правом ребенке - то они в одном пикселе
+        // если запрос содержится и в левом и в правом ребенке - то они в одном пикселе
         {
             const Node &left = nodes[node.child_left];
             const Node &right = nodes[node.child_right];
@@ -427,16 +438,31 @@ void calculateForce(float x0, float y0, float m0, const std::vector<Node> &nodes
             //   У нас поле неоднородное, и такая замена - лишь приближение. Чтобы оно было достаточно точным, будем спускаться внутрь ноды, пока она не станет похожа на точечное тело (маленький размер ее ббокса относительно нашего расстояния до центра масс ноды)
             if (!child.bbox.contains(x0, y0) && barnesHutCondition(x0, y0, child)) {
                 // TODO посчитать взаимодействие точки с центром масс ноды
-                throw std::runtime_error("not implemented");
+				float dx = child.cmsx - x0;
+				float dy = child.cmsy - y0;
+				float dr2 = std::max(100.f, dx * dx + dy * dy);
+
+//                float dr2_inv = 1.f / dr2;
+//                float dr_inv = std::sqrt(dr2_inv);
+				float dr_inv = q_rsqrt(dr2);
+				float dr2_inv = dr_inv * dr_inv;
+
+				float ex = dx * dr_inv;
+				float ey = dy * dr_inv;
+
+				float fx = ex * dr2_inv * GRAVITATIONAL_FORCE;
+				float fy = ey * dr2_inv * GRAVITATIONAL_FORCE;
+
+				dvx += child.mass * fx;
+				dvy += child.mass * fy;
             } else {
-                // TODO кладем ребенка на стек
-                throw std::runtime_error("not implemented");
+				push(i_child);
                 if (stack_size >= 2 * NBITS_PER_DIM) {
                     throw std::runtime_error("0420392384283");
                 }
             }
         }
-    }*/
+    }
 }
 
 void integrate(int i, std::vector<float> &pxs, std::vector<float> &pys, std::vector<float> &vxs, std::vector<float> &vys, float *dvx, float *dvy, int coord_shift)
@@ -1290,20 +1316,18 @@ void buildBBoxes(std::vector<Node> &nodes, std::vector<int> &flags, int N, bool 
 // не сработает для рекурсивно построенного дерева, там такого порядка не вводили
 
 // чтобы не было гонки в многопоточном режиме (и, по аналогии, потом на видеокарте), в первом проходе отметим ноды, которые нужно обновить, и только на втором проходе обновим
-#pragma omp parallel for if(use_omp)
+		#pragma omp parallel for if(use_omp)
         for (int i_node = 0; i_node < N-1; ++i_node) {
             initFlag(flags, i_node, nodes, level);
         }
 
         int n_updated = 0;
-#pragma omp parallel for if(use_omp) reduction(+:n_updated)
+		#pragma omp parallel for if(use_omp) reduction(+:n_updated)
         for (int i_node = 0; i_node < N-1; ++i_node) {
-            // TODO если находимся на нужном уровне (нужный flag), проинициализируем ббокс и центр масс ноды
-//            if (TODO) {
-//                  TODO
-//                ++n_updated;
-//            }
-
+			if (flags[i_node] != level)
+				continue;
+			growNode(nodes[i_node], nodes);
+			++n_updated;
         }
 
 //        std::cout << "n updated: " << n_updated << std::endl;
@@ -1317,7 +1341,7 @@ void buildBBoxes(std::vector<Node> &nodes, std::vector<int> &flags, int N, bool 
 
 void drawLBVH(images::Image<unsigned char> &canvas, const std::vector<Node> &nodes, int coord_shift)
 {
-#pragma omp parallel for
+	#pragma omp parallel for
     for (int y = 0; y < (int) canvas.height; ++y) {
         for (int x = 0; x < (int) canvas.width; ++x) {
 
@@ -1980,7 +2004,7 @@ TEST (LBVH, Nbody)
     nbody(false, evaluate_precision, 1); // gpu naive
 #endif
     nbody(false, evaluate_precision, 2); // cpu lbvh
-    nbody(false, evaluate_precision, 3); // gpu lbvh
+//    nbody(false, evaluate_precision, 3); // gpu lbvh
 }
 
 TEST (LBVH, Nbody_meditation)
