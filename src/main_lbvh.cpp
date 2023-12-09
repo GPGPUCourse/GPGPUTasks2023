@@ -1002,7 +1002,17 @@ int findSplit(const std::vector<morton_t> &codes, int i_begin, int i_end, int bi
     //    }
 
     // TODO бинпоиск для нахождения разбиения области ответственности ноды
-    throw std::runtime_error("not implemented");
+    int l = i_begin, r = i_end - 1;
+    while (l + 1 < r) {
+        int m = (l + r) / 2;
+        int a = getBit(codes[l], bit_index);
+        int b = getBit(codes[m], bit_index);
+        if (a == b) {
+            l = m;
+        } else {
+            r = m;
+        }
+    }
 
     // избыточно, так как на входе в функцию проверили, что ответ существует, но приятно иметь sanity-check на случай если набагали
     throw std::runtime_error("4932492039458209485");
