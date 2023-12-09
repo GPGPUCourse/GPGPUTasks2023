@@ -56,8 +56,10 @@ __kernel void nbody_calculate_force_global(
 		float dy = y1 - y0;
 		float dr2 = max(100.f, dx * dx + dy * dy);
 
-		float dr_inv = q_rsqrt(dr2);
-		float dr2_inv = dr_inv * dr_inv;
+		float dr2_inv = 1.f / dr2;
+		float dr_inv = sqrt(dr2_inv);
+//		float dr_inv = q_rsqrt(dr2);
+//		float dr2_inv = dr_inv * dr_inv;
 
 		float ex = dx * dr_inv;
 		float ey = dy * dr_inv;

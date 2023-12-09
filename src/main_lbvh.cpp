@@ -441,10 +441,10 @@ void calculateForce(float x0, float y0, float m0, const std::vector<Node> &nodes
 				float dy = child.cmsy - y0;
 				float dr2 = std::max(100.f, dx * dx + dy * dy);
 
-//                float dr2_inv = 1.f / dr2;
-//                float dr_inv = std::sqrt(dr2_inv);
-				float dr_inv = q_rsqrt(dr2);
-				float dr2_inv = dr_inv * dr_inv;
+                float dr2_inv = 1.f / dr2;
+                float dr_inv = std::sqrt(dr2_inv);
+//				float dr_inv = q_rsqrt(dr2);
+//				float dr2_inv = dr_inv * dr_inv;
 
 				float ex = dx * dr_inv;
 				float ey = dy * dr_inv;
@@ -604,10 +604,10 @@ void nbody_cpu(DeltaState &delta_state, State &initial_state, int N, int NT, con
                 float dy = y1 - y0;
                 float dr2 = std::max(100.f, dx * dx + dy * dy);
 
-//                float dr2_inv = 1.f / dr2;
-//                float dr_inv = std::sqrt(dr2_inv);
-				float dr_inv = q_rsqrt(dr2);
-				float dr2_inv = dr_inv * dr_inv;
+                float dr2_inv = 1.f / dr2;
+                float dr_inv = std::sqrt(dr2_inv);
+//				float dr_inv = q_rsqrt(dr2);
+//				float dr2_inv = dr_inv * dr_inv;
 
                 float ex = dx * dr_inv;
                 float ey = dy * dr_inv;
