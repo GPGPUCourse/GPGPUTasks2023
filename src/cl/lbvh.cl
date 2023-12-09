@@ -211,12 +211,7 @@ int findSplit(__global const morton_t *codes, int i_begin, int i_end, int bit_in
             r = m;
         }
     }
-    if (getBit(codes[l], bit_index) < getBit(codes[r], bit_index)) {
-        return r;
-    }
-
-    // избыточно, так как на входе в функцию проверили, что ответ существует, но приятно иметь sanity-check на случай если набагали
-    printf("451932492039458209485");
+    return r;
 }
 
 void findRegion(int *i_begin, int *i_end, int *bit_index, __global const morton_t *codes, int N, int i_node)

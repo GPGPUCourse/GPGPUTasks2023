@@ -17,7 +17,7 @@
 
 
 // может понадобиться поменять индекс локально чтобы выбрать GPU если у вас более одного девайса
-#define OPENCL_DEVICE_INDEX 1
+#define OPENCL_DEVICE_INDEX 0
 
 // TODO включить чтобы начали запускаться тесты
 #define ENABLE_TESTING 1
@@ -26,7 +26,7 @@
 #define EVALUATE_PRECISION 1
 
 // удобно включить при локальном тестировании
-#define ENABLE_GUI 1
+#define ENABLE_GUI 0
 
 // сброс картинок симуляции на диск
 #define SAVE_IMAGES 0
@@ -1003,12 +1003,7 @@ int findSplit(const std::vector<morton_t> &codes, int i_begin, int i_end, int bi
             r = m;
         }
     }
-    if (getBit(codes[l], bit_index) < getBit(codes[r], bit_index)) {
-        return r;
-    }
-
-    // избыточно, так как на входе в функцию проверили, что ответ существует, но приятно иметь sanity-check на случай если набагали
-    throw std::runtime_error("4932492039458209485");
+    return r;
 }
 
 void buildLBVHRecursive(std::vector<Node> &nodes, const std::vector<morton_t> &codes, const std::vector<Point> &points, int i_begin, int i_end, int bit_index)
