@@ -437,7 +437,6 @@ void calculateForce(float x0, float y0, float m0, const std::vector<Node> &nodes
             //   Но, с точки зрения физики, замена гравитационного влияния всех точек в регионе на взаимодействие с суммарной массой в центре масс - это точное решение только в однородном поле (например, на поверхности земли)
             //   У нас поле неоднородное, и такая замена - лишь приближение. Чтобы оно было достаточно точным, будем спускаться внутрь ноды, пока она не станет похожа на точечное тело (маленький размер ее ббокса относительно нашего расстояния до центра масс ноды)
             if (!child.bbox.contains(x0, y0) && barnesHutCondition(x0, y0, child)) {
-                // TODO посчитать взаимодействие точки с центром масс ноды
 				float dx = child.cmsx - x0;
 				float dy = child.cmsy - y0;
 				float dr2 = std::max(100.f, dx * dx + dy * dy);
@@ -1021,29 +1020,23 @@ int findSplit(const std::vector<morton_t> &codes, int i_begin, int i_end, int bi
     }
 
     // наивная версия, линейный поиск, можно использовать для отладки бинпоиска
-
-	int answer = -1;
-	for (int i = i_begin + 1; i < i_end; ++i) {
-		int a = getBit(codes[i-1], bit_index);
-		int b = getBit(codes[i], bit_index);
-		if (a < b) {
+//	for (int i = i_begin + 1; i < i_end; ++i) {
+//		int a = getBit(codes[i-1], bit_index);
+//		int b = getBit(codes[i], bit_index);
+//		if (a < b) {
 //			return i;
-			answer = i;
-			break;
+//		}
+//	}
+
+	while (i_begin + 1 < i_end) {
+		int m = (i_begin + i_end) / 2;
+		if (getBit(codes[m], bit_index)) {
+			i_end = m;
+		} else {
+			i_begin = m;
 		}
 	}
-
-	if (answer == -1) {
-		throw std::runtime_error("4932492039458209485");
-	}
-
-	return answer;
-
-    // TODO бинпоиск для нахождения разбиения области ответственности ноды
-    throw std::runtime_error("not implemented");
-
-    // избыточно, так как на входе в функцию проверили, что ответ существует, но приятно иметь sanity-check на случай если набагали
-    throw std::runtime_error("4932492039458209485");
+	return i_end;
 }
 
 void buildLBVHRecursive(std::vector<Node> &nodes, const std::vector<morton_t> &codes, const std::vector<Point> &points, int i_begin, int i_end, int bit_index)
@@ -1183,7 +1176,6 @@ void initLBVHNode(std::vector<Node> &nodes, int i_node, const std::vector<morton
     }
 
     // инициализируем внутреннюю ноду
-
     int i_begin = 0, i_end = N, bit_index = NBITS-1;
     // если рассматриваем не корень, то нужно найти зону ответственности ноды и самый старший бит, с которого надо начинать поиск разреза
     if (i_node) {
@@ -1208,9 +1200,6 @@ void initLBVHNode(std::vector<Node> &nodes, int i_node, const std::vector<morton
 			throw std::runtime_error("043204230042343");
 		}
 
-
-        // TODO проинициализировать nodes[i_node].child_left, nodes[i_node].child_right на основе i_begin, i_end, split
-        //   не забудьте на N-1 сдвинуть индексы, указывающие на листья
 		cur_node.child_left = split - 1 + (split - i_begin < 2 ? N - 1 : 0);
 		cur_node.child_right = split + (i_end - split < 2 ? N - 1 : 0);
 
@@ -2004,7 +1993,7 @@ TEST (LBVH, Nbody)
     nbody(false, evaluate_precision, 1); // gpu naive
 #endif
     nbody(false, evaluate_precision, 2); // cpu lbvh
-//    nbody(false, evaluate_precision, 3); // gpu lbvh
+    nbody(false, evaluate_precision, 3); // gpu lbvh
 }
 
 TEST (LBVH, Nbody_meditation)
