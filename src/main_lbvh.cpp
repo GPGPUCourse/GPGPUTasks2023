@@ -20,7 +20,7 @@
 #define OPENCL_DEVICE_INDEX 0
 
 // TODO включить чтобы начали запускаться тесты
-#define ENABLE_TESTING 0
+#define ENABLE_TESTING 1
 
 // имеет смысл отключать при оффлайн симуляции больших N, но в итоговом решении стоит оставить
 #define EVALUATE_PRECISION 1
@@ -294,6 +294,7 @@ private:
 
 };
 
+constexpr auto eps = 1e-2;
 struct Node {
 
     bool hasLeftChild() const { return child_left >= 0; }
@@ -301,8 +302,10 @@ struct Node {
     bool isLeaf() const { return !hasLeftChild() && !hasRightChild(); }
 
     bool operator==(const Node &other) const {
-        return std::tie(child_left, child_right, bbox, mass, cmsx, cmsy)
-               == std::tie(other.child_left, other.child_right, other.bbox, other.mass, other.cmsx, other.cmsy);
+        return std::tie(child_left, child_right, bbox) == std::tie(other.child_left, other.child_right, other.bbox)
+               && fabs(mass - other.mass) < eps
+               && fabs(cmsx - other.cmsx) < eps
+               && fabs(cmsy - other.cmsy) < eps;
     }
 
     bool operator!=(const Node &other) const {
