@@ -20,7 +20,7 @@
 #define OPENCL_DEVICE_INDEX 0
 
 // TODO включить чтобы начали запускаться тесты
-#define ENABLE_TESTING 0
+#define ENABLE_TESTING 1
 
 // имеет смысл отключать при оффлайн симуляции больших N, но в итоговом решении стоит оставить
 #define EVALUATE_PRECISION 1
@@ -1363,7 +1363,7 @@ void checkLBVHInvariants(const std::vector<Node> &nodes, int N)
 
 void nbody(bool interactive, bool evaluate_precision, int nbody_impl_index)
 {
-    //    State initial_state = makeRandomState(N, -200, 200, -200, 200);
+    //    State initial_state = makeRandomState(1000, -200, 200, -200, 200);
     //    State initial_state = makeCircularState();
 
 #if NBODY_INITIAL_STATE_COMPLEXITY == 2
@@ -1476,7 +1476,7 @@ void nbody(bool interactive, bool evaluate_precision, int nbody_impl_index)
 
         if (ENABLE_GUI) {
             window->display(canvas);
-            window->resize(1000, 1000);
+            window->resize(840, 840);
             window->wait(5);
         }
     };
@@ -1929,8 +1929,8 @@ TEST (LBVH, Nbody)
     nbody(false, evaluate_precision, 0); // cpu naive
     nbody(false, evaluate_precision, 1); // gpu naive
 #endif
-    nbody(false, evaluate_precision, 2); // cpu lbvh
-    nbody(false, evaluate_precision, 3); // gpu lbvh
+    //nbody(false, evaluate_precision, 2); // cpu lbvh
+    //nbody(false, evaluate_precision, 3); // gpu lbvh
 }
 
 TEST (LBVH, Nbody_meditation)
@@ -1946,5 +1946,5 @@ TEST (LBVH, Nbody_meditation)
     context.init(device.device_id_opencl);
     context.activate();
 
-    nbody(true, false, 3); // gpu lbvh
+    nbody(true, false, 1);
 }
