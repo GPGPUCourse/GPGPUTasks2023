@@ -1087,46 +1087,31 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, const std::vector<mort
     morton_t pref0 = getBits(codes[i_node], i_bit, K);
 
     // граница зоны ответственности - момент, когда префикс перестает совпадать
-    // int i_node_end = (dir > 0) ? N - 2 : i_node;
-    int i_node_end = -1;
-    // наивная версия, линейный поиск, можно использовать для отладки бинпоиска
-       for (int i = i_node; i >= 0 && i < int(codes.size()); i += dir) {
-           if (getBits(codes[i], i_bit, K) == pref0) {
-               i_node_end = i;
-           } else {
-               break;
-           }
-       }
-    // if (i_node_end == -1) {
-    //     throw std::runtime_error("47248457284332098");
-    // }
-
     // TODO бинпоиск зоны ответственности
 
-    // int i_node_end = (dir > 0) ? N - 2 : i_node;
-    // int l, r;
-    // if (dir > 0) {
-    //     l = i_node;
-    //     r = N - 1;
-    // } else {
-    //     l = 0;
-    //     r = i_node;
-    // }
-    // while (l + 1 < r) {
-    //     int m = (l + r) / 2;
-    //     if (getBits(codes[m], i_bit, K) == pref0) {
-    //         ((dir > 0) ? l : r) = m;
-    //     } else {
-    //         ((dir > 0) ? r : l) = m;
-    //     }
-    // }
+    int l, r;
+    if (dir > 0) {
+        l = i_node;
+        r = N;
+    } else {
+        l = -1;
+        r = i_node;
+    }
+    while (l + 1 < r) {
+        int m = (l + r) / 2;
+        if (getBits(codes[m], i_bit, K) == pref0) {
+            ((dir > 0) ? l : r) = m;
+        } else {
+            ((dir > 0) ? r : l) = m;
+        }
+    }
     *bit_index = i_bit - 1;
 
     if (dir > 0) {
         *i_begin = i_node;
-        *i_end = i_node_end + 1;
+        *i_end = r;
     } else {
-        *i_begin = i_node_end;
+        *i_begin = l + 1;
         *i_end = i_node + 1;
     }
 }
