@@ -1005,13 +1005,16 @@ int findSplit(const std::vector<morton_t> &codes, int i_begin, int i_end, int bi
     int l = i_begin, r = i_end - 1;
     while (l + 1 < r) {
         int m = (l + r) / 2;
-        int a = getBit(codes[l], bit_index);
-        int b = getBit(codes[m], bit_index);
-        if (a == b) {
+        int lb = getBit(codes[l], bit_index);
+        int mb = getBit(codes[m], bit_index);
+        if (lb == mb) {
             l = m;
         } else {
             r = m;
         }
+    }
+    if (getBit(codes[l], bit_index) < getBit(codes[r], bit_index)) {
+        return r;
     }
 
     // избыточно, так как на входе в функцию проверили, что ответ существует, но приятно иметь sanity-check на случай если набагали
@@ -1064,9 +1067,23 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, const std::vector<mort
     // dir: 1 если мы левая граница и -1 если правая
     int dir = 0;
     int i_bit = NBITS-1;
+    morton_t lmorton = codes[i_node - 1];
+    morton_t mmorton = codes[i_node];
+    morton_t rmorton = codes[i_node + 1];
+    const morton_t right = 1, left = 3;
     for (; i_bit >= 0; --i_bit) {
         // TODO найти dir и значащий бит
-        throw std::runtime_error("not implemented");
+        int64_t m = getBit(lmorton, i_bit) |
+                      getBit(mmorton, i_bit) |
+                      getBit(rmorton, i_bit);
+        if (m == left) {
+            dir = 1;
+            break;
+        }
+        if (m == right) {
+            dir = -1;
+            break;
+        }
     }
 
     if (dir == 0) {
@@ -1080,7 +1097,7 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, const std::vector<mort
     morton_t pref0 = getBits(codes[i_node], i_bit, K);
 
     // граница зоны ответственности - момент, когда префикс перестает совпадать
-    int i_node_end = -1;
+    int i_node_end = (dir > 0) ? N - 2 : i_node;
     // наивная версия, линейный поиск, можно использовать для отладки бинпоиска
     //    for (int i = i_node; i >= 0 && i < int(codes.size()); i += dir) {
     //        if (getBits(codes[i], i_bit, K) == pref0) {
@@ -1089,12 +1106,29 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, const std::vector<mort
     //            break;
     //        }
     //    }
-    //    if (i_node_end == -1) {
-    //        throw std::runtime_error("47248457284332098");
-    //    }
+    if (i_node_end == -1) {
+        throw std::runtime_error("47248457284332098");
+    }
 
     // TODO бинпоиск зоны ответственности
-    throw std::runtime_error("not implemented");
+
+    int l, r;
+    if (dir > 0) {
+        l = i_node;
+        r = N - 1;
+    } else {
+        l = 0;
+        r = i_node;
+    }
+    while (l + 1 < r) {
+        int m = (l + r) / 2;
+        if (getBits(codes[m], i_bit, K) == pref0) {
+            ((dir > 0) ? l : r) = m;
+        } else {
+            ((dir > 0) ? r : l) = m;
+        }
+    }
+    i_node_end = r;
 
     *bit_index = i_bit - 1;
 
@@ -1146,7 +1180,7 @@ void initLBVHNode(std::vector<Node> &nodes, int i_node, const std::vector<morton
     // если рассматриваем не корень, то нужно найти зону ответственности ноды и самый старший бит, с которого надо начинать поиск разреза
     if (i_node) {
         // TODO
-        throw std::runtime_error("not implemented");
+        findRegion(&i_begin, &i_end, &bit_index, codes, i_node);
     }
 
     bool found = false;
