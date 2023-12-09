@@ -20,7 +20,7 @@
 #define OPENCL_DEVICE_INDEX 0
 
 // TODO включить чтобы начали запускаться тесты
-#define ENABLE_TESTING 0
+#define ENABLE_TESTING 1
 
 // имеет смысл отключать при оффлайн симуляции больших N, но в итоговом решении стоит оставить
 #define EVALUATE_PRECISION 1
@@ -195,11 +195,10 @@ morton_t zOrder(const Point &coord, int i){
     int x = coord.x;
     int y = coord.y;
 
-    throw std::runtime_error("not implemented");
-//    morton_t morton_code = TODO
-//
-//    // augmentation
-//    return (morton_code << 32) | i;
+    morton_t morton_code = (spreadBits(y) << 1) | spreadBits(x);
+
+    // augmentation
+    return (morton_code << 32) | i;
 }
 
 #pragma pack (push, 1)
@@ -326,6 +325,24 @@ morton_t getBits(morton_t morton_code, int bit_index, int prefix_size)
 int getBit(morton_t morton_code, int bit_index)
 {
     return (morton_code >> bit_index) & 1;
+}
+
+// Quake III fast inverse square root
+float q_rsqrt(float number)
+{
+	long i;
+	float x2, y;
+	const float threehalfs = 1.5F;
+
+	x2 = number * 0.5F;
+	y  = number;
+	i  = * ( long * ) &y;                       // evil floating point bit level hacking
+	i  = 0x5f3759df - ( i >> 1 );               // what the fuck?
+	y  = * ( float * ) &i;
+	y  = y * ( threehalfs - ( x2 * y * y ) );   // 1st iteration
+//	y  = y * ( threehalfs - ( x2 * y * y ) );   // 2nd iteration, this can be removed
+
+	return y;
 }
 
 // из аугментированного мортоновского кода можно извлечь индекс в изначальном массиве
@@ -542,8 +559,8 @@ void nbody_cpu(DeltaState &delta_state, State &initial_state, int N, int NT, con
         float * dvx = &delta_state.dvx2d[t_interactive * N];
         float * dvy = &delta_state.dvy2d[t_interactive * N];
 
-// to be kernel 1
-#pragma omp parallel for
+		// to be kernel 1
+		#pragma omp parallel for
         for (int i = 0; i < N; ++i) {
             float x0 = pxs[i];
             float y0 = pys[i];
@@ -562,8 +579,10 @@ void nbody_cpu(DeltaState &delta_state, State &initial_state, int N, int NT, con
                 float dy = y1 - y0;
                 float dr2 = std::max(100.f, dx * dx + dy * dy);
 
-                float dr2_inv = 1.f / dr2;
-                float dr_inv = std::sqrt(dr2_inv);
+//                float dr2_inv = 1.f / dr2;
+//                float dr_inv = std::sqrt(dr2_inv);
+				float dr_inv = q_rsqrt(dr2);
+				float dr2_inv = dr_inv * dr_inv;
 
                 float ex = dx * dr_inv;
                 float ey = dy * dr_inv;
@@ -580,8 +599,8 @@ void nbody_cpu(DeltaState &delta_state, State &initial_state, int N, int NT, con
             (*interactive_callback)(pxs, pys, {});
         }
 
-// to be kernel 2
-#pragma omp parallel for
+		// to be kernel 2
+		#pragma omp parallel for
         for (int i = 0; i < N; ++i) {
             vxs[i] += dvx[i];
             vys[i] += dvy[i];
@@ -976,13 +995,23 @@ int findSplit(const std::vector<morton_t> &codes, int i_begin, int i_end, int bi
     }
 
     // наивная версия, линейный поиск, можно использовать для отладки бинпоиска
-    //    for (int i = i_begin + 1; i < i_end; ++i) {
-    //        int a = getBit(codes[i-1].first, bit_index);
-    //        int b = getBit(codes[i].first, bit_index);
-    //        if (a < b) {
-    //            return i;
-    //        }
-    //    }
+
+	int answer = -1;
+	for (int i = i_begin + 1; i < i_end; ++i) {
+		int a = getBit(codes[i-1], bit_index);
+		int b = getBit(codes[i], bit_index);
+		if (a < b) {
+//			return i;
+			answer = i;
+			break;
+		}
+	}
+
+	if (answer == -1) {
+		throw std::runtime_error("4932492039458209485");
+	}
+
+	return answer;
 
     // TODO бинпоиск для нахождения разбиения области ответственности ноды
     throw std::runtime_error("not implemented");
@@ -1038,8 +1067,13 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, const std::vector<mort
     int dir = 0;
     int i_bit = NBITS-1;
     for (; i_bit >= 0; --i_bit) {
-        // TODO найти dir и значащий бит
-        throw std::runtime_error("not implemented");
+		int left_bit = getBit(codes[i_node - 1], i_bit);
+		int right_bit = getBit(codes[i_node + 1], i_bit);
+		if(left_bit != right_bit) {
+			// 0b1->1, 0b0->-1
+			dir = 2 * getBit(codes[i_node], i_bit) - 1;
+			break;
+		}
     }
 
     if (dir == 0) {
@@ -1066,8 +1100,17 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, const std::vector<mort
     //        throw std::runtime_error("47248457284332098");
     //    }
 
-    // TODO бинпоиск зоны ответственности
-    throw std::runtime_error("not implemented");
+	int l = i_node;
+	int r = dir > 0 ? N : -1;
+	while (l + dir != r) {
+		int m = (l + r) / 2;
+		if (getBits(codes[m], i_bit, K) == pref0) {
+			l = m;
+		} else {
+			r = m;
+		}
+	}
+	i_node_end = l;
 
     *bit_index = i_bit - 1;
 
@@ -1085,11 +1128,11 @@ void initLBVHNode(std::vector<Node> &nodes, int i_node, const std::vector<morton
     // инициализация ссылок на соседей для нод lbvh
     // если мы лист, то просто инициализируем минус единицами (нет детей), иначе ищем своб зону ответственности и запускаем на ней findSplit
     // можно заполнить пропуски в виде тудушек, можно реализовать с чистого листа самостоятельно, если так проще
-
-    nodes[i_node].bbox.clear();
-    nodes[i_node].mass = 0;
-    nodes[i_node].cmsx = 0;
-    nodes[i_node].cmsy = 0;
+	Node& cur_node = nodes[i_node];
+    cur_node.bbox.clear();
+    cur_node.mass = 0;
+    cur_node.cmsx = 0;
+    cur_node.cmsy = 0;
 
     const int N = codes.size();
 
@@ -1097,18 +1140,18 @@ void initLBVHNode(std::vector<Node> &nodes, int i_node, const std::vector<morton
 
     // инициализируем лист
     if (i_node >= N-1) {
-        nodes[i_node].child_left = -1;
-        nodes[i_node].child_right = -1;
+        cur_node.child_left = -1;
+        cur_node.child_right = -1;
         int i_point = i_node - (N-1);
 
         float center_mass_x, center_mass_y;
         float mass;
         std::tie(center_mass_x, center_mass_y, mass) = points_mass_array(getIndex(codes[i_point]));
 
-        nodes[i_node].bbox.grow(makePoint(center_mass_x, center_mass_y));
-        nodes[i_node].cmsx = center_mass_x;
-        nodes[i_node].cmsy = center_mass_y;
-        nodes[i_node].mass = mass;
+        cur_node.bbox.grow(makePoint(center_mass_x, center_mass_y));
+        cur_node.cmsx = center_mass_x;
+        cur_node.cmsy = center_mass_y;
+        cur_node.mass = mass;
 
         return;
     }
@@ -1118,28 +1161,34 @@ void initLBVHNode(std::vector<Node> &nodes, int i_node, const std::vector<morton
     int i_begin = 0, i_end = N, bit_index = NBITS-1;
     // если рассматриваем не корень, то нужно найти зону ответственности ноды и самый старший бит, с которого надо начинать поиск разреза
     if (i_node) {
-        // TODO
-        throw std::runtime_error("not implemented");
+		findRegion(&i_begin, &i_end, &bit_index, codes, i_node);
     }
 
     bool found = false;
     for (int i_bit = bit_index; i_bit >= 0; --i_bit) {
-        /*
-        int split = TODO
+
+        int split = findSplit(codes, i_begin, i_end, i_bit);
         if (split < 0) continue;
 
         if (split < 1) {
             throw std::runtime_error("043204230042342");
         }
-         */
-        throw std::runtime_error("not implemented");
+
+		if (split - i_begin < 1) {
+			throw std::runtime_error("043204230042342");
+		}
+
+		if (i_end - split < 1) {
+			throw std::runtime_error("043204230042343");
+		}
 
 
         // TODO проинициализировать nodes[i_node].child_left, nodes[i_node].child_right на основе i_begin, i_end, split
         //   не забудьте на N-1 сдвинуть индексы, указывающие на листья
+		cur_node.child_left = split - 1 + (split - i_begin < 2 ? N - 1 : 0);
+		cur_node.child_right = split + (i_end - split < 2 ? N - 1 : 0);
 
-        throw std::runtime_error("not implemented");
-
+//        throw std::runtime_error("not implemented");
 
         found = true;
         break;
@@ -1634,7 +1683,8 @@ TEST (LBVH, CPU)
         }
     };
 
-    for (int i = 0; i < 10; ++i) {
+//    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 1; ++i) {
         interactive_callback();
     }
 }

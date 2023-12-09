@@ -1,5 +1,5 @@
 #ifdef __CLION_IDE__
-#include <libgpu/opencl/cl/clion_defines.cl>
+#include "clion_defines.cl"
 #endif
 
 #line 6
@@ -7,7 +7,7 @@
 
 #define GRAVITATIONAL_FORCE 0.0001
 
-#define morton_t ulong
+#define morton_t unsigned long
 
 #define NBITS_PER_DIM 16
 #define NBITS (NBITS_PER_DIM /*x dimension*/ + NBITS_PER_DIM /*y dimension*/ + 32 /*index augmentation*/)
@@ -137,9 +137,9 @@ morton_t zOrder(float fx, float fy, int i){
 //        return 0;
     }
 
-    // TODO
+	morton_t morton_code = (spreadBits(y) << 1) | spreadBits(x);
 
-    return 0;
+	return (morton_code << 32) | i;
 }
 
 __kernel void generateMortonCodes(__global const float *pxs, __global const float *pys,
