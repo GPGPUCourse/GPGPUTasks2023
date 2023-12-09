@@ -1785,7 +1785,7 @@ TEST (LBVH, CPU)
 //         }
 //     }
 
-//     ocl::Kernel kernel_build_lbvh(lbvh_kernel, lbvh_kernel_length, "buidLBVH");
+//     ocl::Kernel kernel_build_lbvh(lbvh_kernel, lbvh_kernel_length, "buildLBVH");
 //     kernel_build_lbvh.compile();
 
 //     kernel_build_lbvh.exec(gpu::WorkSize(workGroupSize, global_work_size_nodes),
@@ -1797,7 +1797,7 @@ TEST (LBVH, CPU)
 //     nodes_gpu.read(nodes.data(), tree_size * sizeof(Node));
 
 //     for (int i = 0; i < tree_size; ++i) {
-//         initLBVHNode(nodes_cpu, i, codes, points_mass_array);
+        // initLBVHNode(nodes_cpu, i, codes, points_mass_array);
 //     }
 
 //     for (int i = 0; i < tree_size; ++i) {
