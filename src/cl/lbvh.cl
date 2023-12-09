@@ -263,8 +263,9 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, __global const morton_
     // граница зоны ответственности - момент, когда префикс перестает совпадать
     // TODO бинпоиск зоны ответственности
 
+    bool cmp2 = dir > 0;
     int l, r;
-    if (dir > 0) {
+    if (cmp2) {
         l = i_node;
         r = N;
     } else {
@@ -273,18 +274,12 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, __global const morton_
     }
     while (l + 1 < r) {
         int m = (l + r) / 2;
-        if (getBits(codes[m], i_bit, K) == pref0) {
-            if (dir > 0) {
-                l = m;
-            } else {
-                r = m;
-            }
-        } else {
-            if (dir > 0) {
-                r = m;
-            } else {
-                l = m;
-            }
+        bool cmp1 = getBits(codes[m], i_bit, K) == pref0;
+        if (cmp1 && cmp2 || !cmp1 && !cmp2) {
+            l = m;
+        }
+        if (cmp1 && !cmp2 || !cmp1 && cmp2) {
+            r = m;
         }
     }
     *bit_index = i_bit - 1;
@@ -495,6 +490,8 @@ void calculateForce(float x0, float y0, float m0, __global const struct Node *no
         int indexes[SIZE]; 
         indexes[0] = node->child_left;
         indexes[1] = node->child_right;
+        float delta_force_x = 0.;
+        float delta_force_y = 0.;
         for (int i = 0; i < SIZE; i++) {
             int i_child = indexes[i];
             __global const struct Node* child = &nodes[i_child];
@@ -518,8 +515,8 @@ void calculateForce(float x0, float y0, float m0, __global const struct Node *no
                 float ex = dx * dr_inv;
                 float ey = dy * dr_inv;
 
-                *force_x += m1 * ex * dr2_inv * GRAVITATIONAL_FORCE;
-                *force_y += m1 * ey * dr2_inv * GRAVITATIONAL_FORCE;
+                delta_force_x += m1 * ex * dr2_inv * GRAVITATIONAL_FORCE;
+                delta_force_y += m1 * ey * dr2_inv * GRAVITATIONAL_FORCE;
             } else {
                 // TODO кладем ребенка на стек
                 stack[stack_size++] = i_child;
@@ -528,6 +525,8 @@ void calculateForce(float x0, float y0, float m0, __global const struct Node *no
                 }
             }
         }
+        *force_x += delta_force_x;
+        *force_y += delta_force_y;
     }
 }
 

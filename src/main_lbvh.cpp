@@ -1090,7 +1090,8 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, const std::vector<mort
     // TODO бинпоиск зоны ответственности
 
     int l, r;
-    if (dir > 0) {
+    bool cmp2 = dir > 0;
+    if (cmp2) {
         l = i_node;
         r = N;
     } else {
@@ -1099,10 +1100,12 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, const std::vector<mort
     }
     while (l + 1 < r) {
         int m = (l + r) / 2;
-        if (getBits(codes[m], i_bit, K) == pref0) {
-            ((dir > 0) ? l : r) = m;
-        } else {
-            ((dir > 0) ? r : l) = m;
+        bool cmp1 = getBits(codes[m], i_bit, K) == pref0;
+        if (cmp1 && cmp2 || !cmp1 && !cmp2) {
+            l = m;
+        }
+        if (cmp1 && !cmp2 || !cmp1 && cmp2) {
+            r = m;
         }
     }
     *bit_index = i_bit - 1;
