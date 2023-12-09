@@ -19,6 +19,8 @@ struct float2 { float x;          };
 struct float3 { float x, y, z;    };
 struct float4 { float x, y, z, w; };
 
+using ulong = unsigned long long;
+
 // https://www.khronos.org/registry/OpenCL/sdk/1.2/docs/man/xhtml/commonFunctions.html
 #define gentype float
 gentype		clamp		(gentype x, float minval, float maxval);

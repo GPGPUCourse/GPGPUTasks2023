@@ -137,9 +137,12 @@ morton_t zOrder(float fx, float fy, int i){
 //        return 0;
     }
 
-    // TODO
+    int x_spread = spreadBits(x);
+    int y_spread = spreadBits(y);
+    morton_t morton_code = y_spread | (x_spread << 1);
 
-    return 0;
+    // augmentation
+    return (morton_code << 32) | i;
 }
 
 __kernel void generateMortonCodes(__global const float *pxs, __global const float *pys,
@@ -191,14 +194,110 @@ void __kernel merge(__global const morton_t *as, __global morton_t *as_sorted, u
 
 int findSplit(__global const morton_t *codes, int i_begin, int i_end, int bit_index)
 {
-    // TODO
+    // Если биты в начале и в конце совпадают, то этот бит незначащий
+    if (getBit(codes[i_begin], bit_index) == getBit(codes[i_end-1], bit_index)) {
+        return -1;
+    }
+
+    // Бинпоиск для нахождения разбиения области ответственности ноды.
+    int l = i_begin;
+    int r = i_end;
+    int m = (r + l) / 2;
+
+    while (l < r) {
+        if (getBit(codes[m], bit_index) == 0) {
+            l = m + 1;
+        } else {
+            r = m;
+        }
+        m = (r + l) / 2;
+    }
+    return m;
 }
 
 void findRegion(int *i_begin, int *i_end, int *bit_index, __global const morton_t *codes, int N, int i_node)
 {
-    // TODO
-}
+    if (i_node < 1 || i_node > N - 2) {
+        printf("893279874329842396\n");
+//        return 0;
+    }
 
+    // 1. найдем, какого типа мы граница: левая или правая. Идем от самого старшего бита и паттерн-матчим тройки соседних битов
+    //  если нашли (0, 0, 1), то мы правая граница, если нашли (0, 1, 1), то мы левая
+    // dir: 1 если мы левая граница и -1 если правая
+    int dir = 0;
+    int i_bit = NBITS-1;
+
+    morton_t l = codes[i_node - 1];
+    morton_t m = codes[i_node];
+    morton_t r = codes[i_node + 1];
+    int bits[3];
+    bits[0] = 0; bits[1] = 0; bits[2] = 0;
+    for (; i_bit >= 0; --i_bit) {
+        bits[0] = getBit(l, i_bit);
+        bits[1] = getBit(m, i_bit);
+        bits[2] = getBit(r, i_bit);
+        if (bits[0] != bits[2]) {
+            dir = -1;
+            if (bits[1]) { // left
+                dir = 1;
+            }
+            break;
+        }
+    }
+
+    if (dir == 0) {
+        printf("67187274276982356\n");
+//        return 0;
+    }
+
+    // 2. Найдем вторую границу нашей зоны ответственности
+
+    // количество совпадающих бит в префиксе
+    int K = NBITS - i_bit;
+    morton_t pref0 = getBits(codes[i_node], i_bit, K);
+
+    // граница зоны ответственности - момент, когда префикс перестает совпадать
+    int i_node_end = -1;
+
+    { // Бинпоиск зоны ответственности
+        int l = dir > 0 ? i_node : -1;
+        int r = dir > 0 ? N : i_node;
+        int m = (l + r) / 2;
+
+        if (dir > 0) {
+            while (l + 1 < r) {
+                if (getBits(codes[m], i_bit, K) == pref0) {
+                    l = m;
+                } else {
+                    r = m;
+                }
+                m = (l + r) / 2;
+            }
+            i_node_end = l;
+        } else {
+            while (l + 1 < r) {
+                if (getBits(codes[m], i_bit, K) != pref0) {
+                    l = m;
+                } else {
+                    r = m;
+                }
+                m = (l + r) / 2;
+            }
+            i_node_end = l + 1;
+        }
+    }
+
+    *bit_index = i_bit - 1;
+
+    if (dir > 0) {
+        *i_begin = i_node;
+        *i_end = i_node_end + 1;
+    } else {
+        *i_begin = i_node_end;
+        *i_end = i_node + 1;
+    }
+}
 
 void initLBVHNode(__global struct Node *nodes, int i_node, __global const morton_t *codes, int N, __global const float *pxs, __global const float *pys, __global const float *mxs)
 {
