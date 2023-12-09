@@ -498,7 +498,11 @@ void calculateForce(float x0, float y0, float m0, __global const struct Node *no
             }
         }
 
-        for (int i_child = node->child_left; i_child <= node->child_right; ++i_child) {
+        int children[2];
+        children[0] = node->child_left;
+        children[1] = node->child_right;
+        for (int i = 0; i < 2; ++i) {
+            int i_child = children[i];
             __global const struct Node *child = &nodes[i_child];
             // С точки зрения ббоксов заходить в ребенка, ббокс которого не пересекаем, не нужно (из-за того, что в листьях у нас точки и они не высовываются за свой регион пространства)
             //   Но, с точки зрения физики, замена гравитационного влияния всех точек в регионе на взаимодействие с суммарной массой в центре масс - это точное решение только в однородном поле (например, на поверхности земли)
