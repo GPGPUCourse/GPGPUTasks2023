@@ -1055,18 +1055,12 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, const std::vector<mort
     morton_t lmorton = codes[i_node - 1];
     morton_t mmorton = codes[i_node];
     morton_t rmorton = codes[i_node + 1];
-    const int right = 1, left = 3;
     for (; i_bit >= 0; --i_bit) {
         // TODO найти dir и значащий бит
-        int m = (!!getBit(lmorton, i_bit) << 2) |
-                (!!getBit(mmorton, i_bit) << 1) |
-                !!getBit(rmorton, i_bit);
-        if (m == left) {
-            dir = 1;
-            break;
-        }
-        if (m == right) {
-            dir = -1;
+        int lb = getBit(lmorton, i_bit);
+        int rb = getBit(rmorton, i_bit);
+        if (lb != rb) {
+            dir = getBit(mmorton, i_bit) * 2 - 1;
             break;
         }
     }

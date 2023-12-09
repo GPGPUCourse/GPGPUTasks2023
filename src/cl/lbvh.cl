@@ -194,7 +194,7 @@ void __kernel merge(__global const morton_t *as, __global morton_t *as_sorted, u
 int findSplit(__global const morton_t *codes, int i_begin, int i_end, int bit_index)
 {
     // TODO
-        // Если биты в начале и в конце совпадают, то этот бит незначащий
+    // Если биты в начале и в конце совпадают, то этот бит незначащий
     if (getBit(codes[i_begin], bit_index) == getBit(codes[i_end-1], bit_index)) {
         return -1;
     }
@@ -229,18 +229,12 @@ void findRegion(int *i_begin, int *i_end, int *bit_index, __global const morton_
     morton_t lmorton = codes[i_node - 1];
     morton_t mmorton = codes[i_node];
     morton_t rmorton = codes[i_node + 1];
-    const int right = 1, left = 3;
     for (; i_bit >= 0; --i_bit) {
         // TODO найти dir и значащий бит
-        int m = (!!getBit(lmorton, i_bit) << 2) |
-                (!!getBit(mmorton, i_bit) << 1) |
-                !!getBit(rmorton, i_bit);
-        if (m == left) {
-            dir = 1;
-            break;
-        }
-        if (m == right) {
-            dir = -1;
+        int lb = getBit(lmorton, i_bit);
+        int rb = getBit(rmorton, i_bit);
+        if (lb != rb) {
+            dir = getBit(mmorton, i_bit) * 2 - 1;
             break;
         }
     }
