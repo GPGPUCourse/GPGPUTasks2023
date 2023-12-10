@@ -477,6 +477,8 @@ __kernel void calculateForces(
         int t)
 {
    int i = get_global_id(0);
+   if (i >= N)
+    return;
    float x0 = pxs[i];
    float y0 = pys[i];
    float m0 = mxs[i];

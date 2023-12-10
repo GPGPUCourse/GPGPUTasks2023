@@ -34,8 +34,8 @@
 // TODO на сервер лучше коммитить самую простую конфигурацию. Замеры по времени получатся нерелевантные, но зато быстрее отработает CI
 // TODO локально интересны замеры на самой сложной версии, которую получится дождаться
 // #define NBODY_INITIAL_STATE_COMPLEXITY 0
-// #define NBODY_INITIAL_STATE_COMPLEXITY 1
-#define NBODY_INITIAL_STATE_COMPLEXITY 2
+#define NBODY_INITIAL_STATE_COMPLEXITY 1
+// #define NBODY_INITIAL_STATE_COMPLEXITY 2
 
 // использовать lbvh для построения начального состояния. Нужно на очень больших N (>1000000)
 #define ENABLE_LBVH_STATE_INITIALIZATION 1
@@ -1260,13 +1260,8 @@ void buildBBoxes(std::vector<Node> &nodes, std::vector<int> &flags, int N, bool 
             if (flags[i_node] != level)
                 continue;
             auto &node = nodes[i_node];
-            auto &left_node = nodes[node.child_left], &right_node = nodes[node.child_right];
             node.bbox.clear();
-            node.bbox.grow(left_node.bbox);
-            node.bbox.grow(right_node.bbox);
-            node.mass = left_node.mass + right_node.mass;
-            node.cmsx = (left_node.cmsx * left_node.mass + right_node.cmsx * right_node.mass) / node.mass;
-            node.cmsy = (left_node.cmsy * left_node.mass + right_node.cmsy * right_node.mass) / node.mass;
+            growNode(node, nodes);
             ++n_updated;
         }
 
