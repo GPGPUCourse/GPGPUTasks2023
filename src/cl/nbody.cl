@@ -23,7 +23,6 @@ __kernel void nbody_calculate_force_global(__global float *pxs, __global float *
 
     // TODO
     for (int j = 0; j < N; ++j) {
-
         if (j == i) {
             continue;
         }
