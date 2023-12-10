@@ -25,7 +25,7 @@
 #define EVALUATE_PRECISION 1
 
 // удобно включить при локальном тестировании
-#define ENABLE_GUI 1
+#define ENABLE_GUI 0
 
 // сброс картинок симуляции на диск
 #define SAVE_IMAGES 0
@@ -1259,7 +1259,7 @@ void buildBBoxes(std::vector<Node> &nodes, std::vector<int> &flags, int N, bool 
         int n_updated = 0;
 #pragma omp parallel for if(use_omp) reduction(+:n_updated)
         for (int i_node = 0; i_node < N - 1; ++i_node) {
-            if (flags[i_node] == -1)
+            if (flags[i_node] != level)
                 continue;
             growNode(nodes[i_node], nodes);
             n_updated++;
@@ -1937,7 +1937,7 @@ TEST (LBVH, Nbody) {
     nbody(false, evaluate_precision, 1); // gpu naive
 #endif
     nbody(false, evaluate_precision, 2); // cpu lbvh
-//    nbody(false, evaluate_precision, 3); // gpu lbvh
+    nbody(false, evaluate_precision, 3); // gpu lbvh
 }
 
 TEST (LBVH, Nbody_meditation) {
