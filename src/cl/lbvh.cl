@@ -361,15 +361,16 @@ void calculateForce(float x0, float y0, float m0, __global const struct Node *no
     int stack_size = 0;
     stack[stack_size++] = 0;
     while (stack_size) {
-        const struct Node node = nodes[stack[--stack_size]];
+        __global const struct Node *node = &nodes[stack[--stack_size]];
 
-        if (isLeaf(&nodes[stack[stack_size]])) {
+        if (isLeaf(node)) {
             continue;
         }
 
         // если запрос содержится и а левом и в правом ребенке - то они в одном пикселе
         {
-            if (contains(&nodes[node.child_left].bbox, x0, y0) && contains(&nodes[node.child_right].bbox, x0, y0)) {
+            if (contains(&nodes[node->child_left].bbox, x0, y0) && contains(&nodes[node->child_right].bbox, x0, y0)) {
+#ifdef SAVE_MODE
                 if (!equals(&nodes[node.child_left].bbox, &nodes[node.child_right].bbox)) {
                     printf("42357987645432456547\n");
                     return;
@@ -379,16 +380,17 @@ void calculateForce(float x0, float y0, float m0, __global const struct Node *no
                     printf("5446456456435656\n");
                     return;
                 }
+#endif
                 continue;
             }
         }
 
         {
-            int i_child = node.child_left;
-            if (!contains(&nodes[i_child].bbox, x0, y0) && barnesHutCondition(x0, y0, &nodes[i_child])) {
-                float x1 = nodes[i_child].cmsx;
-                float y1 = nodes[i_child].cmsy;
-                float m1 = nodes[i_child].mass;
+            __global const struct Node *left_child = &nodes[node->child_left];
+            if (!contains(&left_child->bbox, x0, y0) && barnesHutCondition(x0, y0, left_child)) {
+                float x1 = left_child->cmsx;
+                float y1 = left_child->cmsy;
+                float m1 = left_child->mass;
 
                 float dx = x1 - x0;
                 float dy = y1 - y0;
@@ -407,20 +409,22 @@ void calculateForce(float x0, float y0, float m0, __global const struct Node *no
                 *force_y += m1 * fy;
 
             } else {
-                stack[stack_size++] = i_child;
+                stack[stack_size++] = node->child_left;
+#ifdef SAVE_MODE
                 if (stack_size >= 2 * NBITS_PER_DIM) {
                     printf("0420392384283\n");
                     return;
                 }
+#endif
             }
         }
 
         {
-            int i_child = node.child_right;
-            if (!contains(&nodes[i_child].bbox, x0, y0) && barnesHutCondition(x0, y0, &nodes[i_child])) {
-                float x1 = nodes[i_child].cmsx;
-                float y1 = nodes[i_child].cmsy;
-                float m1 = nodes[i_child].mass;
+            __global const struct Node *right_child = &nodes[node->child_right];
+            if (!contains(&right_child->bbox, x0, y0) && barnesHutCondition(x0, y0, right_child)) {
+                float x1 = right_child->cmsx;
+                float y1 = right_child->cmsy;
+                float m1 = right_child->mass;
 
                 float dx = x1 - x0;
                 float dy = y1 - y0;
@@ -439,11 +443,13 @@ void calculateForce(float x0, float y0, float m0, __global const struct Node *no
                 *force_y += m1 * fy;
 
             } else {
-                stack[stack_size++] = i_child;
+                stack[stack_size++] = node->child_right;
+#ifdef SAVE_MODE
                 if (stack_size >= 2 * NBITS_PER_DIM) {
                     printf("0420392384283\n");
                     return;
                 }
+#endif
             }
         }
     }
