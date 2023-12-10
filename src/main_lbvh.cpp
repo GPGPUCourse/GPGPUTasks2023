@@ -17,7 +17,7 @@
 
 
 // может понадобиться поменять индекс локально чтобы выбрать GPU если у вас более одного девайса
-#define OPENCL_DEVICE_INDEX 0
+#define OPENCL_DEVICE_INDEX 1
 
 // TODO включить чтобы начали запускаться тесты
 #define ENABLE_TESTING 1
@@ -26,7 +26,7 @@
 #define EVALUATE_PRECISION 1
 
 // удобно включить при локальном тестировании
-#define ENABLE_GUI 1
+#define ENABLE_GUI 0
 
 // сброс картинок симуляции на диск
 #define SAVE_IMAGES 0
