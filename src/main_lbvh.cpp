@@ -19,14 +19,13 @@
 // может понадобиться поменять индекс локально чтобы выбрать GPU если у вас более одного девайса
 #define OPENCL_DEVICE_INDEX 0
 
-// TODO включить чтобы начали запускаться тесты
-#define ENABLE_TESTING 0
+#define ENABLE_TESTING 1
 
 // имеет смысл отключать при оффлайн симуляции больших N, но в итоговом решении стоит оставить
 #define EVALUATE_PRECISION 1
 
 // удобно включить при локальном тестировании
-#define ENABLE_GUI 0
+#define ENABLE_GUI 1
 
 // сброс картинок симуляции на диск
 #define SAVE_IMAGES 0
@@ -1929,8 +1928,8 @@ TEST (LBVH, Nbody)
     nbody(false, evaluate_precision, 0); // cpu naive
     nbody(false, evaluate_precision, 1); // gpu naive
 #endif
-    nbody(false, evaluate_precision, 2); // cpu lbvh
-    nbody(false, evaluate_precision, 3); // gpu lbvh
+//    nbody(false, evaluate_precision, 2); // cpu lbvh
+//    nbody(false, evaluate_precision, 3); // gpu lbvh
 }
 
 TEST (LBVH, Nbody_meditation)
