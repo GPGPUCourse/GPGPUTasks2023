@@ -22,7 +22,7 @@ void raiseFail(const T &a, const T &b, std::string message, std::string filename
 
 #define EXPECT_THE_SAME(a, b, message) raiseFail(a, b, message, __FILE__, __LINE__)
 #define WORKGROUP_SIZE 128
-#define LOG_MAX_DIGIT 2
+#define LOG_MAX_DIGIT 4
 #define MAX_DIGIT (1 << LOG_MAX_DIGIT)
 
 int main(int argc, char **argv) {
@@ -53,24 +53,31 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
 
+    const int NUM_WORKGROUPS = (n + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE;
+
     gpu::gpu_mem_32u as_gpu;
     as_gpu.resizeN(n);
     gpu::gpu_mem_32u bs_gpu;
     bs_gpu.resizeN(n);
     gpu::gpu_mem_32u t_gpu;
-    t_gpu.resizeN(n);
+    t_gpu.resizeN(NUM_WORKGROUPS * MAX_DIGIT);
+    std::vector<unsigned int> digits_less(MAX_DIGIT, 0);
+    std::vector<unsigned int> tmp(MAX_DIGIT, 0);
+    gpu::gpu_mem_32u digits_less_gpu;
+    digits_less_gpu.resizeN(MAX_DIGIT);
 
     {
-        ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix",
-                           " -D WORKGROUP_SIZE=" + to_string(WORKGROUP_SIZE) +
-                                  " -D LOG_MAX_DIGIT=" + to_string(LOG_MAX_DIGIT) +
-                                  " -D MAX_DIGIT=" + to_string(MAX_DIGIT));
-        radix.compile();
-        ocl::Kernel sums(radix_kernel, radix_kernel_length, "sums",
-                          " -D WORKGROUP_SIZE=" + to_string(WORKGROUP_SIZE) +
-                                 " -D LOG_MAX_DIGIT=" + to_string(LOG_MAX_DIGIT) +
-                                 " -D MAX_DIGIT=" + to_string(MAX_DIGIT));
+        std::string radix_kernel_defines = " -D WORKGROUP_SIZE=" + to_string(WORKGROUP_SIZE) +
+                                           " -D LOG_MAX_DIGIT=" + to_string(LOG_MAX_DIGIT) +
+                                           " -D MAX_DIGIT=" + to_string(MAX_DIGIT);
+        ocl::Kernel fill0(radix_kernel, radix_kernel_length, "fill0", radix_kernel_defines);
+        fill0.compile();
+        ocl::Kernel counts(radix_kernel, radix_kernel_length, "counts", radix_kernel_defines);
+        counts.compile();
+        ocl::Kernel sums(radix_kernel, radix_kernel_length, "sums", radix_kernel_defines);
         sums.compile();
+        ocl::Kernel radix(radix_kernel, radix_kernel_length, "radix", radix_kernel_defines);
+        radix.compile();
 
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
@@ -80,23 +87,34 @@ int main(int argc, char **argv) {
 
             for (int d = 0; d < (32 + LOG_MAX_DIGIT - 1) / LOG_MAX_DIGIT; d++)
             {
-                unsigned int pnt = 0, w = 0;
-                for (int x = 0; x < MAX_DIGIT; x++)
-                {
-                    for (int len = 1; len < 2 * n; len <<= 1)
-                    {
-                        unsigned int all_work2 = (n / len + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE * WORKGROUP_SIZE;
-                        sums.exec(gpu::WorkSize(WORKGROUP_SIZE, all_work2),
-                                  as_gpu, t_gpu, x, d, len, n);
-                    }
-                    t_gpu.readN(&w, 1, n - 1);
-                    if (w != 0)
-                    {
-                        radix.exec(gpu::WorkSize(WORKGROUP_SIZE, (w + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE * WORKGROUP_SIZE),
-                                   as_gpu, bs_gpu, t_gpu, pnt, n, w);
-                    }
-                    pnt += w;
+                fill0.exec(gpu::WorkSize(WORKGROUP_SIZE, (NUM_WORKGROUPS * MAX_DIGIT + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE * WORKGROUP_SIZE),
+                           t_gpu, NUM_WORKGROUPS * MAX_DIGIT);
+                counts.exec(gpu::WorkSize(WORKGROUP_SIZE, NUM_WORKGROUPS * WORKGROUP_SIZE),
+                          as_gpu, t_gpu, d, n);
+
+                for (int len = 2; len <= n; len <<= 1) {
+                    sums.exec(gpu::WorkSize(WORKGROUP_SIZE,((NUM_WORKGROUPS + len - 1) / len + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE * WORKGROUP_SIZE),
+                              t_gpu, len,NUM_WORKGROUPS);
                 }
+
+                // compute the amount of each digit on cpu
+                digits_less.assign(MAX_DIGIT, 0);
+                int pnt = NUM_WORKGROUPS - 1;
+                while (pnt >= 0) {
+                    t_gpu.readN(tmp.data(), MAX_DIGIT, pnt * MAX_DIGIT);
+                    for (int x = 0; x + 1 < MAX_DIGIT; x++) {
+                        digits_less[x + 1] += tmp[x];
+                    }
+                    pnt &= (pnt + 1);
+                    pnt--;
+                }
+                for (int x = 1; x < MAX_DIGIT; x++) {
+                    digits_less[x] += digits_less[x - 1];
+                }
+                digits_less_gpu.writeN(digits_less.data(), MAX_DIGIT);
+
+                radix.exec(gpu::WorkSize(WORKGROUP_SIZE, NUM_WORKGROUPS * WORKGROUP_SIZE),
+                           as_gpu, bs_gpu, t_gpu, d, n, digits_less_gpu);
                 std::swap(as_gpu, bs_gpu);
             }
 
