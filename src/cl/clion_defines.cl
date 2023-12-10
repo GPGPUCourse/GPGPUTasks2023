@@ -21,6 +21,7 @@ gentype		clamp		(gentype x, float minval, float maxval);
 gentype		degrees		(gentype radians);
 gentype		max			(gentype x, gentype y);
 gentype		min			(gentype x, gentype y);
+gentype     sqrt        (gentype x);
 gentype		mix			(gentype x, gentype y, gentype a);
 gentype		radians		(gentype degrees);
 gentype		sign		(gentype x);
