@@ -636,7 +636,7 @@ void nbody_gpu_lbvh(DeltaState &delta_state, State &initial_state, int N, int NT
 
     ocl::Kernel kernel_generate_morton_codes(lbvh_kernel, lbvh_kernel_length, "generateMortonCodes");
     ocl::Kernel kernel_merge(lbvh_kernel, lbvh_kernel_length, "merge");
-    ocl::Kernel kernel_build_lbvh(lbvh_kernel, lbvh_kernel_length, "buidLBVH");
+    ocl::Kernel kernel_init_LBVH_Node(lbvh_kernel, lbvh_kernel_length, "initLBVHNode");
     ocl::Kernel kernel_init_flags(lbvh_kernel, lbvh_kernel_length, "initFlags");
     ocl::Kernel kernel_grow_nodes(lbvh_kernel, lbvh_kernel_length, "growNodes");
     ocl::Kernel kernel_calculate_forces(lbvh_kernel, lbvh_kernel_length, "calculateForces");
@@ -644,7 +644,7 @@ void nbody_gpu_lbvh(DeltaState &delta_state, State &initial_state, int N, int NT
 
     kernel_generate_morton_codes.compile();
     kernel_merge.compile();
-    kernel_build_lbvh.compile();
+    kernel_init_LBVH_Node.compile();
     kernel_init_flags.compile();
     kernel_grow_nodes.compile();
     kernel_calculate_forces.compile();
@@ -697,10 +697,10 @@ void nbody_gpu_lbvh(DeltaState &delta_state, State &initial_state, int N, int NT
         }
 
         // build child pointers for lbvh nodes
-        kernel_build_lbvh.exec(gpu::WorkSize(workGroupSize, global_work_size_nodes),
-                               pxs_gpu, pys_gpu, mxs_gpu,
-                               codes_gpu, nodes_gpu,
-                               N);
+        kernel_init_LBVH_Node.exec(gpu::WorkSize(workGroupSize, global_work_size_nodes),
+                                   nodes_gpu, codes_gpu,
+                                   pxs_gpu, pys_gpu, mxs_gpu,
+                                   N);
 
         // propagate bbox and mass info from leaves
         for (int level = 0; level < NBITS; ++level) {
@@ -712,10 +712,10 @@ void nbody_gpu_lbvh(DeltaState &delta_state, State &initial_state, int N, int NT
                                    flags_gpu, nodes_gpu,
                                    N, level);
 
-            int n_updated;
-            flags_gpu.readN(&n_updated, 1, N-1);
+            int flags_0;
+            flags_gpu.readN(&flags_0, 1, 0);
 
-            if (!n_updated)
+            if (flags_0 != -1)
                 break;
         }
 
@@ -940,7 +940,7 @@ State makeGalacticState(int N, int s0, int s1)
     result.pys.back() = 0;
     result.vxs.back() = 0;
     result.vys.back() = 0;
-    result.mxs.back() = 100.0 * total_mass;
+    result.mxs.back() = 8.0 * total_mass;
 
     DeltaState delta_state;
     auto tmp = result;
@@ -1235,6 +1235,8 @@ void buildBBoxes(std::vector<Node> &nodes, std::vector<int> &flags, int N, bool 
 
 void drawLBVH(images::Image<unsigned char> &canvas, const std::vector<Node> &nodes, int coord_shift)
 {
+    return;
+
 #pragma omp parallel for
     for (int y = 0; y < (int) canvas.height; ++y) {
         for (int x = 0; x < (int) canvas.width; ++x) {
@@ -1443,7 +1445,7 @@ void nbody(bool interactive, bool evaluate_precision, int nbody_impl_index)
 
         if (ENABLE_GUI) {
             window->display(canvas);
-            window->resize(840, 840);
+            window->resize(1000, 1000);
             window->wait(5);
         }
     };
@@ -1596,7 +1598,7 @@ TEST (LBVH, CPU)
             }
 
             window->display(canvas);
-            window->resize(840, 840);
+            window->resize(1000, 1000);
             window->wait(500);
         }
     };
@@ -1668,7 +1670,7 @@ TEST (LBVH, GPU)
     ocl::Kernel kernel_merge(lbvh_kernel, lbvh_kernel_length, "merge");
     kernel_merge.compile();
 
-    gpu::gpu_mem_64f codes_gpu_buf;
+    gpu::gpu_mem_64u codes_gpu_buf;
     codes_gpu_buf.resizeN(N);
     for (unsigned int subn = 1; subn < N; subn *= 2) {
         kernel_merge.exec(gpu::WorkSize(workGroupSize, global_work_size_points), codes_gpu, codes_gpu_buf, N, subn);
@@ -1709,24 +1711,15 @@ TEST (LBVH, GPU)
 
     gpu::gpu_mem_any nodes_gpu;
     nodes_gpu.resize(tree_size * sizeof(Node));
+    nodes_gpu.write(nodes.data(), tree_size * sizeof(Node));
 
-    {
-        nodes_gpu.write(nodes.data(), tree_size * sizeof(Node));
-        std::vector<Node> tmp(tree_size);
-        nodes_gpu.read(tmp.data(), tree_size * sizeof(Node));
+    ocl::Kernel kernel_init_LBVH_Node(lbvh_kernel, lbvh_kernel_length, "initLBVHNode");
+    kernel_init_LBVH_Node.compile();
 
-        for (int i = 0; i < tree_size; ++i) {
-            EXPECT_EQ(tmp[i], nodes[i]);
-        }
-    }
-
-    ocl::Kernel kernel_build_lbvh(lbvh_kernel, lbvh_kernel_length, "buidLBVH");
-    kernel_build_lbvh.compile();
-
-    kernel_build_lbvh.exec(gpu::WorkSize(workGroupSize, global_work_size_nodes),
-                           pxs_gpu, pys_gpu, mxs_gpu,
-                           codes_gpu, nodes_gpu,
-                           N);
+    kernel_init_LBVH_Node.exec(gpu::WorkSize(workGroupSize, global_work_size_nodes),
+                               nodes_gpu, codes_gpu,
+                               pxs_gpu, pys_gpu, mxs_gpu,
+                               N);
 
 
     nodes_gpu.read(nodes.data(), tree_size * sizeof(Node));
@@ -1738,7 +1731,6 @@ TEST (LBVH, GPU)
     for (int i = 0; i < tree_size; ++i) {
         EXPECT_EQ(nodes[i], nodes_cpu[i]);
     }
-
 
     // BUILD BBOXES AND AGGREGATE MASS INFO
 
@@ -1763,12 +1755,10 @@ TEST (LBVH, GPU)
                                    flags_gpu, nodes_gpu,
                                    N, level);
 
-            int n_updated;
-            flags_gpu.readN(&n_updated, 1, N-1);
+            int flags_0;
+            flags_gpu.readN(&flags_0, 1, 0);
 
-            //            std::cout << "n updated: " << n_updated << std::endl;
-
-            if (!n_updated)
+            if (flags_0 != -1)
                 break;
         }
 
@@ -1897,7 +1887,7 @@ TEST (LBVH, Nbody)
     nbody(false, evaluate_precision, 1); // gpu naive
 #endif
     nbody(false, evaluate_precision, 2); // cpu lbvh
-    //nbody(false, evaluate_precision, 3); // gpu lbvh
+    nbody(false, evaluate_precision, 3); // gpu lbvh
 }
 
 TEST (LBVH, Nbody_meditation)
@@ -1913,5 +1903,5 @@ TEST (LBVH, Nbody_meditation)
     context.init(device.device_id_opencl);
     context.activate();
 
-    nbody(true, false, 2);
+    nbody(true, false, 3);
 }
