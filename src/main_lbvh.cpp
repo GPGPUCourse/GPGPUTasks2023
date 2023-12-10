@@ -506,8 +506,8 @@ void nbody_cpu_lbvh(DeltaState &delta_state, State &initial_state, int N, int NT
         // упорядочиваем тела по z-curve
         std::sort(codes.begin(), codes.end());
 
-        // строим LBVH
-        #pragma omp parallel for
+// строим LBVH
+#pragma omp parallel for
         for (int i_node = 0; i_node < tree_size; ++i_node) {
             initLBVHNode(nodes, i_node, codes, points_mass_array);
         }
@@ -974,7 +974,7 @@ int findSplit(const std::vector<morton_t> &codes, int i_begin, int i_end, int bi
         return -1;
     }
 
-        // наивная версия, линейный поиск, можно использовать для отладки бинпоиска
+    // наивная версия, линейный поиск, можно использовать для отладки бинпоиска
     // int naive_result = 0;
     // for (int i = i_begin + 1; i < i_end; ++i) {
     //     int a = getBit(codes[i - 1], bit_index);
@@ -1143,7 +1143,7 @@ void initLBVHNode(std::vector<Node> &nodes, int i_node, const std::vector<morton
                   const points_mass_functor &points_mass_array) {
     // инициализация ссылок на соседей для нод lbvh
     // если мы лист, то просто инициализируем минус единицами (нет детей), иначе ищем своб зону ответственности и запускаем на ней findSplit
-// можно заполнить пропуски в виде тудушек, можно реализовать с чистого листа самостоятельно, если так проще
+    // можно заполнить пропуски в виде тудушек, можно реализовать с чистого листа самостоятельно, если так проще
 
     nodes[i_node].bbox.clear();
     nodes[i_node].mass = 0;
