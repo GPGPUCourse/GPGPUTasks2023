@@ -446,7 +446,7 @@ bool barnesHutCondition(float x, float y, __global const struct Node *node)
     return s * s < d2 * thresh * thresh;
 }
 
-void calculateInteraction(float x0, float y0, float m0, float x1, float y1, float m1, float *force_x, float *force_y) {
+void calculateInteraction(float x0, float y0, float m0, float x1, float y1, float m1, __global float *force_x, __global float *force_y) {
     float dx = x1 - x0;
     float dy = y1 - y0;
     float dr2 = fmax((float)100, dx * dx + dy * dy);
