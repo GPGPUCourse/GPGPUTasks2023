@@ -26,7 +26,7 @@
 #define EVALUATE_PRECISION 1
 
 // удобно включить при локальном тестировании
-#define ENABLE_GUI 1
+#define ENABLE_GUI 0
 
 // сброс картинок симуляции на диск
 #define SAVE_IMAGES 0
