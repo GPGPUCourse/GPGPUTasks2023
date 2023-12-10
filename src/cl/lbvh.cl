@@ -463,8 +463,8 @@ __kernel void calculateForces(
     if (i_node > N)
         return;
 
-    dvx2d[i_node], dvy2d[i_node] = 0;
-    calculateForce(pxs[i_node], pys[i_node], mxs[i_node], nodes, &dvx2d[i_node], &dvy2d[i_node]);
+    dvx2d[i_node + t * N] = 0, dvy2d[i_node + t * N] = 0;
+    calculateForce(pxs[i_node], pys[i_node], mxs[i_node], nodes, &dvx2d[i_node + t * N], &dvy2d[i_node + t * N]);
 }
 
 __kernel void integrate(
