@@ -4,6 +4,7 @@
 
 #line 6
 
+// VERSION 1
 __kernel void fill0(__global unsigned int *t,
                      const unsigned int n)
 {
@@ -80,4 +81,32 @@ __kernel void radix(__global unsigned int *as,
         return;
 
     bs[outside[as[i] >> (d * LOG_MAX_DIGIT) & (MAX_DIGIT - 1)] + inside[li]] = as[i];
+}
+
+// VERSION 2
+__kernel void counts2(__global unsigned int *as,
+                      __global unsigned int *t,
+                      const unsigned int d,
+                      const unsigned int n)
+{
+    const unsigned int i = get_global_id(0);
+    const unsigned int li = get_local_id(0);
+
+    __local unsigned int cnt[MAX_DIGIT];
+
+    if (li < MAX_DIGIT) {
+        cnt[li] = 0;
+    }
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    if (i < n) {
+        atomic_add(&cnt[(as[i] >> (d * LOG_MAX_DIGIT) & (MAX_DIGIT - 1))], 1);
+    }
+
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    if (li < MAX_DIGIT) {
+        t[i / WORKGROUP_SIZE * MAX_DIGIT + li] = cnt[li];
+    }
 }
