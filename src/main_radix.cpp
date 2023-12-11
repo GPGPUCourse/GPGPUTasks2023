@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
     context.init(device.device_id_opencl);
     context.activate();
 
-    int benchmarkingIters = 10;
+    int benchmarkingIters = 1;
     unsigned int n = 32 * 1024 * 1024;
     std::vector<unsigned int> as(n, 0);
     FastRandom r(n);
@@ -203,6 +203,86 @@ int main(int argc, char **argv) {
         }
         std::cout << "GPU (VERSION 2): " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "GPU (VERSION 2): " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+
+        std::vector<unsigned int> gpu_sorted(n);
+        as_gpu.readN(gpu_sorted.data(), n);
+
+        // Проверяем корректность результатов
+        for (int i = 0; i < n; ++i) {
+            EXPECT_THE_SAME(gpu_sorted[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
+        }
+    }
+
+    // VERSION 3
+    if (1)
+    {
+        gpu::gpu_mem_32u as_gpu;
+        as_gpu.resizeN(n);
+        gpu::gpu_mem_32u bs_gpu;
+        bs_gpu.resizeN(n);
+        gpu::gpu_mem_32u t_gpu;
+        t_gpu.resizeN((NUM_WORKGROUPS + 1) * MAX_DIGIT);
+        std::vector<unsigned int> digits_less(MAX_DIGIT, 0);
+        std::vector<unsigned int> tmp(MAX_DIGIT, 0);
+        gpu::gpu_mem_32u digits_less_gpu;
+        digits_less_gpu.resizeN(MAX_DIGIT);
+
+        ocl::Kernel fill0(radix_kernel, radix_kernel_length, "fill0", radix_kernel_defines);
+        fill0.compile();
+        ocl::Kernel counts3(radix_kernel, radix_kernel_length, "counts3", radix_kernel_defines);
+        counts3.compile();
+        ocl::Kernel sums3a(radix_kernel, radix_kernel_length, "sums3a", radix_kernel_defines);
+        sums3a.compile();
+        ocl::Kernel sums3b(radix_kernel, radix_kernel_length, "sums3b", radix_kernel_defines);
+        sums3b.compile();
+        ocl::Kernel radix3(radix_kernel, radix_kernel_length, "radix3", radix_kernel_defines);
+        radix3.compile();
+
+        timer t;
+        for (int iter = 0; iter < benchmarkingIters; ++iter) {
+            as_gpu.writeN(as.data(), n);
+
+            t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
+
+            fill0.exec(gpu::WorkSize(WORKGROUP_SIZE, WORKGROUP_SIZE),
+                       t_gpu, MAX_DIGIT);
+
+            for (int d = 0; d < NUM_SORTS; d++) {
+                counts3.exec(gpu::WorkSize(WORKGROUP_SIZE, NUM_WORKGROUPS * WORKGROUP_SIZE),
+                             as_gpu, t_gpu, d, n);
+
+                int len = 2;
+                for (; len <= n; len <<= 1) {
+                    sums3a.exec(gpu::WorkSize(WORKGROUP_SIZE,
+                                            ((NUM_WORKGROUPS + len - 1) / len + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE *
+                                            WORKGROUP_SIZE),
+                              t_gpu, len, NUM_WORKGROUPS);
+                }
+
+                for (; len > 1; len >>= 1) {
+                    sums3b.exec(gpu::WorkSize(WORKGROUP_SIZE,
+                                            ((NUM_WORKGROUPS + len - 1) / len + WORKGROUP_SIZE - 1) / WORKGROUP_SIZE *
+                                            WORKGROUP_SIZE),
+                              t_gpu, len, NUM_WORKGROUPS);
+                }
+
+                t_gpu.readN(digits_less.data() + 1, MAX_DIGIT - 1, NUM_WORKGROUPS * MAX_DIGIT);
+                digits_less[0] = 0;
+                for (int x = 1; x < MAX_DIGIT; x++) {
+                    digits_less[x] += digits_less[x - 1];
+                }
+                digits_less_gpu.writeN(digits_less.data(), MAX_DIGIT);
+
+                radix3.exec(gpu::WorkSize(WORKGROUP_SIZE, NUM_WORKGROUPS * WORKGROUP_SIZE),
+                           as_gpu, bs_gpu, t_gpu, d, n, digits_less_gpu);
+                std::swap(as_gpu, bs_gpu);
+            }
+
+            t.nextLap();
+        }
+
+        std::cout << "GPU (VERSION 3): " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << "GPU (VERSION 3): " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
 
         std::vector<unsigned int> gpu_sorted(n);
         as_gpu.readN(gpu_sorted.data(), n);
