@@ -102,13 +102,13 @@ int main(int argc, char **argv) {
 
                 t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
-                int work_size_write = n;
+                int workSizeWrite = n;
                 for (int p = 0; p <= n_pow; ++p) {
-                    int work_size_reduce = n / (1 << iter);
+                    const unsigned int workSizeReduce = n >> p;
                     const unsigned int workGroupSize = 128;
-                    prefix_sum_reduce.exec(gpu::WorkSize(work_size_reduce < workGroupSize ? work_size_reduce : workGroupSize, work_size_reduce),
+                    prefix_sum_reduce.exec(gpu::WorkSize(workSizeReduce < workGroupSize ? workSizeReduce : workGroupSize, workSizeReduce),
                                     as_gpu, p);
-					prefix_sum_write.exec(gpu::WorkSize(work_size_write < workGroupSize ? work_size_write : workGroupSize, work_size_write),
+					prefix_sum_write.exec(gpu::WorkSize(workSizeWrite < workGroupSize ? workSizeWrite : workGroupSize, workSizeWrite),
                                     as_gpu, result_gpu, p);
                 }
                 t.nextLap();
