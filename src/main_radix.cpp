@@ -119,6 +119,7 @@ struct RadixSort {
         uint wg_size = 1 << k;
         gpu::WorkSize ws(wg_size, n);
         uint wg_count = n / wg_size;
+        zeros_gpu.writeN(n_zeros.data(), n);
 
         for (int shift = 0; shift < sizeof(uint) * 8; shift += k) {
             // std::cout << "As:\n";
@@ -127,8 +128,7 @@ struct RadixSort {
             merge_sort(as_gpu, wg_size, shift, k);
             // std::cout << "As after merge:\n";
             // print_gpu_mem(as_gpu, n);
-
-            counters_gpu.writeN(n_zeros.data(), n);
+            zeros_gpu.copyToN(counters_gpu, n);
             calc_counters_kernel.exec(ws, as_gpu, shift, k, counters_gpu);
             // std::cout << "Counters:\n";
             // print_gpu_mem(counters_gpu, wg_count, wg_size);
@@ -138,12 +138,12 @@ struct RadixSort {
             // std::cout << "Counters T:\n";
             // print_gpu_mem(counters_t_gpu, wg_size, wg_count);
 
-            sums_gpu.writeN(n_zeros.data(), n);
+            zeros_gpu.copyToN(sums_gpu, n);
             prefix_sum(counters_gpu, sums_gpu);
             // std::cout << "Sums:\n";
             // print_gpu_mem(sums_gpu, wg_count, wg_size);
 
-            sums_t_gpu.writeN(n_zeros.data(), n);
+            zeros_gpu.copyToN(sums_t_gpu, n);
             prefix_sum(counters_t_gpu, sums_t_gpu);
             // std::cout << "Sums T:\n";
             // print_gpu_mem(sums_t_gpu, wg_size, wg_count);
@@ -159,6 +159,7 @@ struct RadixSort {
 
     std::vector<uint> n_zeros = std::vector<uint>(n, 0);
     gpu::gpu_mem_32u counters_gpu = get_mem(n);
+    gpu::gpu_mem_32u zeros_gpu = get_mem(n);
     gpu::gpu_mem_32u counters_t_gpu = get_mem(n);
     gpu::gpu_mem_32u sums_gpu = get_mem(n);
     gpu::gpu_mem_32u sums_t_gpu = get_mem(n);
@@ -228,7 +229,7 @@ int main(int argc, char **argv) {
     //test_radix();
    // return 0;
 
-    int benchmarkingIters = 10;
+    int benchmarkingIters = 1;
     std::vector<unsigned int> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
