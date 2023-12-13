@@ -7,11 +7,14 @@ __kernel void prefix_sum_reduce(__global _uint *reduce_lst, const int power) {
     const int gid = get_global_id(0);
     const int n = get_global_size(0);
 
+    if (power == 0) return;
+
     const int chunk_size = 1 << power;
-    const int power_zero = power == 0;
-    const int rhs = power_zero ? gid : gid + (1 << (power - 1));
+    const int lhs = gid * chunk_size;
+    const int rhs = lhs + (1 << (power - 1));
+    
     const bool addition = rhs < n && gid % chunk_size == 0;
-    reduce_lst[gid] = power_zero ? reduce_lst[gid] : (addition ? reduce_lst[gid] + reduce_lst[rhs] : reduce_lst[gid]);
+    reduce_lst[lhs] = reduce_lst[lhs] + reduce_lst[rhs];
 }
 
 __kernel void prefix_sum_write(__global _uint *reduce_lst, __global _uint *result, const int power) {
