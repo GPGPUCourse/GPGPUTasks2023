@@ -59,12 +59,13 @@ void print_gpu_mem(gpu::gpu_mem_32u as_gpu, uint n, uint m) {
 
 
 uint n = 32 * 1024 * 1024;
-gpu::gpu_mem_32u temp_gpu;
+uint k = 4;
+uint wg_size = 256;
 
 
 struct PrefixSum {
 
-    void operator()(gpu::gpu_mem_32u &as_gpu, gpu::gpu_mem_32u sums_gpu) {
+    void operator()(gpu::gpu_mem_32u &as_gpu, gpu::gpu_mem_32u sums_gpu, uint n, gpu::gpu_mem_32u &temp_gpu) {
         uint wg_size = std::min(n, 128u);
         for (int sum_len = 1; sum_len <= n; sum_len <<= 1) {
             if (sum_len != 1) {
@@ -81,7 +82,7 @@ struct PrefixSum {
 
 struct MergeSort {
 
-    void operator()(gpu::gpu_mem_32u &as_gpu, uint merge_size, uint shift, uint k) {
+    void operator()(gpu::gpu_mem_32u &as_gpu, uint merge_size, uint shift, uint k, gpu::gpu_mem_32u &temp_gpu) {
         unsigned int workGroupSize = std::min(n, 128u);
         unsigned int global_work_size = n;
         {
@@ -116,53 +117,54 @@ struct RadixSort {
 
     void operator()(ocl::Kernel calc_counters_kernel, ocl::Kernel radix_kernel, MatrixTranspose matrix_transpose,
                     MergeSort merge_sort, PrefixSum prefix_sum, gpu::gpu_mem_32u &as_gpu, uint k) {
-        uint wg_size = 1 << k;
         gpu::WorkSize ws(wg_size, n);
         uint wg_count = n / wg_size;
-        zeros_gpu.writeN(n_zeros.data(), n);
+        zeros_gpu.writeN(n_zeros.data(), counters_size);
 
         for (int shift = 0; shift < sizeof(uint) * 8; shift += k) {
             // std::cout << "As:\n";
             // print_gpu_mem(as_gpu, n);
 
-            merge_sort(as_gpu, wg_size, shift, k);
+            merge_sort(as_gpu, wg_size, shift, k, temp_gpu_n);
             // std::cout << "As after merge:\n";
             // print_gpu_mem(as_gpu, n);
-            zeros_gpu.copyToN(counters_gpu, n);
-            calc_counters_kernel.exec(ws, as_gpu, shift, k, counters_gpu);
+            zeros_gpu.copyToN(counters_gpu, counters_size);
+            calc_counters_kernel.exec(ws, as_gpu, shift, counters_gpu);
             // std::cout << "Counters:\n";
             // print_gpu_mem(counters_gpu, wg_count, wg_size);
 
-            //counters with sizes wg_count x wg_size
-            matrix_transpose(counters_gpu, counters_t_gpu, wg_count, wg_size);
+            //counters with sizes wg_count x (1 << k)
+            matrix_transpose(counters_gpu, counters_t_gpu, wg_count, 1 << k);
             // std::cout << "Counters T:\n";
             // print_gpu_mem(counters_t_gpu, wg_size, wg_count);
 
-            zeros_gpu.copyToN(sums_gpu, n);
-            prefix_sum(counters_gpu, sums_gpu);
+            zeros_gpu.copyToN(sums_gpu, counters_size);
+            prefix_sum(counters_gpu, sums_gpu, counters_size, temp_gpu);
             // std::cout << "Sums:\n";
             // print_gpu_mem(sums_gpu, wg_count, wg_size);
 
-            zeros_gpu.copyToN(sums_t_gpu, n);
-            prefix_sum(counters_t_gpu, sums_t_gpu);
+            zeros_gpu.copyToN(sums_t_gpu, counters_size);
+            prefix_sum(counters_t_gpu, sums_t_gpu, counters_size, temp_gpu);
             // std::cout << "Sums T:\n";
             // print_gpu_mem(sums_t_gpu, wg_size, wg_count);
 
 
-            radix_kernel.exec(ws, as_gpu, shift, k, sums_gpu, sums_t_gpu, temp_gpu);
+            radix_kernel.exec(ws, as_gpu, shift, sums_gpu, sums_t_gpu, temp_gpu_n);
             // std::cout << "Radix:\n";
             // print_gpu_mem(temp_gpu, n);
 
-            std::swap(as_gpu, temp_gpu);
+            std::swap(as_gpu, temp_gpu_n);
         }
     }
-
-    std::vector<uint> n_zeros = std::vector<uint>(n, 0);
-    gpu::gpu_mem_32u counters_gpu = get_mem(n);
-    gpu::gpu_mem_32u zeros_gpu = get_mem(n);
-    gpu::gpu_mem_32u counters_t_gpu = get_mem(n);
-    gpu::gpu_mem_32u sums_gpu = get_mem(n);
-    gpu::gpu_mem_32u sums_t_gpu = get_mem(n);
+    uint counters_size = n / wg_size * (1 << k);
+    std::vector<uint> n_zeros = std::vector<uint>(counters_size, 0);
+    gpu::gpu_mem_32u counters_gpu = get_mem(counters_size);
+    gpu::gpu_mem_32u temp_gpu_n = get_mem(n);
+    gpu::gpu_mem_32u temp_gpu = get_mem(counters_size);
+    gpu::gpu_mem_32u zeros_gpu = get_mem(counters_size);
+    gpu::gpu_mem_32u counters_t_gpu = get_mem(counters_size);
+    gpu::gpu_mem_32u sums_gpu = get_mem(counters_size);
+    gpu::gpu_mem_32u sums_t_gpu = get_mem(counters_size);
     gpu::gpu_mem_32u res_gpu = get_mem(n);
 };
 
@@ -179,7 +181,6 @@ void test_radix() {
     auto calc_counters = get_kernel(radix_kernel, radix_kernel_length, "calc_counters", defines);
     auto radix = get_kernel(radix_kernel, radix_kernel_length, "radix_sort", defines);
     auto as_gpu = get_mem(n);
-    temp_gpu = get_mem(n);
     RadixSort radix_sort;
     MatrixTranspose matrix_transpose;
     MergeSort merge_sort;
@@ -227,9 +228,9 @@ int main(int argc, char **argv) {
     context.init(device.device_id_opencl);
     context.activate();
     //test_radix();
-   // return 0;
+    // return 0;
 
-    int benchmarkingIters = 1;
+    int benchmarkingIters = 10;
     std::vector<unsigned int> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -251,12 +252,11 @@ int main(int argc, char **argv) {
 
 
     {
-        uint k = 8;
-        auto defines = "-DWG_SIZE=" + to_string(1 << k);
+
+        auto defines = "-DWG_SIZE=" + to_string(wg_size) + " -DBITS_COUNT=" + to_string(k);
         auto calc_counters = get_kernel(radix_kernel, radix_kernel_length, "calc_counters", defines);
         auto radix = get_kernel(radix_kernel, radix_kernel_length, "radix_sort", defines);
         auto as_gpu = get_mem(n);
-        temp_gpu = get_mem(n);
         RadixSort radix_sort;
         MatrixTranspose matrix_transpose;
         MergeSort merge_sort;
@@ -284,14 +284,15 @@ int main(int argc, char **argv) {
 
     {
         auto as_gpu = get_mem(n);
+        auto temp_gpu = get_mem(n);
         MergeSort merge_sort;
-        
+
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
 
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
-            merge_sort(as_gpu, n, 0, sizeof(uint)*8);
+            merge_sort(as_gpu, n, 0, sizeof(uint) * 8, temp_gpu);
             t.nextLap();
         }
         std::cout << "GPU (merge): " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
