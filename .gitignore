@@ -3,3 +3,8 @@
 build
 cmake-build*
 .vs
+Makefile
+.gitignore
+CMakeCache.txt
+cmake_install.cmake
+CMakeFiles
