@@ -11,7 +11,7 @@
 __kernel void bitonic(__global float *as, const unsigned int size, const unsigned int block_size) {
     // TODO
     unsigned int global_id = get_global_id(0);
-    if (global_id * 2 > size) {
+    if (global_id * 2 >= size) {
         return;
     }
     unsigned int block_id = 2 * global_id / block_size;
@@ -35,6 +35,8 @@ __kernel void bitonic(__global float *as, const unsigned int size, const unsigne
         }
         local_block_size /= 2;
         block_id = 2 * global_id / local_block_size;
-        barrier(CLK_GLOBAL_MEM_FENCE);
+        barrier(CLK_LOCAL_MEM_FENCE);
     }
+//    float tmp = as[10];
+//    as[0] = 2.0f;
 }
