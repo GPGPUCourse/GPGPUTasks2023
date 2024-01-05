@@ -16,7 +16,7 @@
 
 // может понадобиться поменять индекс локально чтобы выбрать GPU если у вас
 // более одного девайса
-#define OPENCL_DEVICE_INDEX 1
+#define OPENCL_DEVICE_INDEX 0
 
 // включить чтобы начали запускаться тесты
 #define ENABLE_TESTING 1
