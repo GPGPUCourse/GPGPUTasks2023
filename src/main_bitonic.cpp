@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
     context.activate();
 
     int benchmarkingIters = 10;
-    unsigned int n = 2;
+    unsigned int n = 32 * 1024 * 1024;
     std::vector<float> as(n, 0);
     FastRandom r(n);
     for (unsigned int i = 0; i < n; ++i) {
@@ -63,7 +63,6 @@ int main(int argc, char **argv) {
 
     gpu::gpu_mem_32f as_gpu;
     unsigned int workn = closedPowerOfTwo(n);
-    std::cout << "workn = " << workn << std::endl;
     as_gpu.resizeN(workn);
 
     auto as_complete = std::vector<float>(workn);
@@ -78,35 +77,28 @@ int main(int argc, char **argv) {
             as_complete[i] = std::numeric_limits<float>::infinity();
         }
     }
-    for (int i = 0; i < as.size(); ++i) {
-        std::cout << as[i] << " ";
-    }
-    std::cout << std::endl;
 
-    for (int i = 0; i < as_complete.size(); ++i) {
-        std::cout << as_complete[i] << " ";
-    }
     std::cout << std::endl;
 
     {
-        std::cout << "GPU: " << std::endl;
         ocl::Kernel bitonic(bitonic_kernel, bitonic_kernel_length, "bitonic");
-        std::cout << "Compiling" << std::endl;
         bitonic.compile();
 
-        std::cout << "Compiled" << std::endl;
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as_complete.data(), workn);
 
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
-            std::cout << "Started" << std::endl;
             unsigned int block_size = 2;
             while (block_size <= n) {
-                bitonic.exec(gpu::WorkSize(WORKGROUP_SIZE, workn), as_gpu, workn, block_size);
-                std::cout << "block_size = " << block_size << std::endl;
+                unsigned int sub_block_size = block_size;
+                while (sub_block_size >= 2) {
+                    bitonic.exec(gpu::WorkSize(WORKGROUP_SIZE, workn), as_gpu, workn, block_size, sub_block_size);
+                    sub_block_size /= 2;
+                }
                 block_size *= 2;
             }
+            t.nextLap();
             // TODO
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
@@ -114,6 +106,7 @@ int main(int argc, char **argv) {
 
         as_gpu.readN(as.data(), n);
     }
+
 
     // Проверяем корректность результатов
     for (int i = 0; i < n; ++i) {
