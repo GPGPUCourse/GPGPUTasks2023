@@ -69,15 +69,28 @@ int main() {
         // Аналогично тому, как был запрошен список идентификаторов всех платформ - так и с названием платформы, теперь, когда известна длина названия - его можно запросить:
         std::vector<unsigned char> platformName(platformNameSize, 0);
         // clGetPlatformInfo(...);
+        OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_NAME, platformNameSize, platformName.data(), nullptr));
         std::cout << "    Platform name: " << platformName.data() << std::endl;
 
         // TODO 1.3
         // Запросите и напечатайте так же в консоль вендора данной платформы
 
+        std::size_t platformVendorSize;
+        OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, 0, nullptr, &platformVendorSize));
+
+        std::vector<unsigned char> platformVendor(platformVendorSize, 0);
+        OCL_SAFE_CALL(clGetPlatformInfo(platform, CL_PLATFORM_VENDOR, platformVendorSize, platformVendor.data(), nullptr));
+
+        std::cout << "    Platform vendor: " << platformVendor.data() << std::endl;
+
         // TODO 2.1
         // Запросите число доступных устройств данной платформы (аналогично тому, как это было сделано для запроса числа доступных платформ - см. секцию "OpenCL Runtime" -> "Query Devices")
         cl_uint devicesCount = 0;
+        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, 0, nullptr, &devicesCount));
+        std::cout << "    Number of Devices: " << devicesCount << std::endl;
 
+        std::vector<cl_device_id> deviceIds(devicesCount);
+        OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, devicesCount, deviceIds.data(), nullptr));
         for (int deviceIndex = 0; deviceIndex < devicesCount; ++deviceIndex) {
             // TODO 2.2
             // Запросите и напечатайте в консоль:
@@ -85,6 +98,46 @@ int main() {
             // - Тип устройства (видеокарта/процессор/что-то странное)
             // - Размер памяти устройства в мегабайтах
             // - Еще пару или более свойств устройства, которые вам покажутся наиболее интересными
+            auto & deviceId = deviceIds[deviceIndex];
+
+            std::size_t deviceNameSize;
+            cl_device_type deviceType;
+            cl_ulong deviceGlobalMemorySize;
+
+            OCL_SAFE_CALL(clGetDeviceInfo(deviceId, CL_DEVICE_NAME, 0, nullptr, &deviceNameSize));
+            std::vector<unsigned char> deviceName(deviceNameSize, 0);
+            OCL_SAFE_CALL(clGetDeviceInfo(deviceId, CL_DEVICE_NAME, deviceNameSize, deviceName.data(), nullptr));
+            std::cout << "        Device name: " << deviceName.data() << std::endl;
+
+            OCL_SAFE_CALL(clGetDeviceInfo(deviceId, CL_DEVICE_TYPE, sizeof(deviceType), &deviceType, nullptr));
+            std::cout << "        Device type: ";
+            if (deviceType & CL_DEVICE_TYPE_CPU)
+                std::cout << "CPU ";
+            if (deviceType & CL_DEVICE_TYPE_GPU)
+                std::cout << "GPU ";
+            if (deviceType & CL_DEVICE_TYPE_ACCELERATOR)
+                std::cout << "accelerator ";
+            if (deviceType & CL_DEVICE_TYPE_DEFAULT)
+                std::cout << "default ";
+            std::cout << std::endl;
+
+
+            OCL_SAFE_CALL(clGetDeviceInfo(deviceId, CL_DEVICE_GLOBAL_MEM_SIZE, sizeof(deviceGlobalMemorySize), &deviceGlobalMemorySize, nullptr));
+            std::cout << "        Device memory size: " << deviceType << std::endl;
+
+            // Дополнительные свойства:
+            cl_uint deviceAddressBits;
+            cl_bool deviceAvailable;
+            cl_bool deviceIsLittleEndian;
+
+            OCL_SAFE_CALL(clGetDeviceInfo(deviceId, CL_DEVICE_ADDRESS_BITS, sizeof(deviceAddressBits), &deviceAddressBits, nullptr));
+            std::cout << "        Device address bits: " << deviceAddressBits << std::endl;
+
+            OCL_SAFE_CALL(clGetDeviceInfo(deviceId, CL_DEVICE_AVAILABLE, sizeof(deviceAvailable), &deviceAvailable, nullptr));
+            std::cout<< "        Device available: " <<  (deviceAvailable ? "true" : "false") << std::endl;
+
+            OCL_SAFE_CALL(clGetDeviceInfo(deviceId, CL_DEVICE_AVAILABLE, sizeof(deviceIsLittleEndian), &deviceIsLittleEndian, nullptr));
+            std::cout<< "        Device is little endian: " <<  (deviceIsLittleEndian ? "true" : "false") << std::endl;
         }
     }
 
