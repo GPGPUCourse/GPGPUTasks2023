@@ -80,8 +80,8 @@ int main(int argc, char **argv) {
     bs_gpu.resizeN(n);
 
     {
-        unsigned int wg_merge = 4;
-        unsigned int wg_count = 4;
+        unsigned int wg_merge = 32;
+        unsigned int wg_count = 32;
         unsigned int wg_fill_zeros = 32;
         unsigned int wg_update_blocks = 32;
         unsigned int wg_prefix_sum = 32;
