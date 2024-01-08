@@ -15,7 +15,7 @@ __kernel void mandelbrot(__global float* res,
     // в узлах регулярной решетки внутри пикселя, а затем посчитав среднее значение результатов - взять его за результат для всего пикселя
     // это увеличит число операций в N*N раз, поэтому при рассчетах гигаплопс антиальясинг должен быть выключен
 
-    int id_x = get_global_id(0) % width, id_y = get_global_id(0) / width;
+    int id_x = get_global_id(0), id_y = get_global_id(1);
 
     if (id_x >= width || id_y >= height)
         return;
@@ -23,8 +23,8 @@ __kernel void mandelbrot(__global float* res,
     const float threshold = 256.0f;
     const float threshold2 = threshold * threshold;
 
-    float x0 = fromX + (id_x + 0.5f) * sizeX;
-    float y0 = fromY + (id_y + 0.5f) * sizeY;
+    float x0 = fromX + (id_x + 0.5f) * sizeX / width;
+    float y0 = fromY + (id_y + 0.5f) * sizeY / height;
     
     float x = x0, y = y0;
 

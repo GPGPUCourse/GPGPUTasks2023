@@ -100,7 +100,7 @@ int main(int argc, char **argv) {
 
 
     //    // Раскомментируйте это:
-    //
+
     gpu::Context context;
     context.init(device.device_id_opencl);
     context.activate();
@@ -117,6 +117,36 @@ int main(int argc, char **argv) {
         kernel.compile(printLog);
         // TODO близко к ЦПУ-версии, включая рассчет таймингов, гигафлопс, Real iterations fraction и сохранение в файл
         // результат должен оказаться в gpu_results
+
+        gpu::gpu_mem_32f resMem;
+        resMem.resizeN(width * height);
+
+        timer t;
+        for (int i = 0; i < benchmarkingIters; ++i) {
+            kernel.exec(gpu::WorkSize(256, 1, width, height), resMem, width, height, centralX - 0.5f * sizeX,
+                        centralY - 0.5f * sizeY, sizeX, sizeY, iterationsLimit, 1);
+            t.nextLap();
+        }
+
+        size_t opsPerLoop = 10;
+        size_t maxOps = width * height * iterationsLimit * opsPerLoop;
+        double gflops = maxOps / 1e9 / t.lapAvg();
+
+        std::cout << device.name << ": " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+        std::cout << device.name << ": " << gflops << " GFlops" << std::endl;
+
+        resMem.readN(gpu_results.ptr(), width * height);
+
+        double realIterFraction = 0.0;
+        for (int j = 0; j < height; ++j)
+            for (int i = 0; i < width; ++i)
+                realIterFraction += gpu_results.ptr()[j * width + i];
+
+        std::cout << "    Real iterations fraction: " << 100.0 * realIterFraction / (width * height) << "%"
+                  << std::endl;
+
+        renderToColor(gpu_results.ptr(), image.ptr(), width, height);
+        image.savePNG("mandelbrot_gpu.png");
     }
 
     {
