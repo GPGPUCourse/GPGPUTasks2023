@@ -85,10 +85,8 @@ int main(int argc, char **argv) {
             bool printLog = false;
             kernel.compile(printLog);
 
-            unsigned workItemVals = 1;
             unsigned workGroupSize = 256;
-            unsigned workitemsNum = (n + workItemVals - 1) / workItemVals;
-            unsigned workSizeGlobal = (workitemsNum + workGroupSize - 1) / workGroupSize * workGroupSize;
+            unsigned workSizeGlobal = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
 
             timer t;
             for (int i = 0; i < benchmarkingIters; ++i) {
@@ -160,10 +158,8 @@ int main(int argc, char **argv) {
             bool printLog = false;
             kernel.compile(printLog);
 
-            unsigned workItemVals = 1;
             unsigned workGroupSize = 256;
-            unsigned workitemsNum = (n + workItemVals - 1) / workItemVals;
-            unsigned workSizeGlobal = (workitemsNum + workGroupSize - 1) / workGroupSize * workGroupSize;
+            unsigned workSizeGlobal = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
 
             timer t;
             for (int i = 0; i < benchmarkingIters; ++i) {
@@ -185,10 +181,8 @@ int main(int argc, char **argv) {
             bool printLog = false;
             kernel.compile(printLog);
 
-            unsigned workItemVals = 1;
             unsigned workGroupSize = 256;
-            unsigned workitemsNum = (n + workItemVals - 1) / workItemVals;
-            unsigned workSizeGlobal = (workitemsNum + workGroupSize - 1) / workGroupSize * workGroupSize;
+            unsigned workSizeGlobal = (n + workGroupSize - 1) / workGroupSize * workGroupSize;
 
             timer t;
             for (int i = 0; i < benchmarkingIters; ++i) {
