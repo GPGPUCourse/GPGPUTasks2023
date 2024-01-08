@@ -82,6 +82,7 @@ int main(int argc, char **argv) {
     {
         unsigned int wg_merge = 4;
         unsigned int wg_count = 4;
+        unsigned int wg_fill_zeros = 32;
         unsigned int wg_update_blocks = 32;
         unsigned int wg_prefix_sum = 32;
         unsigned int wg_transpose = 32;
@@ -99,6 +100,13 @@ int main(int argc, char **argv) {
                                    + "-DK=" + std::to_string(1 << k) + " "
                                    + "-DTILE_SIZE=" + std::to_string(tile_size));
         count.compile();
+
+        ocl::Kernel fill_zeros(radix_kernel, radix_kernel_length, "fill_zeros",
+                           "-DWG=" + std::to_string(wg_fill_zeros) + " "
+                                   + "-DK=" + std::to_string(1 << k) + " "
+                                   + "-DTILE_SIZE=" + std::to_string(tile_size));
+        fill_zeros.compile();
+
         ocl::Kernel update_blocks(radix_kernel, radix_kernel_length, "update_blocks",
                            "-DWG=" + std::to_string(wg_update_blocks) + " "
                                    + "-DK=" + std::to_string(1 << k) + " "
@@ -125,6 +133,25 @@ int main(int argc, char **argv) {
                                          + "-DTILE_SIZE=" + std::to_string(tile_size));
         radix.compile();
 
+
+        unsigned int max_elem = (1 << k);
+        unsigned groups_cnt = (n + wg_count - 1) / wg_count;
+        gpu::gpu_mem_32u cnt_gpu;
+        cnt_gpu.resizeN(groups_cnt * max_elem);
+
+        gpu::gpu_mem_32u cnt_pfsum_gpu1;
+        cnt_pfsum_gpu1.resizeN(groups_cnt * max_elem);
+        gpu::gpu_mem_32u blocks_gpu;
+        blocks_gpu.resizeN(groups_cnt * max_elem);
+
+        gpu::gpu_mem_32u cnt_t_gpu;
+        cnt_t_gpu.resizeN(groups_cnt * max_elem);
+        gpu::gpu_mem_32u cnt_t_pfsum_gpu;
+        cnt_t_pfsum_gpu.resizeN(groups_cnt * max_elem);
+
+        gpu::gpu_mem_32u cnt_pfsum_gpu2;
+        cnt_pfsum_gpu2.resizeN(groups_cnt * max_elem);
+
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
@@ -145,23 +172,22 @@ int main(int argc, char **argv) {
                         assert(block_size / 2 == wg_count);
                     }
                     {
-                        unsigned int max_elem = (1 << k);
-                        unsigned groups_cnt = (n + wg_count - 1) / wg_count;
-                        gpu::gpu_mem_32u cnt_gpu;
-                        cnt_gpu.resizeN(groups_cnt * max_elem);
-
                         {
                             unsigned int mask = (1 << k) - 1;
                             unsigned int global_work_size = groups_cnt * wg_count;
                             count.exec(gpu::WorkSize(wg_count, global_work_size),
                                        as_gpu, cnt_gpu, n, offset, mask);
                         }
-                        gpu::gpu_mem_32u cnt_pfsum_gpu1;
-                        cnt_pfsum_gpu1.resizeN(groups_cnt * max_elem);
+
                         std::vector<unsigned int> zeros(groups_cnt * max_elem);
-                        cnt_pfsum_gpu1.writeN(zeros.data(), groups_cnt * max_elem);
-                        gpu::gpu_mem_32u blocks_gpu;
-                        blocks_gpu.resizeN(groups_cnt * max_elem);
+                        {
+                            //cnt_pfsum_gpu1.writeN(zeros.data(), groups_cnt * max_elem);
+                            unsigned int N = groups_cnt * max_elem;
+                            unsigned int global_work_size =
+                                            (N + wg_fill_zeros - 1) / wg_fill_zeros * wg_fill_zeros;
+                            fill_zeros.exec(gpu::WorkSize(wg_fill_zeros, global_work_size),
+                                                    cnt_pfsum_gpu1, N);
+                        }
                         cnt_gpu.copyTo(blocks_gpu, groups_cnt * max_elem * sizeof(unsigned int));
                         {
                             unsigned int N = groups_cnt * max_elem;
@@ -189,16 +215,18 @@ int main(int argc, char **argv) {
                             }
                         }
 
-                        gpu::gpu_mem_32u cnt_t_gpu;
-                        cnt_t_gpu.resizeN(groups_cnt * max_elem);
                         {
                             matrix_transpose.exec(gpu::WorkSize(tile_size, tile_size, max_elem, groups_cnt),
                                                   cnt_gpu, cnt_t_gpu, groups_cnt, max_elem);
                         }
-
-                        gpu::gpu_mem_32u cnt_t_pfsum_gpu;
-                        cnt_t_pfsum_gpu.resizeN(groups_cnt * max_elem);
-                        cnt_t_pfsum_gpu.writeN(zeros.data(), groups_cnt * max_elem);
+                        {
+                            //cnt_t_pfsum_gpu.writeN(zeros.data(), groups_cnt * max_elem);
+                            unsigned int N = groups_cnt * max_elem;
+                            unsigned int global_work_size =
+                                            (N + wg_fill_zeros - 1) / wg_fill_zeros * wg_fill_zeros;
+                            fill_zeros.exec(gpu::WorkSize(wg_fill_zeros, global_work_size),
+                                                    cnt_t_pfsum_gpu, N);
+                        }
                         cnt_t_gpu.copyTo(blocks_gpu, groups_cnt * max_elem * sizeof(unsigned int));
                         {
                             unsigned int N = groups_cnt * max_elem;
@@ -226,8 +254,6 @@ int main(int argc, char **argv) {
                             }
                         }
 
-                        gpu::gpu_mem_32u cnt_pfsum_gpu2;
-                        cnt_pfsum_gpu2.resizeN(groups_cnt * max_elem);
                         {
                             unsigned int global_work_size = (max_elem * groups_cnt + wg_sub_prev_row - 1) / wg_sub_prev_row * wg_sub_prev_row;
                             sub_prev_row.exec(gpu::WorkSize(wg_sub_prev_row, global_work_size),

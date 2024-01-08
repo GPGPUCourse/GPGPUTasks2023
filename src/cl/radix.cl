@@ -72,6 +72,16 @@ count(
     }
 }
 
+__kernel void fill_zeros(
+    __global unsigned int *as,
+    unsigned int n)
+{
+    int i = get_global_id(0);
+    if(i > n)
+        return;
+    as[i] = 0;
+}
+
 __kernel void update_blocks(
     __global unsigned int *bs,
     unsigned int block_size,
