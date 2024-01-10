@@ -58,58 +58,75 @@ int main(int argc, char **argv)
 
     const std::vector<float> cs_cpu_reference = cs;
 
-    
-    gpu::gpu_mem_32f as_gpu, bs_gpu, cs_gpu;
-    as_gpu.resizeN(M*K);
-    bs_gpu.resizeN(K*N);
-    cs_gpu.resizeN(M*N);
-
-    as_gpu.writeN(as.data(), M*K);
-    bs_gpu.writeN(bs.data(), K*N);
-
-    ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length,
-                                             "matrix_multiplication_local_work");
-    matrix_multiplication_kernel.compile();
-
+    struct KernelConfig
     {
-        timer t;
-        for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            // TODO
-            unsigned int work_group_size = 16;
-            unsigned int thread_work_size = 4;
-            gpu::WorkSize ws
-            (
-                work_group_size,
-                work_group_size / thread_work_size,
-                M, gpu::divup(N, thread_work_size)
-            );
-            matrix_multiplication_kernel.exec(ws, as_gpu, bs_gpu, cs_gpu, M, K, N);
+        std::string name;
+        size_t thread_work;
+    };
 
-            t.nextLap();
+    std::vector<KernelConfig> kernels =
+    {
+        { "matrix_multiplication_basic", 1 },
+        { "matrix_multiplication_local", 1 },
+        { "matrix_multiplication_local_work", 4 }
+    };
+
+    for (const KernelConfig& config : kernels)
+    {
+        gpu::gpu_mem_32f as_gpu, bs_gpu, cs_gpu;
+        as_gpu.resizeN(M* K);
+        bs_gpu.resizeN(K* N);
+        cs_gpu.resizeN(M* N);
+
+        as_gpu.writeN(as.data(), M* K);
+        bs_gpu.writeN(bs.data(), K* N);
+
+        ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length,
+                                                 config.name);
+        matrix_multiplication_kernel.compile();
+
+        {
+            timer t;
+            const unsigned int work_group_size = 16;
+            const unsigned int thread_work_size = config.thread_work;
+            for (int iter = 0; iter < benchmarkingIters; ++iter)
+            {
+                gpu::WorkSize ws
+                (
+                    work_group_size,
+                    work_group_size / thread_work_size,
+                    M, gpu::divup(N, thread_work_size)
+                );
+                matrix_multiplication_kernel.exec(ws, as_gpu, bs_gpu, cs_gpu, M, K, N);
+
+                t.nextLap();
+            }
+            std::cout << "GPU " << config.name << ": " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+            std::cout << "GPU " << config.name << ": " << gflops / t.lapAvg() << " GFlops" << std::endl;
         }
-        std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "GPU: " << gflops / t.lapAvg() << " GFlops" << std::endl;
-    }
 
-    cs_gpu.readN(cs.data(), M*N);
-    
+        cs_gpu.readN(cs.data(), M * N);
 
-    // Проверяем корректность результатов
-    double diff_sum = 0;
-    for (int i = 0; i < M * N; ++i) {
-        double a = cs[i];
-        double b = cs_cpu_reference[i];
-        if (a != 0.0 || b != 0.0) {
-            double diff = fabs(a - b) / std::max(fabs(a), fabs(b));
-            diff_sum += diff;
+        // Проверяем корректность результатов
+        double diff_sum = 0;
+        for (int i = 0; i < M * N; ++i)
+        {
+            double a = cs[i];
+            double b = cs_cpu_reference[i];
+            if (a != 0.0 || b != 0.0)
+            {
+                double diff = fabs(a - b) / std::max(fabs(a), fabs(b));
+                diff_sum += diff;
+            }
         }
-    }
 
-    double diff_avg = diff_sum / (M * N);
-    std::cout << "Average difference: " << diff_avg * 100.0 << "%" << std::endl;
-    if (diff_avg > 0.01) {
-        std::cerr << "Too big difference!" << std::endl;
-        return 1;
+        double diff_avg = diff_sum / (M * N);
+        std::cout << "Average difference: " << diff_avg * 100.0 << "%" << std::endl;
+        if (diff_avg > 0.01)
+        {
+            std::cerr << "Too big difference!" << std::endl;
+            return 1;
+        }
     }
 
     return 0;
