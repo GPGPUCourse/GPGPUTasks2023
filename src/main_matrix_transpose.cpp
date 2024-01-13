@@ -44,10 +44,8 @@ int main(int argc, char **argv)
     {
         timer t;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
-            std::cout << "Iteration " << iter << std::endl;
             // TODO
             unsigned int work_group_size = 16;
-            unsigned int global_work_size = M * K;
             // Для этой задачи естественнее использовать двухмерный NDRange. Чтобы это сформулировать
             // в терминологии библиотеки - нужно вызвать другую вариацию конструктора WorkSize.
             // В CLion удобно смотреть какие есть вариант аргументов в конструкторах:
@@ -64,36 +62,16 @@ int main(int argc, char **argv)
     as_t_gpu.readN(as_t.data(), M*K);
 
      //Проверяем корректность результатов
-    //for (int j = 0; j < M; ++j)
-    //{
-    //    for (int i = 0; i < K; ++i)
-    //    {
-    //        std::cout << as[j * K + i] << ' ';
-    //    }
-    //    std::cout << std::endl;
-    //}
-    //std::cout << std::endl;
-
-    //for (int j = 0; j < M; ++j)
-    //{
-    //    for (int i = 0; i < K; ++i)
-    //    {
-    //        std::cout << as_t[i * M + j] << ' ';
-    //    }
-    //    std::cout << std::endl;
-    //}
-    //std::cout << std::endl;
-
-    //for (int j = 0; j < M; ++j) {
-    //    for (int i = 0; i < K; ++i) {
-    //        float a = as[j * K + i];
-    //        float b = as_t[i * M + j];
-    //        if (abs(a - b) > 1e-6) {
-    //            std::cerr << "Not the same!" << std::endl;
-    //            return 1;
-    //        }
-    //    }
-    //}
+    for (int j = 0; j < M; ++j) {
+        for (int i = 0; i < K; ++i) {
+            float a = as[j * K + i];
+            float b = as_t[i * M + j];
+            if (abs(a - b) > 1e-6) {
+                std::cerr << "Not the same!" << std::endl;
+                return 1;
+            }
+        }
+    }
 
     std::cout << "Ok" << std::endl;
     return 0;
