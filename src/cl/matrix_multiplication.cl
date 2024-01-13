@@ -19,7 +19,6 @@ __kernel void matrix_multiplication_basic(__global const float *a, __global cons
     c[j * N + i] = sum;
 }
 
-#define TILE_SIZE 16
 __kernel void matrix_multiplication_local(__global const float *a, __global const float *b, __global float *c,
                                           unsigned int M, unsigned int K, unsigned int N)
 {
@@ -33,14 +32,15 @@ __kernel void matrix_multiplication_local(__global const float *a, __global cons
     float sum = 0.0f;
     for (size_t tileK = 0; tileK * TILE_SIZE < K; tileK++)
     {
+        const size_t offset = tileK * TILE_SIZE;
         if (j < M && (tileK * TILE_SIZE + local_i) < K)
         {
-            tileA[local_j][local_i] = a[j * K + tileK * TILE_SIZE + local_i];
+            tileA[local_j][local_i] = a[j * K + offset + local_i];
         }
 
         if (i < N && tileK * TILE_SIZE + local_j < K)
         {
-            tileB[local_j][local_i] = b[(tileK * TILE_SIZE + local_j) * N + i];
+            tileB[local_j][local_i] = b[(offset + local_j) * N + i];
         }
 
         barrier(CLK_LOCAL_MEM_FENCE);
@@ -56,7 +56,6 @@ __kernel void matrix_multiplication_local(__global const float *a, __global cons
     }
 }
 
-#define THREAD_WORK 4
 __kernel void matrix_multiplication_local_work(__global const float *a, __global const float *b, __global float *c,
                                                unsigned int M, unsigned int K, unsigned int N)
 {

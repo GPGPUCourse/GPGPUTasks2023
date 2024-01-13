@@ -68,7 +68,9 @@ int main(int argc, char **argv)
     {
         { "matrix_multiplication_basic", 1 },
         { "matrix_multiplication_local", 1 },
-        { "matrix_multiplication_local_work", 4 }
+        { "matrix_multiplication_local_work", 2 },
+        { "matrix_multiplication_local_work", 4 },
+        { "matrix_multiplication_local_work", 8 },
     };
 
     for (const KernelConfig& config : kernels)
@@ -81,28 +83,33 @@ int main(int argc, char **argv)
         as_gpu.writeN(as.data(), M* K);
         bs_gpu.writeN(bs.data(), K* N);
 
+        const unsigned int tile_size = 16;
+        const unsigned int thread_work_size = config.thread_work;
+
+        std::string param_string = "-DTILE_SIZE=" + std::to_string(tile_size)
+                                 + " -DTHREAD_WORK=" + std::to_string(thread_work_size);
         ocl::Kernel matrix_multiplication_kernel(matrix_multiplication, matrix_multiplication_length,
-                                                 config.name);
+                                                 config.name, param_string);
         matrix_multiplication_kernel.compile();
 
         {
             timer t;
-            const unsigned int work_group_size = 16;
-            const unsigned int thread_work_size = config.thread_work;
             for (int iter = 0; iter < benchmarkingIters; ++iter)
             {
                 gpu::WorkSize ws
                 (
-                    work_group_size,
-                    work_group_size / thread_work_size,
+                    tile_size,
+                    tile_size / thread_work_size,
                     M, gpu::divup(N, thread_work_size)
                 );
                 matrix_multiplication_kernel.exec(ws, as_gpu, bs_gpu, cs_gpu, M, K, N);
 
                 t.nextLap();
             }
-            std::cout << "GPU " << config.name << ": " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-            std::cout << "GPU " << config.name << ": " << gflops / t.lapAvg() << " GFlops" << std::endl;
+            std::cout << "GPU " << config.name << ", thread_work_size = " << thread_work_size << ": "
+                      << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
+            std::cout << "GPU " << config.name << ", thread_work_size = " << thread_work_size << ": "
+                      << gflops / t.lapAvg() << " GFlops" << std::endl;
         }
 
         cs_gpu.readN(cs.data(), M * N);
