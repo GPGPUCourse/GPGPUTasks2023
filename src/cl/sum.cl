@@ -51,7 +51,7 @@ __kernel void sum_local(__global const unsigned int *arr, __global unsigned int 
     size_t lid = get_local_id(0);
 
     __local unsigned int local_buf[WORKGROUP_SIZE];
-    local_buf[lid] = arr[gid];
+    local_buf[lid] = gid < n ? arr[gid] : 0;
 
     barrier(CLK_LOCAL_MEM_FENCE);
 

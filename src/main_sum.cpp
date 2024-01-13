@@ -69,13 +69,20 @@ int main(int argc, char **argv)
          gpu::Context context;
          context.init(device.device_id_opencl);
          context.activate();
-         std::vector<std::string> kernel_names =
+
+         struct KernelConfig
          {
-             "sum_atomic",
-             "sum_atomic_cycle",
-             "sum_atomic_cycle_coalesced",
-             "sum_local",
-             "sum_tree_atomic",
+             std::string name;
+             size_t n_groups;
+         };
+
+         std::vector<KernelConfig> kernel_configs =
+         {
+             { "sum_atomic", n },
+             { "sum_atomic_cycle", gpu::divup(n, 64) },
+             { "sum_atomic_cycle_coalesced", gpu::divup(n, 64) },
+             { "sum_local", n },
+             { "sum_tree_atomic", n },
              //"sum_tree_array"  <-- здесь в конце нужен массив, потому вместе со всеми не получится
          };
          gpu::gpu_mem_32u as_gpu;
@@ -84,8 +91,10 @@ int main(int argc, char **argv)
          gpu::gpu_mem_32u result;
          result.resizeN(1);
 
-         for (const std::string& kernel_name : kernel_names)
+         for (const auto& kernel_conf : kernel_configs)
          {
+             const std::string& kernel_name = kernel_conf.name;
+             const size_t n_groups = kernel_conf.n_groups;
              ocl::Kernel kernel(sum_kernel, sum_kernel_length, kernel_name);
              bool printLog = false;
              kernel.compile(printLog);
@@ -95,7 +104,7 @@ int main(int argc, char **argv)
              {
                  unsigned int sum = 0;
                  result.writeN(&sum, 1);
-                 kernel.exec(gpu::WorkSize(WORKGROUP_SIZE, n), as_gpu, result, n);
+                 kernel.exec(gpu::WorkSize(WORKGROUP_SIZE, n_groups), as_gpu, result, n);
                  result.readN(&sum, 1);
                  EXPECT_THE_SAME(reference_sum, sum, "GPU result should be consistent: " + kernel_name);
                  t.nextLap();
@@ -104,29 +113,36 @@ int main(int argc, char **argv)
              std::cout << "GPU " << kernel_name << ": " << (n / 1000.0 / 1000.0) / t.lapAvg() << " millions/s" << std::endl;
          }
 
+#define THRESHOLD 100000
          ocl::Kernel kernel(sum_kernel, sum_kernel_length, "sum_tree_array");
          bool printLog = false;
          kernel.compile(printLog);
 
-         gpu::gpu_mem_32u result_arr;
-         size_t n_groups = gpu::divup(n, WORKGROUP_SIZE);
-         std::vector<unsigned int> vec(n_groups, 0);
-         result_arr.resizeN(n_groups);
+         gpu::gpu_mem_32u result_arr1;
+         gpu::gpu_mem_32u result_arr2;
+         std::vector<unsigned int> vec(THRESHOLD, 0);
+         result_arr1.resizeN(n);
+         result_arr2.resizeN(n);
 
          timer t;
          for (int iter = 0; iter < benchmarkingIters; iter++)
          {
              t.stop();
              unsigned int sum = 0;
-             vec.assign(n_groups, 0);
-             result_arr.writeN(vec.data(), n_groups);
+             result_arr1.writeN(as.data(), n);
+             vec.assign(THRESHOLD, 0);
+             unsigned int curr_n = n;
 
              t.start();
-             kernel.exec(gpu::WorkSize(WORKGROUP_SIZE, n), as_gpu, result_arr, n);
+             for (;curr_n > THRESHOLD; curr_n = gpu::divup(curr_n, WORKGROUP_SIZE))
+             {
+                 kernel.exec(gpu::WorkSize(WORKGROUP_SIZE, curr_n), result_arr1, result_arr2, curr_n);
+                 result_arr1.swap(result_arr2);
+             }
+             result_arr1.readN(vec.data(), curr_n);
+             sum = std::accumulate(vec.begin(), vec.end(), 0U);
              t.stop();
 
-             result_arr.readN(vec.data(), n_groups);
-             sum = std::accumulate(vec.begin(), vec.end(), 0U);
              EXPECT_THE_SAME(reference_sum, sum, "GPU result should be consistent!");
              t.nextLap();
          }
