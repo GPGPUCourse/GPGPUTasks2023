@@ -16,13 +16,8 @@ __kernel void matrix_transpose(__global const float *as, __global float *ast, un
     }
     barrier(CLK_LOCAL_MEM_FENCE);
 
-    float tmp = tile[local_i][local_j];
-    tile[local_i][local_j] = tile[local_j][local_i];
-    tile[local_j][local_i] = tmp;
-    barrier(CLK_LOCAL_MEM_FENCE);
-
     if (i < M && j < K)
     {
-        ast[i * M + j] = tile[local_i][local_j];
+        ast[i * M + j] = tile[local_j][local_i];
     }
 }
