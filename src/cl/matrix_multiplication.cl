@@ -26,8 +26,8 @@ __kernel void matrix_multiplication_local(__global const float *a, __global cons
     size_t j = get_global_id(1);
     size_t local_i = get_local_id(0);
     size_t local_j = get_local_id(1);
-    __local float tileA[TILE_SIZE][TILE_SIZE];
-    __local float tileB[TILE_SIZE][TILE_SIZE];
+    __local float tileA[TILE_SIZE][TILE_SIZE + 1];
+    __local float tileB[TILE_SIZE][TILE_SIZE + 1];
 
     float sum = 0.0f;
     for (size_t tileK = 0; tileK * TILE_SIZE < K; tileK++)
@@ -64,8 +64,8 @@ __kernel void matrix_multiplication_local_work(__global const float *a, __global
     size_t i = get_global_id(0);
     size_t j = get_group_id(1) * TILE_SIZE + local_j;
 
-    __local float tileA[TILE_SIZE][TILE_SIZE];
-    __local float tileB[TILE_SIZE][TILE_SIZE];
+    __local float tileA[TILE_SIZE][TILE_SIZE + 1];
+    __local float tileB[TILE_SIZE][TILE_SIZE + 1];
     const size_t WORK_STEP = TILE_SIZE / THREAD_WORK;
 
     float sum[THREAD_WORK] = { 0 };
