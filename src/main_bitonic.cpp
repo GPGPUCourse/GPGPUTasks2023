@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
-    /*
+    
     gpu::gpu_mem_32f as_gpu;
     as_gpu.resizeN(n);
 
@@ -59,15 +59,23 @@ int main(int argc, char **argv) {
         bitonic.compile();
 
         timer t;
+        const size_t WS_SIZE = 256;
         for (int iter = 0; iter < benchmarkingIters; ++iter) {
             as_gpu.writeN(as.data(), n);
 
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
-            // TODO
+            for (unsigned int i = 2; i <= n; i <<= 1)
+            {
+                for (unsigned int j = (i >> 1); j > 0; j >>= 1)
+                {
+                    bitonic.exec(gpu::WorkSize(WS_SIZE, n), as_gpu, n, i, j);
+                }
+            }
+            t.nextLap();
         }
         std::cout << "GPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
-        std::cout << "GPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
+        std::cout << "GPU: " << (n / 1000. / 1000.) / t.lapAvg() << " millions/s" << std::endl;
 
         as_gpu.readN(as.data(), n);
     }
@@ -76,6 +84,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < n; ++i) {
         EXPECT_THE_SAME(as[i], cpu_sorted[i], "GPU results should be equal to CPU results!");
     }
-*/
+
+    std::cout << "Ok!" << std::endl;
     return 0;
 }
