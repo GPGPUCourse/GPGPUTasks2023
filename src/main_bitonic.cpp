@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
         std::cout << "CPU: " << t.lapAvg() << "+-" << t.lapStd() << " s" << std::endl;
         std::cout << "CPU: " << (n / 1000 / 1000) / t.lapAvg() << " millions/s" << std::endl;
     }
-    
+
     gpu::gpu_mem_32f as_gpu;
     as_gpu.resizeN(n);
 
@@ -65,11 +65,11 @@ int main(int argc, char **argv) {
 
             t.restart();// Запускаем секундомер после прогрузки данных, чтобы замерять время работы кернела, а не трансфер данных
 
-            for (unsigned int i = 2; i <= n; i <<= 1)
+            for (unsigned int block_size = 2; block_size <= n; block_size <<= 1)
             {
-                for (unsigned int j = (i >> 1); j > 0; j >>= 1)
+                for (unsigned int gap = (block_size >> 1); gap > 0; gap >>= 1)
                 {
-                    bitonic.exec(gpu::WorkSize(WS_SIZE, n), as_gpu, n, i, j);
+                    bitonic.exec(gpu::WorkSize(WS_SIZE, n), as_gpu, n, block_size, gap);
                 }
             }
             t.nextLap();
