@@ -140,7 +140,9 @@ namespace helpers {
         OCL_SAFE_CALL(clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &logSize));
         std::string log(logSize, ' ');
         OCL_SAFE_CALL(clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, logSize, (void*)log.data(), nullptr));
-        std::cout << "Build log:"  << std::endl << "log size: " << logSize << std::endl << log << std::endl;
+        std::cout << "Build log:"  << std::endl
+                  << "log size: " << logSize << std::endl
+                  << log << std::endl;
     }
 
     void buildProgram(const cl_program &program, const cl_device_id& device) {
