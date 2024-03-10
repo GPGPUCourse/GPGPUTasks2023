@@ -97,7 +97,6 @@ int main() {
         }
         std::cout << "        Vendor name: " << platformVendor.data() << std::endl;
 
-
         // TODO 2.1
         // Запросите число доступных устройств данной платформы (аналогично тому, как это было сделано для запроса числа доступных платформ - см. секцию "OpenCL Runtime" -> "Query Devices")
         cl_uint devicesCount = 0;
@@ -106,7 +105,6 @@ int main() {
 
         std::vector<cl_device_id> devices(devicesCount);
         OCL_SAFE_CALL(clGetDeviceIDs(platform, CL_DEVICE_TYPE_ALL, devicesCount, devices.data(), nullptr));
-
 
         for (int deviceIndex = 0; deviceIndex < devicesCount; ++deviceIndex) {
             std::cout << "        Device #" << deviceIndex + 1 << "/" << devicesCount << std::endl;
@@ -152,7 +150,7 @@ int main() {
             }
 
             cl_uint deviceUnits = 0;
-            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_MAX_COMPUTE_UNITS, deviceUnitsSize, &deviceUnits, nullptr));
+            OCL_SAFE_CALL(clGetDeviceInfo(device, CL_DEVICE_MAX_COMPUTE_UNITS, deviceUnitSize, &deviceUnits, nullptr));
             std::cout << "            Number of compute units: " << deviceUnits << std::endl;
 
             // -- Размер локальной памяти устройства
