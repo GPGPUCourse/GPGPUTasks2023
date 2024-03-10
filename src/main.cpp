@@ -174,7 +174,7 @@ int main() {
     {
         timer t;
         for (unsigned int i = 0; i < 20; ++i) {
-            helpers::enqueRead(queue, csBuffer, cs);
+            helpers::enqueueRead(queue, csBuffer, cs);
             t.nextLap();
         }
 

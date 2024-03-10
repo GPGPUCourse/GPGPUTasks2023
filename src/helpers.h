@@ -138,8 +138,8 @@ namespace helpers {
     void printBuildLog(const cl_program &program, const cl_device_id& device) {
         size_t logSize = 0;
         OCL_SAFE_CALL(clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &logSize));
-        std::string log(logSize, '\n');
-        OCL_SAFE_CALL(clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, logSize, &log[0], nullptr));
+        std::string log(logSize, ' ');
+        OCL_SAFE_CALL(clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, logSize, (void*)log.data(), nullptr));
         std::cout << "Build log:"  << std::endl << "log size: " << logSize << std::endl << log << std::endl;
     }
 
@@ -181,14 +181,16 @@ namespace helpers {
     }
 
     template<class T>
-    void setKernelArg(const cl_kernel& kernel, const unsigned int& argInd, const T& arg) {
-        OCL_SAFE_CALL(clSetKernelArg(kernel, argInd, sizeof(T), &arg));
+    void setKernelArg(const cl_kernel& kernel, const unsigned int&argIndex, const T&argValue) {
+        OCL_SAFE_CALL(clSetKernelArg(kernel, argIndex, sizeof(T), &argValue));
     }
 
     template<class T>
-    void enqueRead(const cl_command_queue& queue,
+    void enqueueRead(const cl_command_queue& queue,
                    const cl_mem& source, std::vector<T>& dest) {
-        OCL_SAFE_CALL(clEnqueueReadBuffer(queue, source, CL_TRUE, 0, dest.size() * sizeof(T), dest.data(), 0, nullptr, nullptr));
+        OCL_SAFE_CALL(clEnqueueReadBuffer(queue, source, CL_TRUE, 0,
+                                          dest.size() * sizeof(T), dest.data(),
+                                          0, nullptr, nullptr));
     }
 
     void releaseKernel(cl_kernel& kernel) {
