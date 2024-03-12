@@ -18,13 +18,13 @@ __kernel void compute_sum_baseline(global const unsigned int* inputArray, global
 }
 
 __kernel void compute_sum_coalesced(global const unsigned int* inputArray, global unsigned int* outputSum, const unsigned int arraySize) {
-    const unsigned int local_id = get_local_id(0);
-    const unsigned int workgroup_id = get_group_id(0);
-    const unsigned int localSize = get_local_size(0);
+    size_t local_id = get_local_id(0);
+    size_t workgroup_id = get_group_id(0);
+    size_t localSize = get_local_size(0);
 
-    int partialSum = 0;
-    for (unsigned long long i = 0; i < VALUES_PER_WORKITEM; ++i) {
-        unsigned long long global_id = workgroup_id * localSize * VALUES_PER_WORKITEM + i * localSize + local_id;
+    size_t partialSum = 0;
+    for (size_t i = 0; i < VALUES_PER_WORKITEM; i++) {
+        size_t global_id = workgroup_id * localSize * VALUES_PER_WORKITEM + i * localSize + local_id;
         if (global_id < arraySize) {
             partialSum += inputArray[global_id];
         }
@@ -36,9 +36,9 @@ __kernel void compute_sum_coalesced(global const unsigned int* inputArray, globa
 __kernel void compute_sum_uncoalesced(global const unsigned int* inputArray, global unsigned int* totalSum, const unsigned int arrayLength) {
     const unsigned int global_id = get_global_id(0);
 
-    int partialSum = 0;
-    for (unsigned long long i = 0; i < VALUES_PER_WORKITEM; ++i) {
-        unsigned long long element_id = global_id * VALUES_PER_WORKITEM + i;
+    size_t partialSum = 0;
+    for (size_t i = 0; i < VALUES_PER_WORKITEM; i++) {
+        size_t element_id = global_id * VALUES_PER_WORKITEM + i;
         if (element_id < arrayLength) {
             partialSum += inputArray[element_id];
         }
