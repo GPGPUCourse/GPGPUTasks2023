@@ -1,0 +1,10 @@
+# ninja log v5
+0	250	1709922260740083508	CMakeFiles/aplusb.dir/src/helpers.cpp.o	1f97c1bc76edd9f8
+202	239	1704585331515506304	enumDevices	6872ca50b658de4d
+0	20	1710093731854515096	build.ninja	2e56438c08c08a09
+1	388	1710093337866972794	CMakeFiles/aplusb.dir/src/main.cpp.o	a8478bb04719d20e
+388	432	1710093337910972264	aplusb	873caac56a69e608
+0	207	1709499512916242792	libs/utils/CMakeFiles/libutils.dir/libutils/string_utils.cpp.o	32ed05e056fc04b2
+207	212	1709499512920242779	libs/utils/liblibutils.a	2680a766a7fb49ef
+0	94	1709499512800243153	libs/clew/CMakeFiles/libclew.dir/libclew/ocl_init.cpp.o	e852d829112baf9c
+94	101	1709499512808243128	libs/clew/liblibclew.a	c67e0f814aba39ca

@@ -1,0 +1,8 @@
+/home/evgenii/MyEducation/GPU/GPGPUTasks2023/build/CMakeFiles/enumDevices.dir
+/home/evgenii/MyEducation/GPU/GPGPUTasks2023/build/CMakeFiles/edit_cache.dir
+/home/evgenii/MyEducation/GPU/GPGPUTasks2023/build/CMakeFiles/rebuild_cache.dir
+/home/evgenii/MyEducation/GPU/GPGPUTasks2023/build/libs/CMakeFiles/edit_cache.dir
+/home/evgenii/MyEducation/GPU/GPGPUTasks2023/build/libs/CMakeFiles/rebuild_cache.dir
+/home/evgenii/MyEducation/GPU/GPGPUTasks2023/build/libs/clew/CMakeFiles/libclew.dir
+/home/evgenii/MyEducation/GPU/GPGPUTasks2023/build/libs/clew/CMakeFiles/edit_cache.dir
+/home/evgenii/MyEducation/GPU/GPGPUTasks2023/build/libs/clew/CMakeFiles/rebuild_cache.dir
