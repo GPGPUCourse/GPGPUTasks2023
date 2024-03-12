@@ -39,7 +39,7 @@ else
 
 Произойдет ли code divergence? Почему?
 
-**Решение** 
+**Решение:** 
 
 ```
 int idx = get_local_id(1) + get_local_size(1) * get_local_id(0);
@@ -87,7 +87,7 @@ data[1 + get_local_id(0) + get_local_size(0) * get_local_id(1)] = 1.0f;
 ```
 Будет ли данное обращение к памяти coalesced? Сколько кеш линий записей произойдет в одной рабочей группе?
 
-**Решение** 
+**Решение:** 
 
 **(a)**
 
