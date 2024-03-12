@@ -83,7 +83,7 @@ __kernel void compute_tree_sum(global const unsigned int* inputArray, global uns
     }
 
     barrier(CLK_LOCAL_MEM_FENCE);
-I
+
     for (int activeElements = WORKGROUP_SIZE; activeElements > 1; activeElements /= 2) {
         if (2 * local_id < activeElements) {
             unsigned int firstValue = localBuffer[local_id];
