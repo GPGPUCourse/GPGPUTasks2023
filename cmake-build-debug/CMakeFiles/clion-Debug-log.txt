@@ -1,0 +1,1 @@
+CMakeLists.txt not found in /home/evgenii/MyEducation/GPU/GPGPUTasks2023 Select CMakeLists.txt
