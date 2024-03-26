@@ -2,7 +2,24 @@
 
 [Остальные задания](https://github.com/GPGPUCourse/GPGPUTasks2023/).
 
+
 # Задание 0. Вводное.
+
+- [Задание 0](https://github.com/GPGPUCourse/GPGPUTasks2023/tree/task00): Вводное. (5 баллов)
+- [Задание 1](https://github.com/GPGPUCourse/GPGPUTasks2023/tree/task01): A+B. (5 баллов)
+- [Задание 2](https://github.com/GPGPUCourse/GPGPUTasks2023/tree/task02): Теоретическое задание: параллелизуемость/code divergence/memory coalesced access. (5 баллов)
+- [Задание 3](https://github.com/GPGPUCourse/GPGPUTasks2023/tree/task03): Фрактал Мандельброта. Сумма чисел. (10 баллов)
+- [Задание 4](https://github.com/GPGPUCourse/GPGPUTasks2023/tree/task04): Транспонирование матрицы, умножение матриц. (10 баллов)
+- [Задание 5](https://github.com/GPGPUCourse/GPGPUTasks2023/tree/task05): Merge sort. (10 баллов)
+- [Задание 6](https://github.com/GPGPUCourse/GPGPUTasks2023/tree/task06): Bitonic sort, prefix sum. (10 баллов)
+- [Задание 7](https://github.com/GPGPUCourse/GPGPUTasks2023/tree/task07): Radix sort. (10 баллов)
+- [Задание 8](https://github.com/GPGPUCourse/GPGPUTasks2023/tree/task08): SDF. (7 баллов)
+- [Задание 9](https://github.com/GPGPUCourse/GPGPUTasks2023/tree/task09): N-body, LBVH. (15 баллов)
+
+А так же:
+
+ - [OpenCL <-> CUDA](https://github.com/GPGPUCourse/GPGPUSpeedupGuidelines): Пример как написать кернел на OpenCL, а запускать его в т.ч. через CUDA и т.о. получить доступ к профилировщику **NVIDIA Nsight Compute** и **compute-sanitizer**. Там же есть несколько историй/рекомендаций профилирования/ускорения.
+
 
 [![Build Status](https://github.com/GPGPUCourse/GPGPUTasks2023/actions/workflows/cmake.yml/badge.svg?branch=task00&event=push)](https://github.com/GPGPUCourse/GPGPUTasks2023/actions/workflows/cmake.yml)
 
